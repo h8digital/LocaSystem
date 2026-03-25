@@ -69,7 +69,7 @@ export default function EstoqueDetalheProductPage() {
       .from('contrato_itens')
       .select('*, contratos(id, numero, status, data_fim, clientes(nome)), patrimonios(numero_patrimonio)')
       .eq('produto_id', id)
-      .eq('contratos.status', 'ativo')
+    // Filtrar apenas contratos ativos no frontend (PostgREST não suporta filtro em tabela relacionada)
     setLocados((itens ?? []).filter((i: any) => i.contratos?.status === 'ativo'))
 
     // 4. Manutenções abertas/em andamento
@@ -107,7 +107,7 @@ export default function EstoqueDetalheProductPage() {
   const qtdManutencao = manutencoes.length
   const qtdDisponivel = produto.controla_patrimonio
     ? patrimonios.filter((p: any) => p.status === 'disponivel').length
-    : Math.max(0, (produto.estoque_atual ?? 0) - qtdLocada)
+    : Math.max(0, (produto.estoque_total ?? 0) - qtdLocada)
   const previsaoRetorno = locados.length > 0
     ? locados.reduce((mais: string, i: any) => {
         const d = i.contratos?.data_fim ?? ''
@@ -152,7 +152,11 @@ export default function EstoqueDetalheProductPage() {
 
       {/* ── KPIs ────────────────────────────────────────────────────────────── */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
-        <KPI label="Disponível"   value={produto.controla_patrimonio ? `${qtdDisponivel} un` : `${qtdDisponivel} un`} color="var(--c-success)" />
+        <KPI label="Disponível"
+          value={produto.controla_patrimonio ? `${qtdDisponivel} un` : `${qtdDisponivel} un`}
+          color={qtdDisponivel === 0 ? 'var(--c-danger)' : 'var(--c-success)'}
+          sub={!produto.controla_patrimonio && qtdLocada > 0 ? `${produto.estoque_total} total − ${qtdLocada} locado(s)` : undefined}
+        />
         <KPI label="Locado"       value={`${qtdLocada} un`}     color="var(--c-primary)"
           sub={locados.length > 0 ? `${locados.length} contrato(s)` : undefined} />
         <KPI label="Manutenção"   value={`${qtdManutencao} un`} color={qtdManutencao > 0 ? 'var(--c-warning)' : 'var(--t-muted)'}
