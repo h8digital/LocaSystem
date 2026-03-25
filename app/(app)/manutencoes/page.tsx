@@ -172,7 +172,21 @@ export default function ManutencoesPage() {
           }
           return (
             <ActionButtons
-              onEdit={() => abrir(row)}
+              onEdit={() => {
+                setForm({
+                  tipo: row.tipo ?? 'corretiva',
+                  descricao: row.descricao ?? '',
+                  fornecedor: row.fornecedor ?? '',
+                  custo: row.custo ?? 0,
+                  data_abertura: row.data_abertura ?? new Date().toISOString().split('T')[0],
+                  data_previsao: row.data_previsao ?? '',
+                  observacoes: row.observacoes ?? '',
+                })
+                setProdutoId(row.produto_id ?? null)
+                setProdutoNome((row.produtos as any)?.nome ?? '')
+                setErro('')
+                setPanel(true)
+              }}
               acoesSec={sec}
             />
           )
