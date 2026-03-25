@@ -8,7 +8,7 @@ import type { AcaoSecundaria } from '@/components/ui/ActionButtons'
 // ─── tipos ────────────────────────────────────────────────────────────────────
 type Produto = {
   id: number; nome: string; codigo?: string; marca?: string; modelo?: string
-  controla_patrimonio: number; unidade: string; estoque_total: number; estoque_minimo: number
+  controla_patrimonio: number; unidade: string; estoque_total: number; estoque_minimo: number; estoque_disponivel?: number; qtd_locada?: number
   custo_reposicao: number; preco_locacao_diario: number; preco_locacao_semanal: number
   preco_quinzenal: number; preco_locacao_mensal: number; preco_trimestral: number; preco_semestral: number
   observacoes?: string; categorias?: { nome: string }
@@ -105,12 +105,28 @@ export default function EstoquePage() {
 
   async function load() {
     setLoading(true)
-    let q = supabase.from('produtos').select('*, categorias(nome)').eq('ativo', 1)
+    // Buscar produtos com disponibilidade real (estoque - locado em contratos ativos)
+    let q = supabase.from('produtos').select(\`
+      *, categorias(nome),
+      contrato_itens(quantidade, contratos(status))
+    \`).eq('ativo', 1)
     if (filters.busca) q = q.ilike('nome', `%${filters.busca}%`)
     if (filters.tipo === 'patrimonio') q = q.eq('controla_patrimonio', 1)
     if (filters.tipo === 'quantidade') q = q.eq('controla_patrimonio', 0)
     const { data } = await q.order('nome')
-    setLista(data ?? [])
+    // Calcular estoque_disponivel = estoque_total - qtd em contratos ativos
+    const listaComDisponivel = (data ?? []).map((p: any) => {
+      if (p.controla_patrimonio) return { ...p, estoque_disponivel: null, qtd_locada: 0 }
+      const qtdLocada = (p.contrato_itens ?? [])
+        .filter((ci: any) => ci.contratos?.status === 'ativo')
+        .reduce((s: number, ci: any) => s + Number(ci.quantidade), 0)
+      return {
+        ...p,
+        qtd_locada: qtdLocada,
+        estoque_disponivel: Math.max(0, (p.estoque_total ?? 0) - qtdLocada),
+      }
+    })
+    setLista(listaComDisponivel)
     setLoading(false)
   }
 
@@ -325,11 +341,20 @@ export default function EstoquePage() {
                 >Ver patrimônios</button>
               )
             }
-            const alerta = r.estoque_minimo > 0 && r.estoque_total <= r.estoque_minimo
+            const disp   = r.estoque_disponivel ?? r.estoque_total
+            const alerta = r.estoque_minimo > 0 && disp <= r.estoque_minimo
+            const locado = r.qtd_locada > 0
             return (
-              <span style={{ fontWeight:600, color: alerta ? 'var(--c-danger)' : 'var(--t-primary)' }}>
-                {r.estoque_total} {r.unidade}{alerta ? ' ⚠' : ''}
-              </span>
+              <div>
+                <span style={{ fontWeight:700, color: alerta ? 'var(--c-danger)' : 'var(--t-primary)' }}>
+                  {disp} {r.unidade}{alerta ? ' ⚠' : ''}
+                </span>
+                {locado && (
+                  <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginTop:1 }}>
+                    {r.qtd_locada} locado(s)
+                  </div>
+                )}
+              </div>
             )
           }},
           { key:'minimo',    label:'Mínimo',    render: r => r.controla_patrimonio ? '—' : `${r.estoque_minimo} ${r.unidade}` },
@@ -380,7 +405,9 @@ export default function EstoquePage() {
                 { l:'Código', v: prodDetalhe.codigo || '—' },
                 { l:'Categoria', v: (prodDetalhe.categorias as any)?.nome || '—' },
                 { l:'Controle', v: prodDetalhe.controla_patrimonio ? 'Por Patrimônio' : 'Por Quantidade' },
-                { l:'Estoque Atual', v: `${prodDetalhe.estoque_total} ${prodDetalhe.unidade}`, destaque: true },
+                { l:'Total em Estoque', v: `${prodDetalhe.estoque_total} ${prodDetalhe.unidade}`, destaque: false },
+                { l:'Locado', v: `${prodDetalhe.qtd_locada ?? 0} ${prodDetalhe.unidade}`, destaque: false },
+                { l:'Disponível', v: `${prodDetalhe.estoque_disponivel ?? prodDetalhe.estoque_total} ${prodDetalhe.unidade}`, destaque: true },
                 { l:'Estoque Mínimo', v: prodDetalhe.controla_patrimonio ? '—' : `${prodDetalhe.estoque_minimo} ${prodDetalhe.unidade}` },
                 { l:'Custo Reposição', v: fmt.money(prodDetalhe.custo_reposicao) },
               ].map(item => (
@@ -649,7 +676,14 @@ export default function EstoquePage() {
         {prodDetalhe && (
           <div className="ds-inset" style={{ marginBottom:14 }}>
             <span style={{ color:'var(--t-secondary)', fontSize:'var(--fs-md)' }}>Estoque atual: </span>
-            <span style={{ fontWeight:700 }}>{prodDetalhe.estoque_total} {prodDetalhe.unidade}</span>
+            <div>
+              <span style={{ fontWeight:700 }}>{prodDetalhe.estoque_disponivel ?? prodDetalhe.estoque_total} {prodDetalhe.unidade}</span>
+              {(prodDetalhe.qtd_locada ?? 0) > 0 && (
+                <span style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginLeft:8 }}>
+                  ({prodDetalhe.qtd_locada} locado(s) de {prodDetalhe.estoque_total} total)
+                </span>
+              )}
+            </div>
           </div>
         )}
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
