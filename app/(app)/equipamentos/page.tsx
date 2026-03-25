@@ -48,11 +48,23 @@ export default function EquipamentosPage() {
 
   async function load() {
     setLoading(true)
-    let q = supabase.from('produtos').select('*, categorias(nome)').eq('ativo',1).order('nome')
+    let q = supabase.from('produtos').select('*, categorias(nome), contrato_itens(quantidade, contratos(status))').eq('ativo',1).order('nome')
     if (filters.busca) q = q.ilike('nome', `%${filters.busca}%`)
     if (filters.categoria_id) q = q.eq('categoria_id', filters.categoria_id)
     const { data } = await q
-    setLista(data ?? [])
+    // Calcular disponível real = estoque_total − locado em contratos ativos
+    const listaComDisponivel = (data ?? []).map((p: any) => {
+      if (p.controla_patrimonio) return { ...p, estoque_disponivel: null, qtd_locada: 0 }
+      const qtdLocada = (p.contrato_itens ?? [])
+        .filter((ci: any) => ci.contratos?.status === 'ativo')
+        .reduce((s: number, ci: any) => s + Number(ci.quantidade), 0)
+      return {
+        ...p,
+        qtd_locada: qtdLocada,
+        estoque_disponivel: Math.max(0, (p.estoque_total ?? 0) - qtdLocada),
+      }
+    })
+    setLista(listaComDisponivel)
     setLoading(false)
   }
 
@@ -168,11 +180,19 @@ export default function EquipamentosPage() {
           },
           { key:'estoque', label:'Disponível', render: r => {
             if (r.controla_patrimonio) return <span style={{ color:'var(--t-muted)' }}>Por patrimônio</span>
-            const alerta = r.estoque_minimo > 0 && r.estoque_total <= r.estoque_minimo
+            const disp   = r.estoque_disponivel ?? r.estoque_total
+            const alerta = r.estoque_minimo > 0 && disp <= r.estoque_minimo
             return (
-              <span style={{ fontWeight:600, color: alerta ? 'var(--c-danger)' : 'var(--t-primary)' }}>
-                {r.estoque_total} {r.unidade}{alerta ? ' ⚠' : ''}
-              </span>
+              <div>
+                <span style={{ fontWeight:600, color: alerta ? 'var(--c-danger)' : 'var(--t-primary)' }}>
+                  {disp} {r.unidade}{alerta ? ' ⚠' : ''}
+                </span>
+                {(r.qtd_locada ?? 0) > 0 && (
+                  <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginTop:1 }}>
+                    {r.qtd_locada} locado(s)
+                  </div>
+                )}
+              </div>
             )
           }},
           { key:'preco_locacao_diario', label:'Preço/Dia',    align:'right', render: r => fmt.money(r.preco_locacao_diario) },
@@ -231,7 +251,9 @@ export default function EquipamentosPage() {
                     { l:'Modelo',    v: viewRow.modelo || '—' },
                     { l:'Controle',  v: viewRow.controla_patrimonio ? 'Por Patrimônio' : 'Por Quantidade' },
                     { l:'Unidade',   v: viewRow.unidade || '—' },
-                    { l:'Estoque Atual',   v: `${viewRow.estoque_total} ${viewRow.unidade}`, destaque: true },
+                    { l:'Total',       v: `${viewRow.estoque_total} ${viewRow.unidade}`,      destaque: false },
+                    { l:'Locado',      v: `${viewRow.qtd_locada ?? 0} ${viewRow.unidade}`,        destaque: false },
+                    { l:'Disponível',  v: `${viewRow.estoque_disponivel ?? viewRow.estoque_total} ${viewRow.unidade}`, destaque: true },
                     { l:'Estoque Mínimo',  v: viewRow.controla_patrimonio ? '—' : `${viewRow.estoque_minimo} ${viewRow.unidade}` },
                     { l:'Custo Reposição', v: fmt.money(viewRow.custo_reposicao) },
                   { l:'Prazo Entrega', v: viewRow.prazo_entrega_dias > 0 ? `${viewRow.prazo_entrega_dias} dia(s)` : '—' },
