@@ -242,7 +242,7 @@ export default function EstoqueDetalheProductPage() {
                       </button>
                     </Td>
                     <Td mono muted>{(os.patrimonios as any)?.numero_patrimonio ?? '—'}</Td>
-                    <Td muted style={{ textTransform:'capitalize' }}>{os.tipo?.replace(/_/g,' ')}</Td>
+                    <Td muted>{os.tipo?.replace(/_/g,' ')}</Td>
                     <Td><Badge value={os.status} dot /></Td>
                     <Td muted>{fmt.date(os.data_abertura)}</Td>
                     <Td>
