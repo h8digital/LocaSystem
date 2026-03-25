@@ -78,15 +78,30 @@ export async function POST(req: NextRequest) {
     const dias = Math.max(1, Math.ceil((new Date(contrato.data_fim).getTime() - new Date(contrato.data_inicio).getTime()) / 86400000))
     const agora = new Date()
 
-    // Gerar tabela de itens
-    const itensHtml = (itens ?? []).map((item: any, idx: number) => `
-      <tr>
-        <td>${idx + 1}</td>
-        <td>${(item.produtos as any)?.nome ?? ''} ${(item.patrimonios as any)?.numero_patrimonio ? `<small>(${(item.patrimonios as any)?.numero_patrimonio})</small>` : ''}</td>
-        <td style="text-align:center">${item.quantidade}</td>
-        <td style="text-align:right">${fmt_money(item.preco_unitario)}</td>
-        <td style="text-align:right">${fmt_money(item.total_item)}</td>
-      </tr>`).join('')
+    // Gerar tabela de itens — formato Kanoff: Qtd | Patrimônio | Descrição | Aditivo | Val.Equip Unit | Val.Equip Total | Val.Loc Unit | Val.Loc Total
+    const itensHtml = (itens ?? []).map((item: any) => {
+      const prod       = item.produtos as any
+      const patNum     = (item.patrimonios as any)?.numero_patrimonio ?? ''
+      const qtd        = Number(item.quantidade ?? 1)
+      const custoUnit  = Number(item.custo_reposicao ?? prod?.custo_reposicao ?? 0)
+      const custoTotal = custoUnit * qtd
+      const locUnit    = Number(item.preco_unitario ?? 0)
+      const locTotal   = Number(item.total_item ?? locUnit * qtd)
+      return `<tr>
+        <td style="text-align:center">${qtd}</td>
+        <td style="text-align:center">${patNum}</td>
+        <td class="desc">${prod?.nome ?? ''}</td>
+        <td style="text-align:center">-</td>
+        <td style="text-align:right">${fmt_money(custoUnit)}</td>
+        <td style="text-align:right">${fmt_money(custoTotal)}</td>
+        <td style="text-align:right">${fmt_money(locUnit)}</td>
+        <td style="text-align:right">${fmt_money(locTotal)}</td>
+      </tr>`
+    }).join('')
+    // Completar com linhas vazias até mínimo 8 linhas
+    const minRows = 8
+    const emptyRows = Math.max(0, minRows - (itens ?? []).length)
+    const itensHtmlFull = itensHtml + Array(emptyRows).fill('<tr class="empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>').join('')
 
     // Mapa de substituição
     const tags: Record<string,string> = {
@@ -118,7 +133,7 @@ export async function POST(req: NextRequest) {
       '{{multa_por_dia}}':             fmt_money((itens??[]).reduce((s:number,i:any)=>s+Number(i.preco_diario??i.produtos?.preco_locacao_diario??0),0)),
       '{{data_geracao}}':             agora.toLocaleDateString('pt-BR'),
       '{{hora_geracao}}':             agora.toLocaleTimeString('pt-BR'),
-      '{{itens_tabela}}':             itensHtml,
+      '{{itens_tabela}}':             itensHtmlFull,
       '{{devolucao_dias_atraso}}':    '0',
       '{{devolucao_multa}}':          'R$ 0,00',
       '{{devolucao_avarias}}':        'R$ 0,00',
