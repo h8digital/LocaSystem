@@ -118,7 +118,7 @@ export default function EquipamentosPage() {
         icon: <Ico.Archive />,
         label: 'Ver no Estoque',
         grupo: 1,
-        onClick: () => { window.location.href = `/estoque?busca=${encodeURIComponent(row.nome)}` }
+        onClick: () => router.push(`/estoque/${row.id}`)
       },
     ]
   }

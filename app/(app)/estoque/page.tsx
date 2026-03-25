@@ -358,13 +358,13 @@ export default function EstoquePage() {
           prodDetalhe?.controla_patrimonio
             ? (
               <div style={{ display:'flex', gap:8, width:'100%' }}>
-                <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPanelDetalhe(false)}>Fechar</Btn>
+                <Btn variant="secondary" style={{ flex:1 }} onClick={() => { setPanelDetalhe(false); router.push(`/estoque/${prodDetalhe?.id}`) }}>Visão Completa →</Btn>
                 <Btn style={{ flex:2 }} onClick={abrirNovoPat}>+ Cadastrar Patrimônio</Btn>
               </div>
             )
             : (
               <div style={{ display:'flex', gap:8, width:'100%' }}>
-                <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPanelDetalhe(false)}>Fechar</Btn>
+                <Btn variant="secondary" style={{ flex:1 }} onClick={() => { setPanelDetalhe(false); router.push(`/estoque/${prodDetalhe?.id}`) }}>Visão Completa →</Btn>
                 <Btn style={{ flex:2 }} onClick={() => { setPanelMov(true); setFormMov({ tipo:'entrada', quantidade:1, local_armazenagem_id:'', observacoes:'' }); setFormMovLocalNome('') }}>
                   + Movimentar Estoque
                 </Btn>
