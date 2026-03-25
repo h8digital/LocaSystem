@@ -106,10 +106,7 @@ export default function EstoquePage() {
   async function load() {
     setLoading(true)
     // Buscar produtos com disponibilidade real (estoque - locado em contratos ativos)
-    let q = supabase.from('produtos').select(\`
-      *, categorias(nome),
-      contrato_itens(quantidade, contratos(status))
-    \`).eq('ativo', 1)
+    let q = supabase.from('produtos').select('*, categorias(nome), contrato_itens(quantidade, contratos(status))').eq('ativo', 1)
     if (filters.busca) q = q.ilike('nome', `%${filters.busca}%`)
     if (filters.tipo === 'patrimonio') q = q.eq('controla_patrimonio', 1)
     if (filters.tipo === 'quantidade') q = q.eq('controla_patrimonio', 0)
