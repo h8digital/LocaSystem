@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { useRouter } from 'next/navigation'
 import { supabase, fmt } from '@/lib/supabase'
 import { SlidePanel, PageHeader, DataTable, Filters, Badge, ActionButtons, Ico, Btn, FormField, inputCls, selectCls, textareaCls } from '@/components/ui'
 import type { AcaoSecundaria } from '@/components/ui/ActionButtons'
@@ -22,6 +23,7 @@ function campoPreco(nomeP: string) {
 }
 
 export default function EquipamentosPage() {
+  const router = useRouter()
   const [lista, setLista]       = useState<any[]>([])
   const [categorias, setCats]   = useState<any[]>([])
   const [periodos, setPeriodos] = useState<any[]>([])
