@@ -31,9 +31,16 @@ export async function POST(req: NextRequest) {
     // ── Multa por atraso ──────────────────────────────────────────────────────
     let multa_atraso = 0
     if (dias_atraso > 0) {
-      const { data: param } = await sb.from('parametros').select('valor').eq('chave', 'multa_atraso_percentual').single()
-      const pct = Number(param?.valor ?? 2)
-      multa_atraso = contrato.total * (pct / 100) * dias_atraso
+      // Regra PRD seção 3: Overdue = dias × tabela DIÁRIA (não % do total)
+      // Buscar o valor diário médio dos itens do contrato
+      const { data: itensContrato } = await sb.from('contrato_itens')
+        .select('preco_diario, quantidade, produtos(preco_locacao_diario)')
+        .eq('contrato_id', contrato_id)
+      const valorDiarioTotal = (itensContrato ?? []).reduce((s: number, i: any) => {
+        const diario = Number(i.preco_diario ?? (i.produtos as any)?.preco_locacao_diario ?? 0)
+        return s + diario * Number(i.quantidade ?? 1)
+      }, 0)
+      multa_atraso = valorDiarioTotal * dias_atraso
     }
 
     const temAvaria = itens.some((i: any) => i.condicao === 'avariado' || i.condicao === 'extraviado')

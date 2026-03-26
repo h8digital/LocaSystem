@@ -10,7 +10,7 @@ export default function ContratosPage() {
   const [contratos, setContratos] = useState<any[]>([])
   const [loading,   setLoading]   = useState(true)
   const [filters,   setFilters]   = useState<Record<string,string>>({ busca:'', status:'' })
-  const [totais,    setTotais]    = useState({ total:0, ativos:0, valor:0 })
+  const [totais,    setTotais]    = useState({ total:0, ativos:0, valor:0, vencidos:0, pendente_manutencao:0 })
   const router = useRouter()
 
   async function load() {
@@ -29,6 +29,8 @@ export default function ContratosPage() {
       total:  tots?.length ?? 0,
       ativos: tots?.filter(c => c.status === 'ativo').length ?? 0,
       valor:  tots?.filter(c => c.status === 'ativo').reduce((s,c) => s + Number(c.total), 0) ?? 0,
+      vencidos: tots?.filter(c => c.status === 'ativo' && c.data_fim && new Date(c.data_fim) < new Date()).length ?? 0,
+      pendente_manutencao: tots?.filter(c => c.status === 'pendente_manutencao').length ?? 0,
     })
     setLoading(false)
   }
@@ -38,8 +40,16 @@ export default function ContratosPage() {
   function acoesPara(row: any) {
     const ir        = () => router.push(`/contratos/${row.id}`)
     const encerrar  = () => router.push(`/contratos/${row.id}/encerrar`)
-    const alterar   = () => router.push(`/contratos/${row.id}`)   // abre no detalhe com painel de edição
-    const devolucao = () => router.push(`/devolucoes?contrato=${row.id}`)
+    const alterar   = () => router.push(`/contratos/${row.id}`)
+    const devolucao = () => router.push(`/contratos/${row.id}/encerrar`)
+
+    async function ativar() {
+      if (!confirm(`Ativar o contrato ${row.numero}?\n\nIsso registrará a remessa e mudará o status para ATIVO.`)) return
+      const res = await fetch('/api/contratos/ativar', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ contrato_id: row.id }) })
+      const data = await res.json()
+      if (!data.ok) { alert(`Erro: ${data.error}`); return }
+      alert(data.msg); load()
+    }
 
     async function cancelar() {
       if (!confirm(`Cancelar o contrato ${row.numero}?`)) return
@@ -70,8 +80,19 @@ export default function ContratosPage() {
 
     if (row.status === 'rascunho') {
       sec.push(
+        { label:'Ativar Contrato',   onClick: ativar,  grupo:1 },
         { label:'Alterar Contrato',  onClick: alterar,  grupo:1 },
         { label:'Excluir Contrato',  onClick: excluir,  grupo:2, destrutivo:true },
+      )
+    }
+    if (row.status === 'em_devolucao') {
+      sec.push(
+        { label:'Continuar Check-in', onClick: devolucao, grupo:1 },
+      )
+    }
+    if (row.status === 'pendente_manutencao') {
+      sec.push(
+        { label:'Verificar OS / Encerrar', onClick: encerrar, grupo:1 },
       )
     }
 
@@ -109,11 +130,13 @@ export default function ContratosPage() {
       />
 
       {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:14 }}>
         {[
-          { label:'Total de Contratos', value: totais.total,              color:'var(--t-primary)'  },
-          { label:'Contratos Ativos',   value: totais.ativos,             color:'var(--c-success)'  },
-          { label:'Valor em Aberto',    value: fmt.money(totais.valor),   color:'var(--c-primary)'  },
+          { label:'Total de Contratos',  value: totais.total,              color:'var(--t-primary)'  },
+          { label:'Contratos Ativos',    value: totais.ativos,             color:'var(--c-success)'  },
+          { label:'Valor em Aberto',     value: fmt.money(totais.valor),   color:'var(--c-primary)'  },
+          { label:'Retorno Vencido',     value: totais.vencidos ?? 0,      color: (totais.vencidos ?? 0) > 0 ? 'var(--c-danger)'  : 'var(--t-muted)' },
+          { label:'Pend. Manutenção',    value: totais.pendente_manutencao ?? 0, color: (totais.pendente_manutencao ?? 0) > 0 ? 'var(--c-warning)' : 'var(--t-muted)' },
         ].map(k => (
           <div key={k.label} style={{ background:'var(--bg-card)', borderRadius:'var(--r-md)',
             boxShadow:'var(--shadow-sm)', padding:'18px 20px', border:'1px solid var(--border)' }}>
@@ -158,7 +181,16 @@ export default function ContratosPage() {
           { key:'total',  label:'Total',  align:'right', render: r => (
             <span style={{ fontWeight:700 }}>{fmt.money(r.total)}</span>
           )},
-          { key:'status', label:'Status', render: r => <Badge value={r.status} dot /> },
+          { key:'status', label:'Status', render: r => (
+            <div style={{display:'flex',flexDirection:'column',gap:2}}>
+              <Badge value={r.status} dot />
+              {r.status==='ativo'&&r.data_fim&&new Date(r.data_fim)<new Date()&&(
+                <span style={{fontSize:'var(--fs-sm)',fontWeight:700,color:'var(--c-danger)'}}>
+                  ⚠ Vencido {Math.floor((new Date().getTime()-new Date(r.data_fim).getTime())/86400000)}d
+                </span>
+              )}
+            </div>
+          ) },
         ]}
         data={contratos}
         onRowClick={row => router.push(`/contratos/${row.id}`)}

@@ -31,6 +31,7 @@ export default function VerContratoPage() {
   const [contrato,   setContrato]   = useState<any>(null)
   const [itens,      setItens]      = useState<any[]>([])
   const [faturas,    setFaturas]    = useState<any[]>([])
+  const [saldoInfo,  setSaldoInfo]  = useState<any>(null)
   const [devolucoes, setDevolucoes] = useState<any[]>([])
   const [loading,    setLoading]    = useState(true)
   const [templates,  setTemplates]  = useState<any[]>([])
@@ -75,10 +76,11 @@ export default function VerContratoPage() {
         supabase.from('contratos').select('*, clientes(*), usuarios(nome)').eq('id', id).single(),
         supabase.from('contrato_itens').select('*, produtos(nome), patrimonios(numero_patrimonio)').eq('contrato_id', id),
         supabase.from('faturas').select('*').eq('contrato_id', id).order('data_vencimento'),
+        supabase.from('contrato_saldo').select('*').eq('contrato_id', id).single(),
         supabase.from('doc_templates').select('id,nome,tipo').eq('ativo',1).order('tipo').order('nome'),
         supabase.from('devolucoes').select('*, usuarios(nome)').eq('contrato_id', id).order('created_at',{ascending:false}),
       ])
-      setContrato(c); setItens(i??[]); setFaturas(f??[])
+      setContrato(c); setItens(i??[]); setFaturas(f??[]); setSaldoInfo((s as any)?.data ?? null)
       setTemplates(t??[]); setDevolucoes(d??[]); setLoading(false)
       const pad = t?.find((x:any)=>x.padrao===1&&x.tipo==='contrato')
       if(pad) setTemplateSel(String(pad.id))
@@ -146,6 +148,26 @@ export default function VerContratoPage() {
     const { error } = await supabase.from('contratos').delete().eq('id', id)
     if (error) { alert('Erro ao excluir: ' + error.message); return }
     router.push('/contratos')
+  }
+
+  // ── Ativar contrato (DRAFT → ACTIVE) ─────────────────────
+  async function ativarContrato() {
+    if (!confirm(`Ativar o contrato ${contrato.numero}?\n\nIsso registrará a remessa dos equipamentos e mudará o status para ATIVO.`)) return
+    const res = await fetch('/api/contratos/ativar', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ contrato_id: Number(id) }) })
+    const data = await res.json()
+    if (!data.ok) { alert(`Erro: ${data.error}`); return }
+    alert(data.msg)
+    window.location.reload()
+  }
+
+  async function iniciarCheckin() { router.push(`/contratos/${id}/encerrar`) }
+
+  async function encerrarPendente() {
+    const res = await fetch('/api/contratos/encerrar', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ contrato_id: Number(id) }) })
+    const data = await res.json()
+    if (data.fatura_gerada) { alert(data.error); window.location.reload(); return }
+    if (!data.ok) { alert(`Erro: ${data.error}`); return }
+    alert(data.msg); window.location.reload()
   }
 
   // ── Funções de pagamento ─────────────────────────────────
@@ -366,34 +388,43 @@ export default function VerContratoPage() {
         </div>
         <div style={{display:'flex',alignItems:'center',gap:10,flexShrink:0}}>
           {/* Ação primária — muda conforme status */}
-          {contrato.status==='ativo'&&(
-            <Btn onClick={()=>router.push(`/contratos/${id}/encerrar`)}>
-              Encerrar Contrato
+          {/* ── Ação primária por estado ── */}
+          {contrato.status==='rascunho'&&(
+            <Btn onClick={ativarContrato}>
+              Ativar Contrato
             </Btn>
           )}
-          {contrato.status==='rascunho'&&(
-            <Btn onClick={abrirEditar}>
-              Editar Rascunho
+          {contrato.status==='ativo'&&(
+            <Btn onClick={iniciarCheckin}>
+              Iniciar Devolução
+            </Btn>
+          )}
+          {contrato.status==='pendente_manutencao'&&(
+            <Btn onClick={encerrarPendente} variant="secondary">
+              Encerrar (Verificar OS)
             </Btn>
           )}
 
-          {/* Menu de ações secundárias */}
+          {/* ── Badge de alerta para vencidos ── */}
+          {contrato.status==='ativo'&&contrato.data_fim&&new Date(contrato.data_fim)<new Date()&&(
+            <div style={{background:'var(--c-danger-light)',border:'1px solid var(--c-danger)',borderRadius:'var(--r-md)',padding:'4px 10px',fontSize:'var(--fs-md)',color:'var(--c-danger)',fontWeight:700}}>
+              ⚠ VENCIDO
+            </div>
+          )}
+
+          {/* ── Menu de ações secundárias ── */}
           {(()=>{
             const sec: AcaoSecundaria[] = []
-
             sec.push({ label:'Gerar Documento', onClick:()=>{setAba('documentos');setDocLink('')}, grupo:1 })
-
-            if(contrato.status==='ativo'||contrato.status==='rascunho'){
+            if(contrato.status==='rascunho'||contrato.status==='ativo'){
               sec.push({ label:'Alterar Contrato', onClick:abrirEditar, grupo:1 })
             }
             if(contrato.status==='ativo'){
-              sec.push({ label:'Registrar Devolução', onClick:()=>router.push(`/devolucoes?contrato=${id}`), grupo:2 })
-              sec.push({ label:'Cancelar Contrato', onClick:cancelar, grupo:3, destrutivo:true })
+              sec.push({ label:'Cancelar Contrato', onClick:cancelar, grupo:2, destrutivo:true })
             }
             if(contrato.status==='rascunho'||contrato.status==='cancelado'){
-              sec.push({ label:'Excluir Contrato', onClick:excluirContrato, grupo:3, destrutivo:true })
+              sec.push({ label:'Excluir Contrato', onClick:excluirContrato, grupo:2, destrutivo:true })
             }
-
             return <ActionButtons acoesSec={sec}/>
           })()}
         </div>
@@ -552,6 +583,39 @@ export default function VerContratoPage() {
 
               {/* Recebido / Em aberto */}
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                {/* Saldo discriminado (PRD 5.4) */}
+              {saldoInfo && (
+                <div style={{background:'var(--bg-header)',border:'1px solid var(--border)',borderRadius:'var(--r-md)',padding:'12px 16px'}}>
+                  <div style={{fontSize:'var(--fs-md)',fontWeight:700,color:'var(--t-secondary)',marginBottom:10,textTransform:'uppercase',letterSpacing:'.04em'}}>Consolidação Financeira</div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
+                    {[
+                      {l:'Locação',          v:saldoInfo.fat_locacao,     c:'var(--t-primary)'},
+                      {l:'Multa/Atraso',     v:saldoInfo.fat_multa,       c:Number(saldoInfo.fat_multa)>0?'var(--c-danger)':'var(--t-muted)'},
+                      {l:'Manutenção/OS',    v:saldoInfo.fat_manutencao,  c:Number(saldoInfo.fat_manutencao)>0?'var(--c-warning)':'var(--t-muted)'},
+                      {l:'Total Faturado',   v:saldoInfo.total_faturado,  c:'var(--c-primary)'},
+                      {l:'Recebido',         v:saldoInfo.total_recebido,  c:'var(--c-success)'},
+                      {l:'Saldo Devedor',    v:saldoInfo.saldo_devedor,   c:Number(saldoInfo.saldo_devedor)>0?'var(--c-danger)':'var(--c-success)'},
+                    ].map(k=>(
+                      <div key={k.l}>
+                        <div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)',marginBottom:2}}>{k.l}</div>
+                        <div style={{fontWeight:700,color:k.c}}>{fmt.money(k.v)}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {Number(saldoInfo.os_abertas)>0&&(
+                    <div style={{marginTop:10,padding:'6px 10px',background:'var(--c-warning-light)',border:'1px solid var(--c-warning)',borderRadius:'var(--r-sm)',fontSize:'var(--fs-md)',color:'var(--c-warning-text)',fontWeight:600}}>
+                      ⚠ {saldoInfo.os_abertas} OS em aberto — contrato bloqueado para encerramento
+                    </div>
+                  )}
+                  {Number(saldoInfo.custo_os_pendente)>0&&(
+                    <div style={{marginTop:6,padding:'6px 10px',background:'var(--c-danger-light)',border:'1px solid var(--c-danger)',borderRadius:'var(--r-sm)',fontSize:'var(--fs-md)',color:'var(--c-danger-text)'}}>
+                      {fmt.money(saldoInfo.custo_os_pendente)} em custos de OS pendentes de faturamento
+                    </div>
+                  )}
+                </div>
+              )}
+
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
                 <div style={{background:'var(--c-success-light)',borderRadius:'var(--r-md)',padding:'12px 16px',border:'1px solid var(--c-success)'}}>
                   <div style={{fontSize:'var(--fs-md)',color:'var(--c-success-text)',marginBottom:4}}>Recebido</div>
                   <div style={{fontWeight:700,fontSize:'var(--fs-lg)',color:'var(--c-success-text)'}}>{fmt.money(totalPago)}</div>
@@ -560,6 +624,7 @@ export default function VerContratoPage() {
                   <div style={{fontSize:'var(--fs-md)',color:totalPendente>0?'var(--c-danger-text)':'var(--c-success-text)',marginBottom:4}}>Em Aberto</div>
                   <div style={{fontWeight:700,fontSize:'var(--fs-lg)',color:totalPendente>0?'var(--c-danger)':'var(--c-success-text)'}}>{fmt.money(totalPendente)}</div>
                 </div>
+              </div>
               </div>
 
               {/* Faturas */}

@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
       local_uso_cidade:     contrato.local_uso_cidade     || null,
       local_uso_estado:     contrato.local_uso_estado     || null,
       local_uso_referencia: contrato.local_uso_referencia || null,
-      status: 'ativo',
+      status: 'rascunho',
     }).select('id').single()
 
     if (error) return NextResponse.json({ ok:false, error:error.message })

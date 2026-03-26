@@ -74,7 +74,7 @@ export default function EncerrarContratoPage() {
         supabase.from('parametros').select('valor').eq('chave', 'multa_atraso_percentual').single(),
       ])
 
-      if (!c || c.status === 'encerrado' || c.status === 'cancelado') {
+      if (!c || ['encerrado','cancelado','pendente_manutencao'].includes(c.status)) {
         router.push(`/contratos/${id}`); return
       }
 
@@ -87,6 +87,11 @@ export default function EncerrarContratoPage() {
       if (c.data_fim) {
         const diff = Math.floor((Date.now() - new Date(c.data_fim).getTime()) / 86400000)
         if (diff > 0) setDiasAtraso(diff)
+      }
+
+      // Muda status para EM_DEVOLUCAO quando o check-in começa
+      if (c.status === 'ativo') {
+        await supabase.from('contratos').update({ status: 'em_devolucao' }).eq('id', c.id)
       }
 
       setItens((i ?? []).map((item: any) => ({
