@@ -252,7 +252,7 @@ export default function EquipamentosPage() {
       categoria_id: form.categoria_id ? Number(form.categoria_id) : null,
       marca: form.marca||null, modelo: form.modelo||null, descricao: form.descricao||null,
       controla_patrimonio: Number(form.controla_patrimonio),
-      unidade: form.unidade||'un', estoque_total: Number(form.estoque_total)||0,
+      unidade: form.unidade||'un', ...(form.id ? {} : { estoque_total: Number(form.estoque_total)||0 }),
       estoque_minimo: Number(form.estoque_minimo)||0, custo_reposicao: Number(form.custo_reposicao)||0,
       preco_locacao_diario:  Number(form.preco_locacao_diario)||0,
       preco_fds:             Number(form.preco_fds)||0,
@@ -534,7 +534,21 @@ export default function EquipamentosPage() {
                   <input {...F('unidade')} className={inputCls} placeholder="un, kg, m, pç..." />
                 </FormField>
                 <FormField label="Estoque Atual">
-                  <input type="number" min="0" {...F('estoque_total')} className={inputCls} />
+                  <div style={{position:'relative'}}>
+                    <input
+                      type="number"
+                      value={form.estoque_total ?? 0}
+                      readOnly
+                      className={inputCls}
+                      style={{background:'var(--bg-header)',color:'var(--t-muted)',cursor:'not-allowed',paddingRight:32}}
+                    />
+                    <span title="Altere o estoque pela tela de Movimentação de Ativos (botão 📦)"
+                      style={{position:'absolute',right:9,top:'50%',transform:'translateY(-50%)',
+                        fontSize:14,cursor:'help',color:'var(--t-muted)'}}>🔒</span>
+                  </div>
+                  <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginTop:3}}>
+                    Altere via Movimentação de Ativos (📦)
+                  </div>
                 </FormField>
                 <FormField label="Estoque Mínimo">
                   <input type="number" min="0" {...F('estoque_minimo')} className={inputCls} />
