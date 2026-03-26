@@ -73,10 +73,33 @@ export async function POST(req: NextRequest) {
     const p: Record<string,string> = {}
     params?.forEach(x => { p[x.chave] = x.valor ?? '' })
 
-    const cliente = contrato.clientes as any
-    const endCliente = [cliente.endereco, cliente.numero, cliente.bairro, cliente.cidade, cliente.estado].filter(Boolean).join(', ')
-    const dias = Math.max(1, Math.ceil((new Date(contrato.data_fim).getTime() - new Date(contrato.data_inicio).getTime()) / 86400000))
+    const cliente  = contrato.clientes as any
+    const vendedor = (contrato.usuarios as any)?.nome ?? ''
+
+    // Endereço principal do cliente (completo)
+    const endCliente   = [cliente.endereco, cliente.numero, cliente.complemento, cliente.bairro, cliente.cidade, cliente.estado].filter(Boolean).join(', ')
+    const cidadeCliente = [cliente.cidade, cliente.estado].filter(Boolean).join('/')
+
+    // Endereço de entrega: usa local_uso se preenchido, senão endereço do cliente
+    const endEntrega = contrato.local_uso_endereco
+      ? [contrato.local_uso_endereco, contrato.local_uso_numero, contrato.local_uso_complemento, contrato.local_uso_bairro, contrato.local_uso_cidade, contrato.local_uso_estado].filter(Boolean).join(', ')
+      : endCliente
+    const cepEntrega       = contrato.local_uso_cep || cliente.cep || ''
+    const referenciaEntrega = contrato.local_uso_referencia || ''
+
+    // Período de cobrança
+    const { data: periodoData } = await sb.from('periodos_locacao').select('nome').eq('id', contrato.periodo_id).maybeSingle()
+    const periodoNome = (periodoData as any)?.nome ?? ''
+
+    const dias  = Math.max(1, Math.ceil((new Date(contrato.data_fim).getTime() - new Date(contrato.data_inicio).getTime()) / 86400000))
     const agora = new Date()
+
+    // Cidade da empresa extraída do endereço
+    const empresaCidade = (() => {
+      const end = p['empresa_endereco'] ?? ''
+      const partes = end.split(',').map((s: string) => s.trim())
+      return partes.length >= 2 ? partes[partes.length - 2] : ''
+    })()
 
     // Gerar tabela de itens — formato Kanoff: Qtd | Patrimônio | Descrição | Aditivo | Val.Equip Unit | Val.Equip Total | Val.Loc Unit | Val.Loc Total
     const itensHtml = (itens ?? []).map((item: any) => {
@@ -110,7 +133,7 @@ export async function POST(req: NextRequest) {
       '{{empresa_telefone}}':         p['empresa_telefone'] ?? '',
       '{{empresa_email}}':            p['empresa_email'] ?? '',
       '{{empresa_endereco}}':         p['empresa_endereco'] ?? '',
-      '{{empresa_cidade}}':           (p['empresa_endereco'] ?? '').split('/').pop()?.trim() ?? '',
+
       '{{cliente_nome}}':             cliente.nome ?? '',
       '{{cliente_cpf_cnpj}}':         cliente.cpf_cnpj ?? '',
       '{{cliente_tipo_doc}}':         cliente.tipo === 'PJ' ? 'CNPJ' : 'CPF',
@@ -129,6 +152,22 @@ export async function POST(req: NextRequest) {
       '{{contrato_forma_pagamento}}': (contrato.forma_pagamento ?? '').replace(/_/g,' ').replace(/\b\w/g,(c:string)=>c.toUpperCase()),
       '{{contrato_observacoes}}':     contrato.observacoes ?? '',
       '{{contrato_frete}}':            fmt_money(contrato.frete ?? 0),
+      '{{contrato_periodo}}':          periodoNome,
+      '{{contrato_forma_pagamento_desc}}': (contrato.forma_pagamento ?? '').replace(/_/g,' ').replace(/\b\w/g,(cc:string)=>cc.toUpperCase()),
+      '{{contrato_caucao}}':           fmt_money(contrato.caucao ?? 0),
+      '{{contrato_acrescimo}}':        fmt_money(contrato.acrescimo ?? 0),
+      '{{contrato_desconto}}':         fmt_money(contrato.desconto ?? 0),
+      '{{vendedor_nome}}':             vendedor,
+      '{{cliente_rg_ie}}':             cliente.rg_ie ?? '',
+      '{{cliente_tipo_doc}}':          cliente.tipo === 'PJ' ? 'CNPJ' : 'CPF',
+      '{{cliente_cep}}':               cliente.cep ?? '',
+      '{{cliente_cidade}}':            cidadeCliente,
+      '{{cliente_bairro}}':            cliente.bairro ?? '',
+      '{{cliente_estado}}':            cliente.estado ?? '',
+      '{{entrega_endereco}}':          endEntrega,
+      '{{entrega_cep}}':               cepEntrega,
+      '{{entrega_referencia}}':        referenciaEntrega,
+      '{{empresa_cidade}}':            empresaCidade,
       '{{multa_atraso_percentual}}':  p['multa_atraso_percentual'] ?? '2',
       '{{multa_por_dia}}':             fmt_money((itens??[]).reduce((s:number,i:any)=>s+Number(i.preco_diario??i.produtos?.preco_locacao_diario??0),0)),
       '{{data_geracao}}':             agora.toLocaleDateString('pt-BR'),
