@@ -47,6 +47,12 @@ export default function EquipamentosPage() {
   const [panelPrecos, setPanelPrecos] = useState(false)
   const [precosRow,   setPrecosRow]   = useState<any>(null)
 
+  // ── Fotos ─────────────────────────────────────────────────────────────────
+  const [abaForm,      setAbaForm]      = useState<'dados'|'fotos'>('dados')
+  const [fotos,        setFotos]        = useState<any[]>([])
+  const [uploadando,   setUploadando]   = useState(false)
+  const [erroFoto,     setErroFoto]     = useState('')
+
   // ── Movimentação de Ativos ────────────────────────────────────────────────
   const [modalMov,      setModalMov]      = useState(false)
   const [movProduto,    setMovProduto]    = useState<any>(null)
@@ -209,6 +215,7 @@ export default function EquipamentosPage() {
     if (filters.busca) q = q.ilike('nome', `%${filters.busca}%`)
     if (filters.categoria_id) q = q.eq('categoria_id', filters.categoria_id)
     const { data } = await q
+
     // Calcular disponível real = estoque_total − locado em contratos ativos
     const listaComDisponivel = (data ?? []).map((p: any) => {
       if (p.controla_patrimonio) return { ...p, estoque_disponivel: null, qtd_locada: 0 }
@@ -221,7 +228,18 @@ export default function EquipamentosPage() {
         estoque_disponivel: Math.max(0, (p.estoque_total ?? 0) - qtdLocada),
       }
     })
-    setLista(listaComDisponivel)
+
+    // Carregar foto principal de cada produto
+    const prodIds = listaComDisponivel.map((p:any) => p.id)
+    let fotosMap: Record<number,string> = {}
+    if (prodIds.length > 0) {
+      const { data: fotosData } = await supabase
+        .from('produto_fotos').select('produto_id, url')
+        .in('produto_id', prodIds).eq('principal', true)
+      ;(fotosData ?? []).forEach((f:any) => { fotosMap[f.produto_id] = f.url })
+    }
+
+    setLista(listaComDisponivel.map((p:any) => ({ ...p, foto_url: fotosMap[p.id] ?? null })))
     setLoading(false)
   }
 
@@ -318,6 +336,14 @@ export default function EquipamentosPage() {
         loading={loading}
         emptyMessage="Nenhum produto cadastrado."
         columns={[
+          { key:'foto', label:'', render: r => (
+            r.foto_url
+              ? <img src={r.foto_url} alt="" style={{width:36,height:36,objectFit:'cover',borderRadius:'var(--r-sm)',
+                  border:'1px solid var(--border)',flexShrink:0,display:'block'}} />
+              : <div style={{width:36,height:36,borderRadius:'var(--r-sm)',border:'1px solid var(--border)',
+                  background:'var(--bg-header)',display:'flex',alignItems:'center',justifyContent:'center',
+                  fontSize:18,color:'var(--t-muted)',flexShrink:0}}>📦</div>
+          )},
           { key:'nome', label:'Produto', render: r => (
             <div>
               <div style={{ fontWeight:600 }}>{r.nome}</div>
@@ -484,6 +510,120 @@ export default function EquipamentosPage() {
         {erro && <div className="ds-alert-error" style={{ marginBottom:14 }}>{erro}</div>}
 
         <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+
+          {/* ── Tabs: Dados / Fotos (só aparece em modo edição) ── */}
+          {form.id && (
+            <div style={{display:'flex',borderBottom:'1px solid var(--border)',marginBottom:4,gap:0,marginTop:-8}}>
+              {([['dados','📋 Dados'],['fotos',`🖼️ Fotos${fotos.length>0?` (${fotos.length})`:''}`]] as const).map(([k,l])=>(
+                <button key={k} onClick={()=>setAbaForm(k)}
+                  style={{padding:'8px 18px',border:'none',background:'none',cursor:'pointer',
+                    fontWeight:abaForm===k?700:400,fontSize:'var(--fs-md)',
+                    color:abaForm===k?'var(--c-primary)':'var(--t-muted)',
+                    borderBottom:abaForm===k?'2px solid var(--c-primary)':'2px solid transparent',
+                    marginBottom:-1}}>
+                  {l}
+                </button>
+              ))}
+            </div>
+          )}
+
+          {/* ══ ABA FOTOS ══════════════════════════════════════════════════ */}
+          {abaForm==='fotos' && form.id && (
+            <div style={{display:'flex',flexDirection:'column',gap:16}}>
+              {erroFoto && (
+                <div style={{background:'var(--c-danger-light)',border:'1px solid var(--c-danger)',
+                  borderRadius:'var(--r-md)',padding:'10px 14px',color:'var(--c-danger-text)',fontSize:'var(--fs-md)'}}>
+                  {erroFoto}
+                </div>
+              )}
+              {/* Área de upload */}
+              <label style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+                gap:8,border:'2px dashed var(--border)',borderRadius:'var(--r-md)',padding:'28px 16px',
+                cursor:uploadando?'not-allowed':'pointer',
+                background:uploadando?'var(--bg-header)':'transparent',transition:'border-color 150ms'}}
+                onMouseEnter={e=>!uploadando&&((e.currentTarget.style.borderColor='var(--c-primary)'))}
+                onMouseLeave={e=>(e.currentTarget.style.borderColor='var(--border)')}>
+                <input type="file" accept="image/jpeg,image/png,image/webp" multiple style={{display:'none'}}
+                  disabled={uploadando}
+                  onChange={async e=>{
+                    const files=Array.from(e.target.files??[])
+                    if(!files.length) return
+                    setUploadando(true); setErroFoto('')
+                    for(const file of files){
+                      if(file.size>5*1024*1024){setErroFoto(`"${file.name}" excede 5MB`);continue}
+                      const fd=new FormData()
+                      fd.append('produto_id',String(form.id))
+                      fd.append('file',file)
+                      fd.append('principal',fotos.length===0?'true':'false')
+                      const res=await fetch('/api/produto-fotos',{method:'POST',body:fd})
+                      const data=await res.json()
+                      if(data.ok) setFotos(p=>[...p,data.data])
+                      else setErroFoto(data.error)
+                    }
+                    setUploadando(false); e.target.value=''
+                  }}
+                />
+                {uploadando
+                  ?<><span style={{fontSize:32}}>⏳</span><span style={{color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Enviando…</span></>
+                  :<><span style={{fontSize:32}}>📷</span>
+                    <span style={{color:'var(--t-muted)',fontSize:'var(--fs-md)',textAlign:'center'}}>
+                      Clique para adicionar fotos<br/>
+                      <span style={{fontSize:'var(--fs-sm)'}}>JPG, PNG, WEBP · até 5MB cada · múltiplas permitidas</span>
+                    </span></>
+                }
+              </label>
+
+              {/* Grid de fotos */}
+              {fotos.length>0?(
+                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+                  {fotos.map((foto:any)=>(
+                    <div key={foto.id} style={{position:'relative',borderRadius:'var(--r-md)',overflow:'hidden',
+                      border:`2px solid ${foto.principal?'var(--c-primary)':'var(--border)'}`,
+                      aspectRatio:'1',background:'var(--bg-header)'}}>
+                      <img src={foto.url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
+                      {foto.principal&&(
+                        <div style={{position:'absolute',top:4,left:4,background:'var(--c-primary)',color:'#fff',
+                          fontSize:'var(--fs-xs)',fontWeight:700,padding:'2px 6px',borderRadius:'var(--r-sm)'}}>
+                          ★ Principal
+                        </div>
+                      )}
+                      <div style={{position:'absolute',bottom:0,left:0,right:0,display:'flex',gap:4,
+                        padding:5,background:'linear-gradient(transparent,rgba(0,0,0,0.65))'}}>
+                        {!foto.principal&&(
+                          <button onClick={async()=>{
+                              const res=await fetch(`/api/produto-fotos?id=${foto.id}`,{method:'PATCH',
+                                headers:{'Content-Type':'application/json'},body:JSON.stringify({produto_id:form.id})})
+                              if((await res.json()).ok) setFotos(p=>p.map((f:any)=>({...f,principal:f.id===foto.id})))
+                            }}
+                            style={{flex:1,background:'rgba(255,255,255,0.88)',border:'none',borderRadius:'var(--r-sm)',
+                              padding:'3px 0',cursor:'pointer',fontSize:'var(--fs-xs)',fontWeight:700}}>
+                            ★ Tornar Principal
+                          </button>
+                        )}
+                        <button onClick={async()=>{
+                            if(!confirm('Excluir esta foto?')) return
+                            const res=await fetch(`/api/produto-fotos?id=${foto.id}`,{method:'DELETE'})
+                            if((await res.json()).ok) setFotos(p=>p.filter((f:any)=>f.id!==foto.id))
+                          }}
+                          style={{background:'rgba(220,38,38,0.85)',border:'none',borderRadius:'var(--r-sm)',
+                            padding:'3px 8px',cursor:'pointer',color:'#fff',fontSize:'var(--fs-xs)',fontWeight:700}}>
+                          ✕
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ):(
+                <div style={{textAlign:'center',padding:'12px 0',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>
+                  Nenhuma foto ainda. Adicione a primeira acima.
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ══ ABA DADOS (sempre visível para novo produto) ══════════════ */}
+          {(abaForm==='dados'||!form.id)&&<>
+
           {/* Identificação */}
           <div>
             <div className="ds-section-title">Identificação</div>
@@ -590,7 +730,7 @@ export default function EquipamentosPage() {
           <FormField label="Descrição / Observações">
             <textarea {...F('observacoes')} rows={2} className={textareaCls} placeholder="Descrição, especificações técnicas..." />
           </FormField>
-        </div>
+        </>{/* end aba dados fragment */}
       </SlidePanel>
 
       {/* ── Modal de Movimentação de Ativos ───────────────────────────────── */}
