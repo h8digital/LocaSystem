@@ -27,6 +27,13 @@ export default function FinanceiroPage() {
   const [kpis,      setKpis]      = useState({ total:0, recebido:0, pendente:0, vencidas:0, nVencidas:0 })
   const [usuario,   setUsuario]   = useState<any>(null)
 
+  // Painel de edição
+  const [painelEdit,    setPainelEdit]    = useState(false)
+  const [faturaEdit,    setFaturaEdit]    = useState<any>(null)
+  const [formEdit,      setFormEdit]      = useState<any>({})
+  const [salvandoEdit,  setSalvandoEdit]  = useState(false)
+  const [erroEdit,      setErroEdit]      = useState('')
+
   // Painel de recebimento
   const [painel,        setPainel]        = useState(false)
   const [faturaAlvo,    setFaturaAlvo]    = useState<any>(null)
@@ -60,7 +67,113 @@ export default function FinanceiroPage() {
     const lista = data ?? []
     setFaturas(lista)
 
-    const hoje = new Date().toISOString().split('T')[0]
+    // ── Editar fatura ──────────────────────────────────────────────────────────
+  function abrirEdicao(fat: any) {
+    setFaturaEdit(fat)
+    setFormEdit({
+      descricao:       fat.descricao ?? '',
+      data_vencimento: fat.data_vencimento ?? '',
+      forma_pagamento: fat.forma_pagamento ?? '',
+      observacoes:     fat.observacoes ?? '',
+    })
+    setErroEdit('')
+    setPainelEdit(true)
+  }
+
+  async function salvarEdicao() {
+    setSalvandoEdit(true); setErroEdit('')
+    try {
+      const { error } = await supabase.from('faturas').update({
+        descricao:       formEdit.descricao,
+        data_vencimento: formEdit.data_vencimento,
+        forma_pagamento: formEdit.forma_pagamento || null,
+        observacoes:     formEdit.observacoes,
+      }).eq('id', faturaEdit.id)
+      if (error) throw error
+      setPainelEdit(false); load()
+    } catch(e: any) { setErroEdit(e.message) }
+    finally { setSalvandoEdit(false) }
+  }
+
+  async function excluirFatura(fat: any) {
+    if (!confirm(`Excluir a fatura ${fat.numero}?\n\nEsta ação é irreversível.`)) return
+    // Verificar dependências
+    const { data: recs } = await supabase.from('fatura_recebimentos').select('id').eq('fatura_id', fat.id)
+    if (recs && recs.length > 0) {
+      alert(`Esta fatura possui ${recs.length} recebimento(s) registrado(s) e não pode ser excluída.\nEstorne os recebimentos antes de excluir.`)
+      return
+    }
+    await supabase.from('faturas').delete().eq('id', fat.id)
+    load()
+  }
+
+  // ── Impressão de recibo / fatura ──────────────────────────────────────────
+  async function imprimirRecibo(fat: any) {
+    const { data: recs } = await supabase
+      .from('fatura_recebimentos').select('*, usuarios(nome)')
+      .eq('fatura_id', fat.id).order('data_recebimento')
+    const cliente = fat.contratos?.clientes?.nome ?? '—'
+    const contrato = fat.contratos?.numero ?? '—'
+    const w = window.open('', '_blank', 'width=700,height=900')
+    if (!w) return
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Recibo ${fat.numero}</title>
+    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:0;padding:20px}
+    .header{text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px}
+    .title{font-size:18px;font-weight:bold}
+    .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee}
+    .lbl{color:#555;font-weight:600} .val{font-weight:700}
+    .total{font-size:15px;font-weight:bold;background:#f5f5f5;padding:10px;border-radius:4px;margin-top:12px}
+    .ass{margin-top:60px;border-top:1px solid #000;padding-top:8px;width:200px}
+    </style></head><body>
+    <div class="header"><div class="title">RECIBO DE PAGAMENTO</div><div>${fat.numero}</div></div>
+    <div class="row"><span class="lbl">Cliente:</span><span class="val">${cliente}</span></div>
+    <div class="row"><span class="lbl">Contrato:</span><span class="val">${contrato}</span></div>
+    <div class="row"><span class="lbl">Tipo:</span><span class="val">${fat.tipo}</span></div>
+    <div class="row"><span class="lbl">Valor Total:</span><span class="val">${Number(fat.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>
+    <div class="row"><span class="lbl">Valor Recebido:</span><span class="val">${Number(fat.valor_recebido||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>
+    ${(recs??[]).map((r:any)=>`<div class="row"><span class="lbl">${r.data_recebimento} — ${r.forma_pagamento??''}:</span><span class="val">${Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>`).join('')}
+    <div class="total">Saldo Restante: ${Number(fat.saldo_restante??0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</div>
+    <div style="margin-top:40px;font-size:11px;color:#888;text-align:center">Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</div>
+    <div class="ass">Assinatura</div>
+    </body></html>`)
+    w.document.close(); w.print()
+  }
+
+  async function imprimirFatura(fat: any) {
+    const cliente = fat.contratos?.clientes?.nome ?? '—'
+    const contrato = fat.contratos?.numero ?? '—'
+    const { data: todasFat } = await supabase.from('faturas')
+      .select('tipo, valor, valor_recebido, status, descricao')
+      .eq('contrato_id', fat.contrato_id).neq('status','cancelado')
+    const discriminacao = (todasFat??[]).map((f:any)=>
+      `<div class="row"><span class="lbl">${f.tipo?.toUpperCase()}:</span><span>${Number(f.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>`
+    ).join('')
+    const w = window.open('', '_blank', 'width=700,height=900')
+    if (!w) return
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fatura ${fat.numero}</title>
+    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:0;padding:20px}
+    .header{text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px}
+    .title{font-size:18px;font-weight:bold}.subtitle{color:#555;font-size:13px}
+    .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee}
+    .lbl{color:#555;font-weight:600} .section{font-weight:bold;margin-top:14px;margin-bottom:6px;font-size:13px}
+    .total{font-size:15px;font-weight:bold;background:#f5f5f5;padding:10px;border-radius:4px;margin-top:12px}
+    </style></head><body>
+    <div class="header"><div class="title">FATURA DE LOCAÇÃO</div><div class="subtitle">${fat.numero}</div></div>
+    <div class="row"><span class="lbl">Cliente:</span><span>${cliente}</span></div>
+    <div class="row"><span class="lbl">Contrato:</span><span>${contrato}</span></div>
+    <div class="row"><span class="lbl">Vencimento:</span><span>${fat.data_vencimento}</span></div>
+    <div class="row"><span class="lbl">Descrição:</span><span>${fat.descricao??'—'}</span></div>
+    <div class="section">Discriminação por Tipo</div>
+    ${discriminacao}
+    <div class="total">Total da Fatura: ${Number(fat.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}<br>
+    Recebido: ${Number(fat.valor_recebido||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}<br>
+    Saldo: ${Number(fat.saldo_restante||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</div>
+    <div style="margin-top:40px;font-size:11px;color:#888;text-align:center">Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</div>
+    </body></html>`)
+    w.document.close(); w.print()
+  }
+
+  const hoje = new Date().toISOString().split('T')[0]
     setKpis({
       total:    lista.reduce((s,f) => s + Number(f.valor), 0),
       recebido: lista.reduce((s,f) => s + Number(f.valor_recebido ?? 0), 0),
@@ -178,6 +291,112 @@ export default function FinanceiroPage() {
     load()
   }
 
+  // ── Editar fatura ──────────────────────────────────────────────────────────
+  function abrirEdicao(fat: any) {
+    setFaturaEdit(fat)
+    setFormEdit({
+      descricao:       fat.descricao ?? '',
+      data_vencimento: fat.data_vencimento ?? '',
+      forma_pagamento: fat.forma_pagamento ?? '',
+      observacoes:     fat.observacoes ?? '',
+    })
+    setErroEdit('')
+    setPainelEdit(true)
+  }
+
+  async function salvarEdicao() {
+    setSalvandoEdit(true); setErroEdit('')
+    try {
+      const { error } = await supabase.from('faturas').update({
+        descricao:       formEdit.descricao,
+        data_vencimento: formEdit.data_vencimento,
+        forma_pagamento: formEdit.forma_pagamento || null,
+        observacoes:     formEdit.observacoes,
+      }).eq('id', faturaEdit.id)
+      if (error) throw error
+      setPainelEdit(false); load()
+    } catch(e: any) { setErroEdit(e.message) }
+    finally { setSalvandoEdit(false) }
+  }
+
+  async function excluirFatura(fat: any) {
+    if (!confirm(`Excluir a fatura ${fat.numero}?\n\nEsta ação é irreversível.`)) return
+    // Verificar dependências
+    const { data: recs } = await supabase.from('fatura_recebimentos').select('id').eq('fatura_id', fat.id)
+    if (recs && recs.length > 0) {
+      alert(`Esta fatura possui ${recs.length} recebimento(s) registrado(s) e não pode ser excluída.\nEstorne os recebimentos antes de excluir.`)
+      return
+    }
+    await supabase.from('faturas').delete().eq('id', fat.id)
+    load()
+  }
+
+  // ── Impressão de recibo / fatura ──────────────────────────────────────────
+  async function imprimirRecibo(fat: any) {
+    const { data: recs } = await supabase
+      .from('fatura_recebimentos').select('*, usuarios(nome)')
+      .eq('fatura_id', fat.id).order('data_recebimento')
+    const cliente = fat.contratos?.clientes?.nome ?? '—'
+    const contrato = fat.contratos?.numero ?? '—'
+    const w = window.open('', '_blank', 'width=700,height=900')
+    if (!w) return
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Recibo ${fat.numero}</title>
+    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:0;padding:20px}
+    .header{text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px}
+    .title{font-size:18px;font-weight:bold}
+    .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee}
+    .lbl{color:#555;font-weight:600} .val{font-weight:700}
+    .total{font-size:15px;font-weight:bold;background:#f5f5f5;padding:10px;border-radius:4px;margin-top:12px}
+    .ass{margin-top:60px;border-top:1px solid #000;padding-top:8px;width:200px}
+    </style></head><body>
+    <div class="header"><div class="title">RECIBO DE PAGAMENTO</div><div>${fat.numero}</div></div>
+    <div class="row"><span class="lbl">Cliente:</span><span class="val">${cliente}</span></div>
+    <div class="row"><span class="lbl">Contrato:</span><span class="val">${contrato}</span></div>
+    <div class="row"><span class="lbl">Tipo:</span><span class="val">${fat.tipo}</span></div>
+    <div class="row"><span class="lbl">Valor Total:</span><span class="val">${Number(fat.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>
+    <div class="row"><span class="lbl">Valor Recebido:</span><span class="val">${Number(fat.valor_recebido||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>
+    ${(recs??[]).map((r:any)=>`<div class="row"><span class="lbl">${r.data_recebimento} — ${r.forma_pagamento??''}:</span><span class="val">${Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>`).join('')}
+    <div class="total">Saldo Restante: ${Number(fat.saldo_restante??0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</div>
+    <div style="margin-top:40px;font-size:11px;color:#888;text-align:center">Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</div>
+    <div class="ass">Assinatura</div>
+    </body></html>`)
+    w.document.close(); w.print()
+  }
+
+  async function imprimirFatura(fat: any) {
+    const cliente = fat.contratos?.clientes?.nome ?? '—'
+    const contrato = fat.contratos?.numero ?? '—'
+    const { data: todasFat } = await supabase.from('faturas')
+      .select('tipo, valor, valor_recebido, status, descricao')
+      .eq('contrato_id', fat.contrato_id).neq('status','cancelado')
+    const discriminacao = (todasFat??[]).map((f:any)=>
+      `<div class="row"><span class="lbl">${f.tipo?.toUpperCase()}:</span><span>${Number(f.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>`
+    ).join('')
+    const w = window.open('', '_blank', 'width=700,height=900')
+    if (!w) return
+    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fatura ${fat.numero}</title>
+    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:0;padding:20px}
+    .header{text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px}
+    .title{font-size:18px;font-weight:bold}.subtitle{color:#555;font-size:13px}
+    .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee}
+    .lbl{color:#555;font-weight:600} .section{font-weight:bold;margin-top:14px;margin-bottom:6px;font-size:13px}
+    .total{font-size:15px;font-weight:bold;background:#f5f5f5;padding:10px;border-radius:4px;margin-top:12px}
+    </style></head><body>
+    <div class="header"><div class="title">FATURA DE LOCAÇÃO</div><div class="subtitle">${fat.numero}</div></div>
+    <div class="row"><span class="lbl">Cliente:</span><span>${cliente}</span></div>
+    <div class="row"><span class="lbl">Contrato:</span><span>${contrato}</span></div>
+    <div class="row"><span class="lbl">Vencimento:</span><span>${fat.data_vencimento}</span></div>
+    <div class="row"><span class="lbl">Descrição:</span><span>${fat.descricao??'—'}</span></div>
+    <div class="section">Discriminação por Tipo</div>
+    ${discriminacao}
+    <div class="total">Total da Fatura: ${Number(fat.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}<br>
+    Recebido: ${Number(fat.valor_recebido||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}<br>
+    Saldo: ${Number(fat.saldo_restante||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</div>
+    <div style="margin-top:40px;font-size:11px;color:#888;text-align:center">Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</div>
+    </body></html>`)
+    w.document.close(); w.print()
+  }
+
   const hoje = new Date().toISOString().split('T')[0]
   const saldo = faturaAlvo ? Number(faturaAlvo.saldo_restante ?? faturaAlvo.valor) : 0
 
@@ -261,23 +480,42 @@ export default function FinanceiroPage() {
         ]}
         data={faturas}
         actions={row => (
-          row.status !== 'pago' && row.status !== 'cancelado' ? (
-            <button
-              onClick={() => abrirPainel(row)}
-              style={{ background:'var(--c-primary)', color:'#fff', border:'none',
-                borderRadius:'var(--r-md)', padding:'5px 14px', fontWeight:600,
-                fontSize:'var(--fs-md)', cursor:'pointer', whiteSpace:'nowrap',
-                transition:'opacity 150ms' }}
-              onMouseEnter={e => (e.currentTarget.style.opacity='0.85')}
-              onMouseLeave={e => (e.currentTarget.style.opacity='1')}
-            >
-              Receber
-            </button>
-          ) : (
-            row.status === 'pago' ? (
-              <span style={{ fontSize:'var(--fs-md)', color:'var(--c-success)', fontWeight:600 }}>✓ Pago</span>
-            ) : null
-          )
+          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+            {row.status !== 'pago' && row.status !== 'cancelado' && (
+              <button onClick={() => abrirPainel(row)}
+                style={{background:'var(--c-primary)',color:'#fff',border:'none',borderRadius:'var(--r-sm)',
+                  padding:'4px 10px',fontWeight:600,fontSize:'var(--fs-md)',cursor:'pointer'}}>
+                Receber
+              </button>
+            )}
+            <div style={{position:'relative',display:'inline-block'}} className="fat-menu-wrap">
+              <button
+                title="Mais ações"
+                onClick={e=>{const m=e.currentTarget.nextElementSibling as HTMLElement;m.style.display=m.style.display==='block'?'none':'block';e.stopPropagation()}}
+                style={{background:'var(--bg-header)',border:'1px solid var(--border)',borderRadius:'var(--r-sm)',
+                  padding:'4px 8px',cursor:'pointer',fontWeight:700,fontSize:13,color:'var(--t-secondary)',lineHeight:1}}>
+                ⋮
+              </button>
+              <div style={{display:'none',position:'absolute',right:0,top:'100%',zIndex:200,
+                background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:'var(--r-md)',
+                boxShadow:'var(--shadow-md)',minWidth:170,padding:'4px 0'}}
+                onClick={e=>e.stopPropagation()}>
+                {[
+                  {l:'✏️ Editar',          fn:()=>{ abrirEdicao(row); (document.querySelectorAll('.fat-menu-wrap div')[0] as any).style.display='none' }},
+                  {l:'🖨️ Imprimir Recibo', fn:()=>imprimirRecibo(row)},
+                  {l:'📄 Imprimir Fatura', fn:()=>imprimirFatura(row)},
+                  {l:'🗑️ Excluir',         fn:()=>excluirFatura(row), danger:true},
+                ].map(a=>(
+                  <button key={a.l} onClick={()=>{a.fn();(document.querySelectorAll('.fat-menu-wrap div')[0] as any).style.display='none'}}
+                    style={{display:'block',width:'100%',textAlign:'left',background:'none',
+                      border:'none',padding:'7px 14px',cursor:'pointer',fontSize:'var(--fs-md)',
+                      color:a.danger?'var(--c-danger)':'var(--t-primary)',fontWeight:500}}>
+                    {a.l}
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
         )}
       />
 
@@ -458,6 +696,43 @@ export default function FinanceiroPage() {
 
         </div>
       </SlidePanel>
+
+      {/* ── Painel de Edição ───────────────────────────────────────────────── */}
+      <SlidePanel
+        open={painelEdit}
+        onClose={() => setPainelEdit(false)}
+        title="Editar Fatura"
+        subtitle={faturaEdit?.numero}
+        width="sm"
+        footer={
+          <div style={{ display:'flex', gap:10, width:'100%' }}>
+            <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPainelEdit(false)}>Cancelar</Btn>
+            <Btn style={{ flex:2 }} loading={salvandoEdit} onClick={salvarEdicao}>Salvar</Btn>
+          </div>
+        }
+      >
+        {faturaEdit && (
+          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+            {erroEdit && <div style={{background:'var(--c-danger-light)',border:'1px solid var(--c-danger)',borderRadius:'var(--r-md)',padding:'10px 14px',color:'var(--c-danger-text)',fontSize:'var(--fs-md)'}}>{erroEdit}</div>}
+            <FormField label="Descrição">
+              <input className={inputCls} value={formEdit.descricao} onChange={e=>setFormEdit({...formEdit,descricao:e.target.value})} placeholder="Descrição da fatura" />
+            </FormField>
+            <FormField label="Vencimento">
+              <input type="date" className={inputCls} value={formEdit.data_vencimento} onChange={e=>setFormEdit({...formEdit,data_vencimento:e.target.value})} />
+            </FormField>
+            <FormField label="Forma de Pagamento">
+              <select className={selectCls} value={formEdit.forma_pagamento} onChange={e=>setFormEdit({...formEdit,forma_pagamento:e.target.value})}>
+                <option value="">— Selecione —</option>
+                {FORMAS.map(f=><option key={f} value={f}>{fmtForma(f)}</option>)}
+              </select>
+            </FormField>
+            <FormField label="Observações">
+              <textarea className={textareaCls} rows={3} value={formEdit.observacoes} onChange={e=>setFormEdit({...formEdit,observacoes:e.target.value})} placeholder="Observações internas..." />
+            </FormField>
+          </div>
+        )}
+      </SlidePanel>
+
     </div>
   )
 }

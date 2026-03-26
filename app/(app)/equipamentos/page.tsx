@@ -8,7 +8,7 @@ import type { AcaoSecundaria } from '@/components/ui/ActionButtons'
 const emptyForm = () => ({
   nome:'', codigo:'', categoria_id:'', marca:'', modelo:'', descricao:'',
   controla_patrimonio:1, unidade:'un', estoque_total:0, estoque_minimo:0,
-  custo_reposicao:0, prazo_entrega_dias:0, preco_locacao_diario:0, preco_locacao_semanal:0,
+  custo_reposicao:0, prazo_entrega_dias:0, preco_locacao_diario:0, preco_fds:0, preco_locacao_semanal:0,
   preco_quinzenal:0, preco_locacao_mensal:0, preco_trimestral:0, preco_semestral:0, observacoes:''
 })
 
@@ -18,6 +18,7 @@ function campoPreco(nomeP: string) {
   if (n.includes('trimes')) return 'preco_trimestral'
   if (n.includes('mens'))   return 'preco_locacao_mensal'
   if (n.includes('quinz'))  return 'preco_quinzenal'
+  if (n.toLowerCase().includes('final') || n.toLowerCase().includes('fds') || n.toLowerCase().includes('weekend')) return 'preco_fds'
   if (n.includes('seman'))  return 'preco_locacao_semanal'
   return 'preco_locacao_diario'
 }
@@ -45,6 +46,66 @@ export default function EquipamentosPage() {
   // Painel: preços (acesso rápido pelas ações)
   const [panelPrecos, setPanelPrecos] = useState(false)
   const [precosRow,   setPrecosRow]   = useState<any>(null)
+
+  // ── Movimentação de Ativos ────────────────────────────────────────────────
+  const [modalMov,      setModalMov]      = useState(false)
+  const [movProduto,    setMovProduto]    = useState<any>(null)
+  const [movTransacoes, setMovTransacoes] = useState<any[]>([])
+  const [movLoading,    setMovLoading]    = useState(false)
+  const [movTab,        setMovTab]        = useState<'historico'|'nova'>('historico')
+  const [movSalvando,   setMovSalvando]   = useState(false)
+  const [movErro,       setMovErro]       = useState('')
+  const [patrimoniosMov, setPatrimoniosMov] = useState<any[]>([])
+  const emptyMov = () => ({
+    tipo:'compra', patrimonio_id:'', valor:'', data_transacao: new Date().toISOString().split('T')[0],
+    numero_nota_fiscal:'', garantia_ate:'', depreciacao_meses:'', status_apos:'disponivel', observacoes:''
+  })
+  const [formMov, setFormMov] = useState<any>(emptyMov())
+
+  async function abrirMovimentacao(prod: any) {
+    setMovProduto(prod)
+    setMovTab('historico')
+    setFormMov(emptyMov())
+    setMovErro('')
+    setModalMov(true)
+    setMovLoading(true)
+    const res = await fetch(`/api/asset-transactions?produto_id=${prod.id}`)
+    const data = await res.json()
+    setMovTransacoes(data.ok ? data.data : [])
+    // Carregar patrimônios do produto
+    const { data: pats } = await supabase.from('patrimonios')
+      .select('id,numero_patrimonio,numero_serie,status').eq('produto_id', prod.id).order('numero_patrimonio')
+    setPatrimoniosMov(pats ?? [])
+    setMovLoading(false)
+  }
+
+  async function salvarMovimentacao() {
+    setMovSalvando(true); setMovErro('')
+    try {
+      const res = await fetch('/api/asset-transactions', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ ...formMov, produto_id: movProduto.id })
+      })
+      const data = await res.json()
+      if (!data.ok) throw new Error(data.error)
+      // Refresh
+      const res2 = await fetch(`/api/asset-transactions?produto_id=${movProduto.id}`)
+      const data2 = await res2.json()
+      setMovTransacoes(data2.ok ? data2.data : [])
+      setFormMov(emptyMov())
+      setMovTab('historico')
+      load()
+    } catch(e:any) { setMovErro(e.message) }
+    finally { setMovSalvando(false) }
+  }
+
+  async function excluirTransacao(id: number) {
+    if (!confirm('Excluir esta movimentação?')) return
+    await fetch(`/api/asset-transactions?id=${id}`, { method:'DELETE' })
+    const res = await fetch(`/api/asset-transactions?produto_id=${movProduto.id}`)
+    const data = await res.json()
+    setMovTransacoes(data.ok ? data.data : [])
+  }
 
   async function load() {
     setLoading(true)
@@ -98,6 +159,7 @@ export default function EquipamentosPage() {
       unidade: form.unidade||'un', estoque_total: Number(form.estoque_total)||0,
       estoque_minimo: Number(form.estoque_minimo)||0, custo_reposicao: Number(form.custo_reposicao)||0,
       preco_locacao_diario:  Number(form.preco_locacao_diario)||0,
+      preco_fds:             Number(form.preco_fds)||0,
       preco_locacao_semanal: Number(form.preco_locacao_semanal)||0,
       preco_quinzenal:       Number(form.preco_quinzenal)||0,
       preco_locacao_mensal:  Number(form.preco_locacao_mensal)||0,
@@ -202,7 +264,14 @@ export default function EquipamentosPage() {
         data={lista}
         onRowClick={row => verDetalhe(row)}
         actions={row => (
-          <ActionButtons
+          <div style={{display:'flex',gap:6,alignItems:'center'}}>
+            <button onClick={() => abrirMovimentacao(row)}
+              title="Movimentação de Ativos"
+              style={{background:'var(--bg-header)',border:'1px solid var(--border)',borderRadius:'var(--r-sm)',
+                padding:'4px 9px',cursor:'pointer',fontSize:'var(--fs-md)',color:'var(--t-secondary)',fontWeight:600}}>
+              📦
+            </button>
+            <ActionButtons
             onView={()  => verDetalhe(row)}
             onEdit={()  => abrir(row)}
             onDelete={() => inativar(row.id)}
@@ -278,6 +347,7 @@ export default function EquipamentosPage() {
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
                 {[
                   { l:'Diário',        v: viewRow.preco_locacao_diario },
+                  { l:'Final de Sem.', v: viewRow.preco_fds },
                   { l:'Semanal',       v: viewRow.preco_locacao_semanal },
                   { l:'Quinzenal',     v: viewRow.preco_quinzenal },
                   { l:'Mensal',        v: viewRow.preco_locacao_mensal },
@@ -411,6 +481,160 @@ export default function EquipamentosPage() {
           </FormField>
         </div>
       </SlidePanel>
+
+      {/* ── Modal de Movimentação de Ativos ───────────────────────────────── */}
+      {modalMov && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.55)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+          <div style={{background:'var(--bg-card)',borderRadius:'var(--r-lg)',width:'100%',maxWidth:720,
+            maxHeight:'90vh',display:'flex',flexDirection:'column',boxShadow:'var(--shadow-lg)'}}>
+            {/* Header */}
+            <div style={{padding:'16px 20px',borderBottom:'1px solid var(--border)',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:'var(--fs-lg)'}}>Movimentação de Ativos</div>
+                <div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)'}}>{movProduto?.nome}</div>
+              </div>
+              <button onClick={()=>setModalMov(false)}
+                style={{background:'none',border:'none',cursor:'pointer',fontSize:20,color:'var(--t-muted)',padding:'4px 8px'}}>✕</button>
+            </div>
+
+            {/* Tabs */}
+            <div style={{display:'flex',borderBottom:'1px solid var(--border)',padding:'0 20px'}}>
+              {([['historico','📋 Histórico'],['nova','➕ Nova Movimentação']] as const).map(([k,l])=>(
+                <button key={k} onClick={()=>setMovTab(k)}
+                  style={{padding:'10px 16px',border:'none',background:'none',cursor:'pointer',
+                    fontWeight:movTab===k?700:400,fontSize:'var(--fs-md)',
+                    color:movTab===k?'var(--c-primary)':'var(--t-muted)',
+                    borderBottom:movTab===k?'2px solid var(--c-primary)':'2px solid transparent'}}>
+                  {l}
+                </button>
+              ))}
+            </div>
+
+            {/* Content */}
+            <div style={{flex:1,overflowY:'auto',padding:20}}>
+              {movTab==='historico' && (
+                movLoading ? <div style={{textAlign:'center',padding:30,color:'var(--t-muted)'}}>Carregando…</div> :
+                movTransacoes.length===0 ? <div style={{textAlign:'center',padding:30,color:'var(--t-muted)'}}>Nenhuma movimentação registrada.</div> :
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:'var(--fs-md)'}}>
+                  <thead>
+                    <tr style={{background:'var(--bg-header)'}}>
+                      {['Data','Tipo','Patrimônio','Valor','NF','Garantia até','Responsável',''].map(h=>(
+                        <th key={h} style={{padding:'7px 10px',textAlign:'left',fontWeight:600,color:'var(--t-muted)',
+                          fontSize:'var(--fs-sm)',borderBottom:'1px solid var(--border)'}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {movTransacoes.map((t:any)=>(
+                      <tr key={t.id} style={{borderBottom:'1px solid var(--border)'}}>
+                        <td style={{padding:'7px 10px'}}>{t.data_transacao}</td>
+                        <td style={{padding:'7px 10px',textTransform:'capitalize',fontWeight:600}}>{t.tipo}</td>
+                        <td style={{padding:'7px 10px',fontFamily:'var(--font-mono)',fontSize:'var(--fs-sm)'}}>
+                          {t.patrimonios?.numero_patrimonio ?? '—'}
+                        </td>
+                        <td style={{padding:'7px 10px',fontWeight:700}}>
+                          {t.valor>0?`R$ ${Number(t.valor).toFixed(2).replace('.',',')}` : '—'}
+                        </td>
+                        <td style={{padding:'7px 10px',color:'var(--t-muted)'}}>{t.numero_nota_fiscal??'—'}</td>
+                        <td style={{padding:'7px 10px',color:'var(--t-muted)'}}>{t.garantia_ate??'—'}</td>
+                        <td style={{padding:'7px 10px',color:'var(--t-muted)'}}>{t.usuarios?.nome??'—'}</td>
+                        <td style={{padding:'7px 10px'}}>
+                          <button onClick={()=>excluirTransacao(t.id)}
+                            style={{background:'none',border:'none',cursor:'pointer',color:'var(--c-danger)',fontSize:'var(--fs-md)'}}>
+                            🗑️
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+
+              {movTab==='nova' && (
+                <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                  {movErro && <div style={{background:'var(--c-danger-light)',border:'1px solid var(--c-danger)',borderRadius:'var(--r-md)',padding:'10px 14px',color:'var(--c-danger-text)'}}>{movErro}</div>}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                    <FormField label="Tipo de Movimentação *">
+                      <select className={selectCls} value={formMov.tipo} onChange={e=>setFormMov({...formMov,tipo:e.target.value})}>
+                        <option value="compra">Compra / Entrada</option>
+                        <option value="venda">Venda</option>
+                        <option value="baixa">Baixa / Descarte</option>
+                        <option value="ajuste">Ajuste de Estoque</option>
+                        <option value="transferencia">Transferência</option>
+                      </select>
+                    </FormField>
+                    <FormField label="Data *">
+                      <input type="date" className={inputCls} value={formMov.data_transacao}
+                        onChange={e=>setFormMov({...formMov,data_transacao:e.target.value})} />
+                    </FormField>
+                    <FormField label="Patrimônio (Serial Number)">
+                      <select className={selectCls} value={formMov.patrimonio_id}
+                        onChange={e=>setFormMov({...formMov,patrimonio_id:e.target.value})}>
+                        <option value="">— Selecione ou deixe em branco —</option>
+                        {patrimoniosMov.map((p:any)=>(
+                          <option key={p.id} value={p.id}>
+                            {p.numero_patrimonio}{p.numero_serie?` (${p.numero_serie})`:''} — {p.status}
+                          </option>
+                        ))}
+                      </select>
+                    </FormField>
+                    <FormField label="Status após movimentação">
+                      <select className={selectCls} value={formMov.status_apos}
+                        onChange={e=>setFormMov({...formMov,status_apos:e.target.value})}>
+                        <option value="disponivel">Disponível</option>
+                        <option value="manutencao">Em Manutenção</option>
+                        <option value="descartado">Descartado</option>
+                        <option value="reservado">Reservado</option>
+                      </select>
+                    </FormField>
+                    <FormField label="Valor (R$)">
+                      <input type="number" step="0.01" min="0" className={inputCls}
+                        value={formMov.valor} onChange={e=>setFormMov({...formMov,valor:e.target.value})}
+                        placeholder="0,00" />
+                    </FormField>
+                    <FormField label="Nº Nota Fiscal">
+                      <input className={inputCls} value={formMov.numero_nota_fiscal}
+                        onChange={e=>setFormMov({...formMov,numero_nota_fiscal:e.target.value})}
+                        placeholder="Ex: NF-e 000123" />
+                    </FormField>
+                    <FormField label="Garantia até">
+                      <input type="date" className={inputCls} value={formMov.garantia_ate}
+                        onChange={e=>setFormMov({...formMov,garantia_ate:e.target.value})} />
+                    </FormField>
+                    <FormField label="Depreciação (meses)">
+                      <input type="number" min="0" className={inputCls}
+                        value={formMov.depreciacao_meses}
+                        onChange={e=>setFormMov({...formMov,depreciacao_meses:e.target.value})}
+                        placeholder="Ex: 60" />
+                    </FormField>
+                  </div>
+                  <FormField label="Observações">
+                    <textarea className={textareaCls} rows={2} value={formMov.observacoes}
+                      onChange={e=>setFormMov({...formMov,observacoes:e.target.value})}
+                      placeholder="Detalhes da movimentação…" />
+                  </FormField>
+                  {formMov.tipo==='compra' && (
+                    <div style={{background:'var(--c-primary-light,#e8f4f8)',border:'1px solid var(--c-primary)',borderRadius:'var(--r-sm)',padding:'8px 12px',fontSize:'var(--fs-md)',color:'var(--c-primary)'}}>
+                      ℹ️ Ao salvar, o <strong>Custo de Reposição</strong> do produto será atualizado automaticamente com este valor.
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            {movTab==='nova' && (
+              <div style={{padding:'14px 20px',borderTop:'1px solid var(--border)',display:'flex',gap:10}}>
+                <Btn variant="secondary" onClick={()=>setMovTab('historico')} style={{flex:1}}>Cancelar</Btn>
+                <Btn onClick={salvarMovimentacao} loading={movSalvando} style={{flex:2}}>
+                  Registrar Movimentação
+                </Btn>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }

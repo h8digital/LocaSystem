@@ -3,20 +3,17 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 
 const nav = [
-  {href:'/dashboard',   icon:'⊞',  label:'Dashboard',    section:'PRINCIPAL'},
-  {href:'/cotacoes',    icon:'📋', label:'Cotações',     section:'COMERCIAL'},
-  {href:'/contratos',   icon:'📄', label:'Contratos',    section:null},
-  {href:'/financeiro',  icon:'💰', label:'Financeiro',   section:null},
-  {href:'/faturas',     icon:'🧾', label:'Faturas',      section:null},
-  {href:'/clientes',    icon:'👥', label:'Clientes',     section:null},
-  {href:'/equipamentos',icon:'🔧', label:'Equipamentos', section:'ESTOQUE'},
-  {href:'/estoque',     icon:'📦', label:'Estoque',      section:null},
-  {href:'/manutencoes', icon:'🔩', label:'Manutenções',  section:null},
-  {href:'/relatorios',  icon:'📊', label:'Relatórios',   section:'RELATÓRIOS'},
-  {href:'/templates',   icon:'📋', label:'Templates',    section:'DOCUMENTOS'},
-  {href:'/usuarios',    icon:'👤', label:'Usuários',     section:'SISTEMA'},
-  {href:'/parametros',  icon:'⚙️', label:'Parâmetros',   section:null},
-  {href:'/design-system',icon:'🎨', label:'Design System', section:null},
+  {href:'/dashboard',    icon:'⊞',  label:'Dashboard',     section:'PRINCIPAL'},
+  {href:'/cotacoes',     icon:'📋', label:'Cotações',      section:'COMERCIAL'},
+  {href:'/contratos',    icon:'📄', label:'Contratos',     section:null},
+  {href:'/financeiro',   icon:'💰', label:'Financeiro',    section:null},
+  {href:'/clientes',     icon:'👥', label:'Clientes',      section:null},
+  {href:'/equipamentos', icon:'🔧', label:'Equipamentos',  section:'ESTOQUE'},
+  {href:'/manutencoes',  icon:'🔩', label:'Manutenções',   section:null},
+  {href:'/relatorios',   icon:'📊', label:'Relatórios',    section:'RELATÓRIOS'},
+  {href:'/templates',    icon:'📋', label:'Templates',     section:'DOCUMENTOS'},
+  {href:'/usuarios',     icon:'👤', label:'Usuários',      section:'SISTEMA'},
+  {href:'/parametros',   icon:'⚙️', label:'Parâmetros',    section:null},
 ]
 
 export default function Sidebar({ user }: { user: any }) {

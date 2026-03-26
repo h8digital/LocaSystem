@@ -115,6 +115,7 @@ export default function CriarContratoPage() {
       else if(d>=90&&it._produto.preco_trimestral>0)   preco=Number(it._produto.preco_trimestral)
       else if(d>=30&&it._produto.preco_locacao_mensal>0)preco=Number(it._produto.preco_locacao_mensal)
       else if(d>=15&&it._produto.preco_quinzenal>0)    preco=Number(it._produto.preco_quinzenal)
+      else if((()=>{const nm=(periodos.find((x:any)=>String(x.id)===String(form.periodo_id))?.nome??'').toLowerCase();return nm.includes('final')||nm.includes('fds')})()&&it._produto.preco_fds>0)preco=Number(it._produto.preco_fds)
       else if(d>=7&&it._produto.preco_locacao_semanal>0)preco=Number(it._produto.preco_locacao_semanal)
       else preco=Number(it._produto.preco_locacao_diario??0)
       if(preco===0) return it
@@ -153,6 +154,10 @@ export default function CriarContratoPage() {
     if(!prod) return 0
     const p=periodos.find((p:any)=>String(p.id)===String(form.periodo_id))
     const d=p?.dias??dias??1
+    const nomePeriodo=(p?.nome??'').toLowerCase()
+    // FDS (Final de Semana) usa campo próprio preco_fds — NÃO herda do semanal
+    const isFDS = nomePeriodo.includes('final') || nomePeriodo.includes('fds') || nomePeriodo.includes('weekend')
+    if(isFDS && prod.preco_fds>0)             return Number(prod.preco_fds)
     if(d>=180 && prod.preco_semestral>0)      return Number(prod.preco_semestral)
     if(d>=90  && prod.preco_trimestral>0)     return Number(prod.preco_trimestral)
     if(d>=30  && prod.preco_locacao_mensal>0) return Number(prod.preco_locacao_mensal)
@@ -401,7 +406,7 @@ export default function CriarContratoPage() {
                 value={itemProdutoId} displayValue={itemProdutoNome}
                 onChange={(id,row)=>selecionarProduto(id as number,row)}
                 table="produtos" searchColumn="nome"
-                extraColumns="controla_patrimonio,preco_locacao_diario,preco_locacao_semanal,preco_quinzenal,preco_locacao_mensal,preco_trimestral,preco_semestral,marca,custo_reposicao,prazo_entrega_dias"
+                extraColumns="controla_patrimonio,preco_locacao_diario,preco_fds,preco_locacao_semanal,preco_quinzenal,preco_locacao_mensal,preco_trimestral,preco_semestral,marca,custo_reposicao,prazo_entrega_dias"
                 filter={{ativo:1}}
                 renderOption={row=>(
                   <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
