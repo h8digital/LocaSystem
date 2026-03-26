@@ -72,15 +72,15 @@ export default function VerContratoPage() {
 
   useEffect(() => {
     async function load() {
-      const [{ data:c },{ data:i },{ data:f },{ data:t },{ data:d }] = await Promise.all([
+      const [{ data:c },{ data:i },{ data:f }, s,{ data:t },{ data:d }] = await Promise.all([
         supabase.from('contratos').select('*, clientes(*), usuarios(nome)').eq('id', id).single(),
         supabase.from('contrato_itens').select('*, produtos(nome), patrimonios(numero_patrimonio)').eq('contrato_id', id),
         supabase.from('faturas').select('*').eq('contrato_id', id).order('data_vencimento'),
-        supabase.from('contrato_saldo').select('*').eq('contrato_id', id).single(),
+        supabase.from('contrato_saldo').select('*').eq('contrato_id', id).maybeSingle(),
         supabase.from('doc_templates').select('id,nome,tipo').eq('ativo',1).order('tipo').order('nome'),
         supabase.from('devolucoes').select('*, usuarios(nome)').eq('contrato_id', id).order('created_at',{ascending:false}),
       ])
-      setContrato(c); setItens(i??[]); setFaturas(f??[]); setSaldoInfo((s as any)?.data ?? null)
+      setContrato(c); setItens(i??[]); setFaturas(f??[]); setSaldoInfo(s?.data ?? s ?? null)
       setTemplates(t??[]); setDevolucoes(d??[]); setLoading(false)
       const pad = t?.find((x:any)=>x.padrao===1&&x.tipo==='contrato')
       if(pad) setTemplateSel(String(pad.id))
