@@ -62,8 +62,8 @@ export default function EquipamentosPage() {
     tipo:'compra', valor:'', data_transacao: new Date().toISOString().split('T')[0],
     numero_nota_fiscal:'', garantia_ate:'', depreciacao_meses:'', status_apos:'disponivel',
     observacoes:'',
-    // para saída/baixa: patrimônios existentes selecionados
     patrimonio_id:'',
+    quantidade: 1,   // para produtos sem controle de patrimônio
   })
   const [formMov,      setFormMov]      = useState<any>(emptyMov())
   // Linhas de entrada em lote (compra)
@@ -89,9 +89,56 @@ export default function EquipamentosPage() {
   async function salvarMovimentacao() {
     setMovSalvando(true); setMovErro('')
     try {
-      const isEntrada = formMov.tipo === 'compra'
+      const rastreavel = movProduto?.controla_patrimonio === 1
+      const isEntrada  = formMov.tipo === 'compra'
 
-      if (isEntrada) {
+      // ── Produto SEM controle de patrimônio (por quantidade) ──────────────
+      if (!rastreavel) {
+        const qtd = Number(formMov.quantidade) || 0
+        if (qtd <= 0) throw new Error('Informe uma quantidade válida.')
+
+        // Atualizar estoque_total diretamente
+        const delta = isEntrada ? qtd : -qtd
+        const novoTotal = Math.max(0, Number(movProduto.estoque_total || 0) + delta)
+        const { error: estoqErr } = await supabase
+          .from('produtos').update({ estoque_total: novoTotal }).eq('id', movProduto.id)
+        if (estoqErr) throw new Error(estoqErr.message)
+
+        // Registrar em estoque_movimentacoes
+        await supabase.from('estoque_movimentacoes').insert({
+          produto_id:  movProduto.id,
+          tipo:        isEntrada ? 'entrada' : 'saida',
+          quantidade:  qtd,
+          observacoes: `${formMov.tipo.toUpperCase()} — NF: ${formMov.numero_nota_fiscal||'—'} | ${formMov.observacoes||''}`.trim(),
+        })
+
+        // Registrar na tabela asset_transactions (sem patrimônio)
+        await fetch('/api/asset-transactions', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ ...formMov, produto_id: movProduto.id, patrimonio_id: null })
+        })
+
+        // PRD 3.5: atualiza custo de reposição se for compra com valor
+        if (isEntrada && Number(formMov.valor) > 0) {
+          await supabase.from('produtos').update({ custo_reposicao: Number(formMov.valor) }).eq('id', movProduto.id)
+        }
+
+        // Refresh
+        const { data: prod } = await supabase.from('produtos')
+          .select('id,nome,controla_patrimonio,estoque_total').eq('id', movProduto.id).single()
+        if (prod) setMovProduto(prod)
+        const res2 = await fetch(`/api/asset-transactions?produto_id=${movProduto.id}`)
+        const data2 = await res2.json()
+        setMovTransacoes(data2.ok ? data2.data : [])
+        setFormMov(emptyMov())
+        setMovTab('historico')
+        load()
+        return
+      }
+
+      const isEntrada2 = isEntrada
+
+      if (isEntrada2) {
         // Lote: para cada linha, criar patrimônio + transação
         const linhasValidas = linhasEntrada.filter(l => l.numero_patrimonio.trim())
         if (linhasValidas.length === 0) throw new Error('Informe ao menos um número de patrimônio.')
@@ -123,7 +170,7 @@ export default function EquipamentosPage() {
           if (!data.ok) throw new Error(data.error)
         }
       } else {
-        // Saída/Baixa: um patrimônio existente
+        // Saída/Baixa rastreável: patrimônio existente
         if (!formMov.patrimonio_id) throw new Error('Selecione o patrimônio para esta movimentação.')
         const res = await fetch('/api/asset-transactions', {
           method:'POST', headers:{'Content-Type':'application/json'},
@@ -601,21 +648,35 @@ export default function EquipamentosPage() {
               )}
 
               {movTab==='nova' && (() => {
-                const isEntrada = formMov.tipo === 'compra'
+                const rastreavel = movProduto?.controla_patrimonio === 1
+                const isEntrada  = formMov.tipo === 'compra'
                 return (
                 <div style={{display:'flex',flexDirection:'column',gap:14}}>
                   {movErro && <div style={{background:'var(--c-danger-light)',border:'1px solid var(--c-danger)',borderRadius:'var(--r-md)',padding:'10px 14px',color:'var(--c-danger-text)'}}>{movErro}</div>}
+
+                  {/* ── Badge indicando modo de controle ── */}
+                  <div style={{display:'flex',alignItems:'center',gap:8,padding:'7px 12px',
+                    background: rastreavel ? 'var(--c-primary-light,#e8f4f8)' : '#f0fdf4',
+                    border:`1px solid ${rastreavel?'var(--c-primary)':'#22c55e'}`,
+                    borderRadius:'var(--r-sm)',fontSize:'var(--fs-md)'}}>
+                    <span style={{fontSize:16}}>{rastreavel ? '🔖' : '📦'}</span>
+                    <span style={{color: rastreavel?'var(--c-primary)':'#16a34a', fontWeight:600}}>
+                      {rastreavel
+                        ? 'Rastreável por Serial Number — cada item tem número de patrimônio único'
+                        : `Controle por Quantidade — estoque atual: ${movProduto?.estoque_total ?? 0} unidades`
+                      }
+                    </span>
+                  </div>
 
                   {/* ── Linha 1: Tipo + Data ── */}
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                     <FormField label="Tipo de Movimentação *">
                       <select className={selectCls} value={formMov.tipo}
                         onChange={e=>{ setFormMov({...formMov,tipo:e.target.value}); setLinhasEntrada([emptyPatLine()]) }}>
-                        <option value="compra">Compra / Entrada (lote)</option>
-                        <option value="venda">Venda</option>
+                        <option value="compra">{rastreavel ? 'Compra / Entrada (lote com seriais)' : 'Entrada de Estoque'}</option>
+                        <option value="venda">Venda / Saída</option>
                         <option value="baixa">Baixa / Descarte</option>
                         <option value="ajuste">Ajuste de Estoque</option>
-                        <option value="transferencia">Transferência</option>
                       </select>
                     </FormField>
                     <FormField label="Data *">
@@ -624,8 +685,26 @@ export default function EquipamentosPage() {
                     </FormField>
                   </div>
 
-                  {/* ── ENTRADA EM LOTE (Compra) ── */}
-                  {isEntrada && (
+                  {/* ── NÃO RASTREÁVEL: campo de quantidade ── */}
+                  {!rastreavel && (
+                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                      <FormField label={isEntrada ? 'Quantidade a Adicionar *' : 'Quantidade a Remover *'}>
+                        <input type="number" min="1" step="1" className={inputCls}
+                          value={formMov.quantidade}
+                          onChange={e=>setFormMov({...formMov,quantidade:e.target.value})}
+                          placeholder="Ex: 10" />
+                      </FormField>
+                      {!isEntrada && (
+                        <div style={{padding:'8px 12px',background:'var(--c-danger-light)',border:'1px solid var(--c-danger)',
+                          borderRadius:'var(--r-sm)',fontSize:'var(--fs-md)',color:'var(--c-danger-text)',display:'flex',alignItems:'center'}}>
+                          ⚠ Estoque disponível: <strong style={{marginLeft:4}}>{movProduto?.estoque_total ?? 0} un.</strong>
+                        </div>
+                      )}
+                    </div>
+                  )}
+
+                  {/* ── RASTREÁVEL: ENTRADA EM LOTE ── */}
+                  {rastreavel && isEntrada && (
                     <div style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',overflow:'hidden'}}>
                       <div style={{background:'var(--bg-header)',padding:'8px 12px',fontWeight:700,fontSize:'var(--fs-md)',
                         display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid var(--border)'}}>
@@ -675,8 +754,8 @@ export default function EquipamentosPage() {
                     </div>
                   )}
 
-                  {/* ── SAÍDA: patrimônio existente ── */}
-                  {!isEntrada && (
+                  {/* ── RASTREÁVEL: SAÍDA patrimônio existente ── */}
+                  {rastreavel && !isEntrada && (
                     <FormField label="Patrimônio *">
                       <select className={selectCls} value={formMov.patrimonio_id}
                         onChange={e=>setFormMov({...formMov,patrimonio_id:e.target.value})}>
@@ -702,7 +781,7 @@ export default function EquipamentosPage() {
                         onChange={e=>setFormMov({...formMov,numero_nota_fiscal:e.target.value})}
                         placeholder="Ex: NF-e 000123" />
                     </FormField>
-                    {isEntrada && (<>
+                    {rastreavel && isEntrada && (<>
                       <FormField label="Garantia até">
                         <input type="date" className={inputCls} value={formMov.garantia_ate}
                           onChange={e=>setFormMov({...formMov,garantia_ate:e.target.value})} />
@@ -731,11 +810,17 @@ export default function EquipamentosPage() {
                       placeholder="Detalhes da movimentação…" />
                   </FormField>
 
-                  {isEntrada && (
+                  {rastreavel && isEntrada && (
                     <div style={{background:'#e8f4f8',border:'1px solid var(--c-primary)',borderRadius:'var(--r-sm)',
                       padding:'8px 12px',fontSize:'var(--fs-md)',color:'var(--c-primary)'}}>
-                      ℹ️ Serão criados <strong>{linhasEntrada.filter(l=>l.numero_patrimonio.trim()).length} patrimônio(s)</strong> novos.
+                      ℹ️ Serão criados <strong>{linhasEntrada.filter((l:{numero_patrimonio:string})=>l.numero_patrimonio.trim()).length} patrimônio(s)</strong> novos.
                       O <strong>Custo de Reposição</strong> do produto será atualizado com o valor unitário.
+                    </div>
+                  )}
+                  {!rastreavel && Number(formMov.valor) > 0 && isEntrada && (
+                    <div style={{background:'#e8f4f8',border:'1px solid var(--c-primary)',borderRadius:'var(--r-sm)',
+                      padding:'8px 12px',fontSize:'var(--fs-md)',color:'var(--c-primary)'}}>
+                      ℹ️ O <strong>Custo de Reposição</strong> do produto será atualizado com o valor unitário informado.
                     </div>
                   )}
                 </div>
