@@ -24,7 +24,7 @@ export default function ContratosPage() {
     const { data } = await q.limit(100)
     setContratos(data ?? [])
 
-    const { data:tots } = await supabase.from('contratos').select('status, total')
+    const { data:tots } = await supabase.from('contratos').select('status, total, data_fim')
     setTotais({
       total:  tots?.length ?? 0,
       ativos: tots?.filter(c => c.status === 'ativo').length ?? 0,
