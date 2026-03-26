@@ -622,7 +622,7 @@ export default function EquipamentosPage() {
           )}
 
           {/* ══ ABA DADOS (sempre visível para novo produto) ══════════════ */}
-          {(abaForm==='dados'||!form.id)&&<>
+          {(abaForm==='dados'||!form.id)&&<div style={{display:'contents'}}>
 
           {/* Identificação */}
           <div>
@@ -730,7 +730,7 @@ export default function EquipamentosPage() {
           <FormField label="Descrição / Observações">
             <textarea {...F('observacoes')} rows={2} className={textareaCls} placeholder="Descrição, especificações técnicas..." />
           </FormField>
-        </>{/* end aba dados fragment */}
+        </div>{/* end aba dados div */}
       </SlidePanel>
 
       {/* ── Modal de Movimentação de Ativos ───────────────────────────────── */}
