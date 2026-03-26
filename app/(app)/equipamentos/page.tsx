@@ -56,11 +56,18 @@ export default function EquipamentosPage() {
   const [movSalvando,   setMovSalvando]   = useState(false)
   const [movErro,       setMovErro]       = useState('')
   const [patrimoniosMov, setPatrimoniosMov] = useState<any[]>([])
+  // Para compra/entrada em lote: lista de patrimônios novos
+  const emptyPatLine  = () => ({ numero_patrimonio:'', numero_serie:'' })
   const emptyMov = () => ({
-    tipo:'compra', patrimonio_id:'', valor:'', data_transacao: new Date().toISOString().split('T')[0],
-    numero_nota_fiscal:'', garantia_ate:'', depreciacao_meses:'', status_apos:'disponivel', observacoes:''
+    tipo:'compra', valor:'', data_transacao: new Date().toISOString().split('T')[0],
+    numero_nota_fiscal:'', garantia_ate:'', depreciacao_meses:'', status_apos:'disponivel',
+    observacoes:'',
+    // para saída/baixa: patrimônios existentes selecionados
+    patrimonio_id:'',
   })
-  const [formMov, setFormMov] = useState<any>(emptyMov())
+  const [formMov,      setFormMov]      = useState<any>(emptyMov())
+  // Linhas de entrada em lote (compra)
+  const [linhasEntrada, setLinhasEntrada] = useState<{numero_patrimonio:string,numero_serie:string}[]>([emptyPatLine()])
 
   async function abrirMovimentacao(prod: any) {
     setMovProduto(prod)
@@ -82,17 +89,59 @@ export default function EquipamentosPage() {
   async function salvarMovimentacao() {
     setMovSalvando(true); setMovErro('')
     try {
-      const res = await fetch('/api/asset-transactions', {
-        method:'POST', headers:{'Content-Type':'application/json'},
-        body: JSON.stringify({ ...formMov, produto_id: movProduto.id })
-      })
-      const data = await res.json()
-      if (!data.ok) throw new Error(data.error)
+      const isEntrada = formMov.tipo === 'compra'
+
+      if (isEntrada) {
+        // Lote: para cada linha, criar patrimônio + transação
+        const linhasValidas = linhasEntrada.filter(l => l.numero_patrimonio.trim())
+        if (linhasValidas.length === 0) throw new Error('Informe ao menos um número de patrimônio.')
+
+        for (const linha of linhasValidas) {
+          // 1. Criar o patrimônio
+          const { data: pat, error: patErr } = await supabase
+            .from('patrimonios').insert({
+              produto_id:         movProduto.id,
+              numero_patrimonio:  linha.numero_patrimonio.trim(),
+              numero_serie:       linha.numero_serie.trim() || null,
+              status:             formMov.status_apos || 'disponivel',
+              valor_aquisicao:    Number(formMov.valor) || 0,
+              custo_reposicao:    Number(formMov.valor) || 0,
+              data_aquisicao:     formMov.data_transacao,
+            }).select('id').single()
+          if (patErr) throw new Error(`Erro ao criar patrimônio "${linha.numero_patrimonio}": ${patErr.message}`)
+
+          // 2. Registrar a transação vinculada ao patrimônio criado
+          const res = await fetch('/api/asset-transactions', {
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({
+              ...formMov,
+              produto_id:    movProduto.id,
+              patrimonio_id: pat.id,
+            })
+          })
+          const data = await res.json()
+          if (!data.ok) throw new Error(data.error)
+        }
+      } else {
+        // Saída/Baixa: um patrimônio existente
+        if (!formMov.patrimonio_id) throw new Error('Selecione o patrimônio para esta movimentação.')
+        const res = await fetch('/api/asset-transactions', {
+          method:'POST', headers:{'Content-Type':'application/json'},
+          body: JSON.stringify({ ...formMov, produto_id: movProduto.id })
+        })
+        const data = await res.json()
+        if (!data.ok) throw new Error(data.error)
+      }
+
       // Refresh
       const res2 = await fetch(`/api/asset-transactions?produto_id=${movProduto.id}`)
       const data2 = await res2.json()
       setMovTransacoes(data2.ok ? data2.data : [])
+      const { data: pats } = await supabase.from('patrimonios')
+        .select('id,numero_patrimonio,numero_serie,status').eq('produto_id', movProduto.id).order('numero_patrimonio')
+      setPatrimoniosMov(pats ?? [])
       setFormMov(emptyMov())
+      setLinhasEntrada([emptyPatLine()])
       setMovTab('historico')
       load()
     } catch(e:any) { setMovErro(e.message) }
@@ -551,13 +600,18 @@ export default function EquipamentosPage() {
                 </table>
               )}
 
-              {movTab==='nova' && (
+              {movTab==='nova' && (() => {
+                const isEntrada = formMov.tipo === 'compra'
+                return (
                 <div style={{display:'flex',flexDirection:'column',gap:14}}>
                   {movErro && <div style={{background:'var(--c-danger-light)',border:'1px solid var(--c-danger)',borderRadius:'var(--r-md)',padding:'10px 14px',color:'var(--c-danger-text)'}}>{movErro}</div>}
+
+                  {/* ── Linha 1: Tipo + Data ── */}
                   <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                     <FormField label="Tipo de Movimentação *">
-                      <select className={selectCls} value={formMov.tipo} onChange={e=>setFormMov({...formMov,tipo:e.target.value})}>
-                        <option value="compra">Compra / Entrada</option>
+                      <select className={selectCls} value={formMov.tipo}
+                        onChange={e=>{ setFormMov({...formMov,tipo:e.target.value}); setLinhasEntrada([emptyPatLine()]) }}>
+                        <option value="compra">Compra / Entrada (lote)</option>
                         <option value="venda">Venda</option>
                         <option value="baixa">Baixa / Descarte</option>
                         <option value="ajuste">Ajuste de Estoque</option>
@@ -568,27 +622,77 @@ export default function EquipamentosPage() {
                       <input type="date" className={inputCls} value={formMov.data_transacao}
                         onChange={e=>setFormMov({...formMov,data_transacao:e.target.value})} />
                     </FormField>
-                    <FormField label="Patrimônio (Serial Number)">
+                  </div>
+
+                  {/* ── ENTRADA EM LOTE (Compra) ── */}
+                  {isEntrada && (
+                    <div style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',overflow:'hidden'}}>
+                      <div style={{background:'var(--bg-header)',padding:'8px 12px',fontWeight:700,fontSize:'var(--fs-md)',
+                        display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid var(--border)'}}>
+                        <span>Patrimônios a cadastrar <span style={{color:'var(--c-primary)',fontWeight:800}}>{linhasEntrada.filter(l=>l.numero_patrimonio.trim()).length}</span> item(ns)</span>
+                        <button onClick={()=>setLinhasEntrada(p=>[...p,emptyPatLine()])}
+                          style={{background:'var(--c-primary)',color:'#fff',border:'none',borderRadius:'var(--r-sm)',
+                            padding:'3px 10px',cursor:'pointer',fontSize:'var(--fs-md)',fontWeight:600}}>
+                          + Adicionar linha
+                        </button>
+                      </div>
+                      {/* Cabeçalho */}
+                      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 32px',gap:0,
+                        background:'var(--bg-header)',borderBottom:'1px solid var(--border)',padding:'5px 12px'}}>
+                        <span style={{fontSize:'var(--fs-sm)',fontWeight:600,color:'var(--t-muted)'}}>Nº Patrimônio *</span>
+                        <span style={{fontSize:'var(--fs-sm)',fontWeight:600,color:'var(--t-muted)'}}>Nº Série / Serial</span>
+                        <span></span>
+                      </div>
+                      {/* Linhas */}
+                      <div style={{maxHeight:220,overflowY:'auto'}}>
+                        {linhasEntrada.map((linha,idx)=>(
+                          <div key={idx} style={{display:'grid',gridTemplateColumns:'1fr 1fr 32px',gap:6,
+                            padding:'6px 12px',borderBottom:'1px solid var(--border)',alignItems:'center',
+                            background:idx%2===0?'transparent':'var(--bg-header)'}}>
+                            <input className={inputCls} style={{fontSize:'var(--fs-md)',padding:'4px 8px'}}
+                              placeholder={`PAT-${String(idx+1).padStart(3,'0')}`}
+                              value={linha.numero_patrimonio}
+                              onChange={e=>{
+                                const novo=[...linhasEntrada]
+                                novo[idx]={...novo[idx],numero_patrimonio:e.target.value}
+                                setLinhasEntrada(novo)
+                              }} />
+                            <input className={inputCls} style={{fontSize:'var(--fs-md)',padding:'4px 8px'}}
+                              placeholder="Serial (opcional)"
+                              value={linha.numero_serie}
+                              onChange={e=>{
+                                const novo=[...linhasEntrada]
+                                novo[idx]={...novo[idx],numero_serie:e.target.value}
+                                setLinhasEntrada(novo)
+                              }} />
+                            <button onClick={()=>setLinhasEntrada(p=>p.filter((_,i)=>i!==idx))}
+                              disabled={linhasEntrada.length===1}
+                              style={{background:'none',border:'none',cursor:'pointer',color:'var(--c-danger)',
+                                fontSize:16,padding:2,opacity:linhasEntrada.length===1?0.3:1}}>✕</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* ── SAÍDA: patrimônio existente ── */}
+                  {!isEntrada && (
+                    <FormField label="Patrimônio *">
                       <select className={selectCls} value={formMov.patrimonio_id}
                         onChange={e=>setFormMov({...formMov,patrimonio_id:e.target.value})}>
-                        <option value="">— Selecione ou deixe em branco —</option>
-                        {patrimoniosMov.map((p:any)=>(
+                        <option value="">— Selecione o patrimônio —</option>
+                        {patrimoniosMov.filter((p:any)=>p.status!=='descartado').map((p:any)=>(
                           <option key={p.id} value={p.id}>
-                            {p.numero_patrimonio}{p.numero_serie?` (${p.numero_serie})`:''} — {p.status}
+                            {p.numero_patrimonio}{p.numero_serie?` · ${p.numero_serie}`:''} — {p.status}
                           </option>
                         ))}
                       </select>
                     </FormField>
-                    <FormField label="Status após movimentação">
-                      <select className={selectCls} value={formMov.status_apos}
-                        onChange={e=>setFormMov({...formMov,status_apos:e.target.value})}>
-                        <option value="disponivel">Disponível</option>
-                        <option value="manutencao">Em Manutenção</option>
-                        <option value="descartado">Descartado</option>
-                        <option value="reservado">Reservado</option>
-                      </select>
-                    </FormField>
-                    <FormField label="Valor (R$)">
+                  )}
+
+                  {/* ── Campos comuns ── */}
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                    <FormField label={isEntrada ? 'Valor unitário de compra (R$)' : 'Valor (R$)'}>
                       <input type="number" step="0.01" min="0" className={inputCls}
                         value={formMov.valor} onChange={e=>setFormMov({...formMov,valor:e.target.value})}
                         placeholder="0,00" />
@@ -598,29 +702,45 @@ export default function EquipamentosPage() {
                         onChange={e=>setFormMov({...formMov,numero_nota_fiscal:e.target.value})}
                         placeholder="Ex: NF-e 000123" />
                     </FormField>
-                    <FormField label="Garantia até">
-                      <input type="date" className={inputCls} value={formMov.garantia_ate}
-                        onChange={e=>setFormMov({...formMov,garantia_ate:e.target.value})} />
-                    </FormField>
-                    <FormField label="Depreciação (meses)">
-                      <input type="number" min="0" className={inputCls}
-                        value={formMov.depreciacao_meses}
-                        onChange={e=>setFormMov({...formMov,depreciacao_meses:e.target.value})}
-                        placeholder="Ex: 60" />
+                    {isEntrada && (<>
+                      <FormField label="Garantia até">
+                        <input type="date" className={inputCls} value={formMov.garantia_ate}
+                          onChange={e=>setFormMov({...formMov,garantia_ate:e.target.value})} />
+                      </FormField>
+                      <FormField label="Depreciação (meses)">
+                        <input type="number" min="0" className={inputCls}
+                          value={formMov.depreciacao_meses}
+                          onChange={e=>setFormMov({...formMov,depreciacao_meses:e.target.value})}
+                          placeholder="Ex: 60" />
+                      </FormField>
+                    </>)}
+                    <FormField label="Status após movimentação">
+                      <select className={selectCls} value={formMov.status_apos}
+                        onChange={e=>setFormMov({...formMov,status_apos:e.target.value})}>
+                        <option value="disponivel">Disponível</option>
+                        <option value="manutencao">Em Manutenção</option>
+                        <option value="descartado">Descartado</option>
+                        <option value="reservado">Reservado</option>
+                      </select>
                     </FormField>
                   </div>
+
                   <FormField label="Observações">
                     <textarea className={textareaCls} rows={2} value={formMov.observacoes}
                       onChange={e=>setFormMov({...formMov,observacoes:e.target.value})}
                       placeholder="Detalhes da movimentação…" />
                   </FormField>
-                  {formMov.tipo==='compra' && (
-                    <div style={{background:'var(--c-primary-light,#e8f4f8)',border:'1px solid var(--c-primary)',borderRadius:'var(--r-sm)',padding:'8px 12px',fontSize:'var(--fs-md)',color:'var(--c-primary)'}}>
-                      ℹ️ Ao salvar, o <strong>Custo de Reposição</strong> do produto será atualizado automaticamente com este valor.
+
+                  {isEntrada && (
+                    <div style={{background:'#e8f4f8',border:'1px solid var(--c-primary)',borderRadius:'var(--r-sm)',
+                      padding:'8px 12px',fontSize:'var(--fs-md)',color:'var(--c-primary)'}}>
+                      ℹ️ Serão criados <strong>{linhasEntrada.filter(l=>l.numero_patrimonio.trim()).length} patrimônio(s)</strong> novos.
+                      O <strong>Custo de Reposição</strong> do produto será atualizado com o valor unitário.
                     </div>
                   )}
                 </div>
-              )}
+                )
+              })()}
             </div>
 
             {/* Footer */}
