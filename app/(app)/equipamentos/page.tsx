@@ -278,6 +278,7 @@ export default function EquipamentosPage() {
             deleteConfirm={`Inativar o produto "${row.nome}"?`}
             acoesSec={acoesProduto(row)}
           />
+          </div>
         )}
       />
 
