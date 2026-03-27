@@ -608,8 +608,16 @@ export default function EquipamentosPage() {
                 {/* Últimas movimentações */}
                 <div style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',overflow:'hidden'}}>
                   <div style={{padding:'8px 12px',background:'var(--bg-header)',fontWeight:700,
-                    fontSize:'var(--fs-md)',borderBottom:'1px solid var(--border)'}}>
-                    Últimas Movimentações
+                    fontSize:'var(--fs-md)',borderBottom:'1px solid var(--border)',
+                    display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <span>Últimas Movimentações</span>
+                    <button
+                      onClick={()=>{ setPanelView(false); abrirMovimentacao(viewRow) }}
+                      style={{background:'var(--c-primary)',color:'#fff',border:'none',
+                        borderRadius:'var(--r-sm)',padding:'4px 12px',cursor:'pointer',
+                        fontSize:'var(--fs-md)',fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
+                      + Movimentação
+                    </button>
                   </div>
                   {viewLoadingEx ? (
                     <div style={{padding:'16px',textAlign:'center',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Carregando…</div>
