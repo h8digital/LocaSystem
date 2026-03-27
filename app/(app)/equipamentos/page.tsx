@@ -459,21 +459,10 @@ export default function EquipamentosPage() {
         data={lista}
         onRowClick={row => verDetalhe(row)}
         actions={row => (
-          <div style={{display:'flex',gap:6,alignItems:'center'}}>
-            <button onClick={() => abrirMovimentacao(row)}
-              title="Movimentação de Ativos"
-              style={{background:'var(--bg-header)',border:'1px solid var(--border)',borderRadius:'var(--r-sm)',
-                padding:'4px 9px',cursor:'pointer',fontSize:'var(--fs-md)',color:'var(--t-secondary)',fontWeight:600}}>
-              📦
-            </button>
-            <ActionButtons
-            onView={()  => verDetalhe(row)}
-            onEdit={()  => abrir(row)}
+          <ActionButtons
             onDelete={() => inativar(row.id)}
             deleteConfirm={`Inativar o produto "${row.nome}"?`}
-            acoesSec={acoesProduto(row)}
           />
-          </div>
         )}
       />
 
