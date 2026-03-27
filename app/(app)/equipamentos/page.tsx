@@ -73,7 +73,7 @@ export default function EquipamentosPage() {
   const [categorias, setCats]   = useState<any[]>([])
   const [periodos, setPeriodos] = useState<any[]>([])
   const [loading, setLoading]   = useState(true)
-  const [filters, setFilters]   = useState<Record<string,string>>({ busca:'', categoria_id:'' })
+  const [filters, setFilters]   = useState<Record<string,string>>({ busca:'', categoria_id:'', codigo:'', patrimonio:'' })
 
   // Painel: editar/novo
   const [panel, setPanel]   = useState(false)
@@ -260,9 +260,10 @@ export default function EquipamentosPage() {
 
   async function load() {
     setLoading(true)
-    let q = supabase.from('produtos').select('*, categorias(nome), contrato_itens(quantidade, contratos(status))').eq('ativo',1).order('nome')
-    if (filters.busca) q = q.ilike('nome', `%${filters.busca}%`)
+    let q = supabase.from('produtos').select('*, categorias(nome), contrato_itens(quantidade, contratos(status)), patrimonios(numero_patrimonio,numero_serie,status)').eq('ativo',1).order('nome')
+    if (filters.busca)       q = q.ilike('nome',   `%${filters.busca}%`)
     if (filters.categoria_id) q = q.eq('categoria_id', filters.categoria_id)
+    if (filters.codigo)       q = q.ilike('codigo', `%${filters.codigo}%`)
     const { data } = await q
 
     // Calcular disponível real = estoque_total − locado em contratos ativos
@@ -288,7 +289,18 @@ export default function EquipamentosPage() {
       ;(fotosData ?? []).forEach((f:any) => { fotosMap[f.produto_id] = f.url })
     }
 
-    setLista(listaComDisponivel.map((p:any) => ({ ...p, foto_url: fotosMap[p.id] ?? null })))
+    let enriched = listaComDisponivel.map((p:any) => ({ ...p, foto_url: fotosMap[p.id] ?? null }))
+    // Post-filter by patrimônio number
+    if (filters.patrimonio) {
+      const term = filters.patrimonio.toLowerCase()
+      enriched = enriched.filter((p:any) =>
+        (p.patrimonios ?? []).some((pat:any) =>
+          (pat.numero_patrimonio ?? '').toLowerCase().includes(term) ||
+          (pat.numero_serie ?? '').toLowerCase().includes(term)
+        )
+      )
+    }
+    setLista(enriched)
     setLoading(false)
   }
 
@@ -387,32 +399,95 @@ export default function EquipamentosPage() {
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-      <PageHeader
-        title="Equipamentos"
-        subtitle={`${lista.length} produto(s) cadastrado(s)`}
-        actions={<Btn onClick={() => abrir()}>+ Novo Produto</Btn>}
-      />
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 0 }}>
 
-      <Filters
-        fields={[
-          { type:'text', key:'busca', placeholder:'Buscar por nome do produto...', width:'280px' },
-          { type:'select', key:'categoria_id', placeholder:'Todas as categorias',
-            options: categorias.map(c => ({ value: String(c.id), label: c.nome })) },
-        ]}
-        values={filters}
-        onChange={(k,v) => setFilters(f => ({ ...f, [k]: v }))}
-        onClear={() => setFilters({ busca:'', categoria_id:'' })}
-      />
+      {/* ── Título compacto sem PageHeader ─────────────────────────────── */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
+        padding:'10px 0 12px', borderBottom:'1px solid var(--border)', marginBottom:14 }}>
+        <div>
+          <h1 style={{ fontWeight:700, fontSize:'var(--fs-xl)', color:'var(--t-primary)', margin:0, lineHeight:1.2 }}>
+            Equipamentos
+          </h1>
+          <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginTop:2 }}>
+            {lista.length} produto(s) cadastrado(s)
+          </div>
+        </div>
+        <Btn onClick={() => abrir()}>+ Novo Produto</Btn>
+      </div>
+
+      {/* ── Filtros em linha única ──────────────────────────────────────── */}
+      <div style={{ display:'flex', gap:8, alignItems:'center', flexWrap:'wrap', marginBottom:14 }}>
+        {/* Busca por nome */}
+        <div style={{ position:'relative', flex:'2 1 180px', minWidth:160 }}>
+          <svg style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)',
+            color:'var(--t-muted)', pointerEvents:'none' }}
+            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+            strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input className="ds-input" style={{ paddingLeft:32, width:'100%' }}
+            placeholder="Nome do produto..." value={filters.busca}
+            onChange={e => setFilters(f => ({ ...f, busca: e.target.value }))} />
+        </div>
+
+        {/* Busca por código */}
+        <div style={{ position:'relative', flex:'1 1 120px', minWidth:110 }}>
+          <svg style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)',
+            color:'var(--t-muted)', pointerEvents:'none' }}
+            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+            strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+          </svg>
+          <input className="ds-input" style={{ paddingLeft:32, width:'100%' }}
+            placeholder="Código / SKU..." value={filters.codigo}
+            onChange={e => setFilters(f => ({ ...f, codigo: e.target.value }))} />
+        </div>
+
+        {/* Busca por patrimônio */}
+        <div style={{ position:'relative', flex:'1 1 140px', minWidth:120 }}>
+          <svg style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)',
+            color:'var(--t-muted)', pointerEvents:'none' }}
+            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"
+            strokeLinecap="round" strokeLinejoin="round">
+            <path d="M20.59 13.41l-7.17 7.17a2 2 0 01-2.83 0L2 12V2h10l8.59 8.59a2 2 0 010 2.82z"/>
+            <line x1="7" y1="7" x2="7.01" y2="7"/>
+          </svg>
+          <input className="ds-input" style={{ paddingLeft:32, width:'100%' }}
+            placeholder="Nº Patrimônio / Serial..." value={filters.patrimonio}
+            onChange={e => setFilters(f => ({ ...f, patrimonio: e.target.value }))} />
+        </div>
+
+        {/* Categoria */}
+        <select className="ds-input" style={{ flex:'1 1 160px', minWidth:140 }}
+          value={filters.categoria_id}
+          onChange={e => setFilters(f => ({ ...f, categoria_id: e.target.value }))}>
+          <option value="">Todas as categorias</option>
+          {categorias.map((cat:any) => (
+            <option key={cat.id} value={String(cat.id)}>{cat.nome}</option>
+          ))}
+        </select>
+
+        {/* Limpar */}
+        {Object.values(filters).some(Boolean) && (
+          <button onClick={() => setFilters({ busca:'', categoria_id:'', codigo:'', patrimonio:'' })}
+            style={{ background:'none', border:'1px solid var(--border)', borderRadius:'var(--r-md)',
+              padding:'6px 12px', cursor:'pointer', fontSize:'var(--fs-md)', color:'var(--t-muted)',
+              whiteSpace:'nowrap', transition:'all 150ms' }}
+            onMouseEnter={e => { e.currentTarget.style.borderColor='var(--c-danger)'; e.currentTarget.style.color='var(--c-danger)' }}
+            onMouseLeave={e => { e.currentTarget.style.borderColor='var(--border)'; e.currentTarget.style.color='var(--t-muted)' }}>
+            ✕ Limpar
+          </button>
+        )}
+      </div>
 
       <DataTable
         loading={loading}
-        emptyMessage="Nenhum produto cadastrado."
+        emptyMessage="Nenhum produto encontrado."
         columns={[
           { key:'foto', label:'', render: r => (
             r.foto_url
-              ? <img src={r.foto_url} alt="" style={{width:36,height:36,objectFit:'cover',borderRadius:'var(--r-sm)',
-                  border:'1px solid var(--border)',flexShrink:0,display:'block'}} />
+              ? <img src={r.foto_url} alt="" style={{width:36,height:36,objectFit:'cover',
+                  borderRadius:'var(--r-sm)',border:'1px solid var(--border)',display:'block',flexShrink:0}} />
               : <div style={{width:36,height:36,borderRadius:'var(--r-sm)',border:'1px solid var(--border)',
                   background:'var(--bg-header)',display:'flex',alignItems:'center',justifyContent:'center',
                   fontSize:18,color:'var(--t-muted)',flexShrink:0}}>📦</div>
@@ -420,49 +495,61 @@ export default function EquipamentosPage() {
           { key:'nome', label:'Produto', render: r => (
             <div>
               <div style={{ fontWeight:600 }}>{r.nome}</div>
-              {(r.marca || r.modelo) && (
-                <div style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)' }}>
-                  {[r.marca, r.modelo].filter(Boolean).join(' · ')}
+              {r.codigo && (
+                <div style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)', fontFamily:'var(--font-mono)',
+                  marginTop:1, letterSpacing:'.02em' }}>
+                  {r.codigo}
                 </div>
               )}
             </div>
           )},
           { key:'categoria', label:'Categoria', render: r => (
-            <span style={{ color:'var(--t-secondary)' }}>{(r.categorias as any)?.nome || '—'}</span>
+            <span style={{ color:'var(--t-secondary)', fontSize:'var(--fs-md)' }}>
+              {(r.categorias as any)?.nome || '—'}
+            </span>
           )},
-          { key:'controle', label:'Controle', render: r =>
-            r.controla_patrimonio
-              ? <Badge value="locado"   label="Patrimônio" />
-              : <Badge value="rascunho" label="Quantidade"  />
-          },
-          { key:'estoque', label:'Disponível', render: r => {
-            if (r.controla_patrimonio) return <span style={{ color:'var(--t-muted)' }}>Por patrimônio</span>
+          { key:'disponivel', label:'Disponível', render: r => {
+            if (r.controla_patrimonio) {
+              const total = (r.patrimonios ?? []).length
+              const disp  = (r.patrimonios ?? []).filter((p:any) => p.status === 'disponivel').length
+              return (
+                <span style={{ fontWeight:600, color: disp > 0 ? 'var(--c-primary)' : 'var(--t-muted)' }}>
+                  {disp} / {total} un
+                </span>
+              )
+            }
             const disp   = r.estoque_disponivel ?? r.estoque_total
             const alerta = r.estoque_minimo > 0 && disp <= r.estoque_minimo
             return (
-              <div>
-                <span style={{ fontWeight:600, color: alerta ? 'var(--c-danger)' : 'var(--t-primary)' }}>
-                  {disp} {r.unidade}{alerta ? ' ⚠' : ''}
-                </span>
-                {(r.qtd_locada ?? 0) > 0 && (
-                  <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginTop:1 }}>
-                    {r.qtd_locada} locado(s)
-                  </div>
-                )}
-              </div>
+              <span style={{ fontWeight:600, color: alerta ? 'var(--c-danger)' : disp > 0 ? 'var(--c-primary)' : 'var(--t-muted)' }}>
+                {disp} {r.unidade}{alerta ? ' ⚠' : ''}
+              </span>
             )
           }},
-          { key:'preco_locacao_diario', label:'Preço/Dia',    align:'right', render: r => fmt.money(r.preco_locacao_diario) },
-          { key:'preco_locacao_mensal', label:'Preço/Mês',    align:'right', render: r => fmt.money(r.preco_locacao_mensal) },
-          { key:'custo_reposicao',      label:'Reposição',    align:'right', render: r => fmt.money(r.custo_reposicao) },
+          { key:'locado', label:'Locado', render: r => {
+            if (r.controla_patrimonio) {
+              const qtd = (r.patrimonios ?? []).filter((p:any) => p.status === 'locado').length
+              return <span style={{ fontWeight:600, color: qtd > 0 ? 'var(--c-warning,#f59e0b)' : 'var(--t-muted)' }}>{qtd} un</span>
+            }
+            const qtd = r.qtd_locada ?? 0
+            return <span style={{ fontWeight:600, color: qtd > 0 ? 'var(--c-warning,#f59e0b)' : 'var(--t-muted)' }}>{qtd} {r.unidade}</span>
+          }},
+          { key:'preco_locacao_diario', label:'Preço/Dia', align:'right',
+            render: r => <span style={{ fontFamily:'var(--font-mono)', fontWeight:500 }}>{fmt.money(r.preco_locacao_diario)}</span> },
+          { key:'preco_locacao_mensal', label:'Preço/Mês', align:'right',
+            render: r => <span style={{ fontFamily:'var(--font-mono)', fontWeight:500 }}>{fmt.money(r.preco_locacao_mensal)}</span> },
+          { key:'custo_reposicao', label:'Reposição', align:'right',
+            render: r => <span style={{ fontFamily:'var(--font-mono)', color:'var(--t-muted)' }}>{fmt.money(r.custo_reposicao)}</span> },
         ]}
         data={lista}
         onRowClick={row => verDetalhe(row)}
         actions={row => (
-          <ActionButtons
-            onDelete={() => inativar(row.id)}
-            deleteConfirm={`Inativar o produto "${row.nome}"?`}
-          />
+          <div style={{ display:'flex', justifyContent:'center' }}>
+            <ActionButtons
+              onDelete={() => inativar(row.id)}
+              deleteConfirm={`Inativar o produto "${row.nome}"?`}
+            />
+          </div>
         )}
       />
 
