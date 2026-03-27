@@ -34,6 +34,8 @@ export default function ParametrosPage() {
   const [locais,     setLocais]     = useState<any[]>([])
   const [saving,     setSaving]     = useState(false)
   const [aba,        setAba]        = useState('empresa')
+  const [uploadandoLogo, setUploadandoLogo] = useState(false)
+  const [erroLogo,       setErroLogo]       = useState('')
 
   // ── Pesquisa por aba ────────────────────────────────────────────────────────
   const [buscaCat,  setBuscaCat]  = useState('')
@@ -63,11 +65,11 @@ export default function ParametrosPage() {
   ]
 
   const CAMPOS_EMPRESA = [
-    { k:'empresa_nome',     l:'Nome da Empresa',  full:true  },
-    { k:'empresa_cnpj',     l:'CNPJ',             full:false },
-    { k:'empresa_telefone', l:'Telefone',          full:false },
-    { k:'empresa_email',    l:'Email',             full:false },
-    { k:'empresa_endereco', l:'Endereço Completo', full:true  },
+    { k:'empresa_nome',      l:'Nome da Empresa',    full:true,  mono:false },
+    { k:'empresa_cnpj',      l:'CNPJ',               full:false, mono:true  },
+    { k:'empresa_ie',        l:'Inscrição Estadual',  full:false, mono:true  },
+    { k:'empresa_telefone',  l:'Telefone',            full:false, mono:false },
+    { k:'empresa_email',     l:'E-mail',              full:true,  mono:false },
   ]
 
   const CAMPOS_FIN = [
@@ -235,17 +237,140 @@ export default function ParametrosPage() {
 
           {/* ═══ EMPRESA ══════════════════════════════════════════════ */}
           {aba === 'empresa' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
-              <div className="ds-section-title">Dados da Empresa</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
-                {CAMPOS_EMPRESA.map(f => (
-                  <div key={f.k} style={{ gridColumn: f.full ? 'span 2' : undefined }}>
-                    <FormField label={f.l}>
-                      <input value={params[f.k]??''} onChange={e=>setParams(p=>({...p,[f.k]:e.target.value}))} className={inpSm}/>
+            <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
+
+              {/* ── Logo ─────────────────────────────────────────────── */}
+              <div>
+                <div className="ds-section-title">Logotipo</div>
+                <div style={{ display:'flex', alignItems:'flex-start', gap:20, marginTop:12 }}>
+                  {/* Preview */}
+                  <div style={{ width:120, height:80, border:'1px solid var(--border)', borderRadius:'var(--r-md)',
+                    display:'flex', alignItems:'center', justifyContent:'center',
+                    background:'var(--bg-header)', flexShrink:0, overflow:'hidden' }}>
+                    {params['empresa_logo_url']
+                      ? <img src={params['empresa_logo_url']} alt="Logo" style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'contain' }} />
+                      : <span style={{ fontSize:32, color:'var(--t-muted)' }}>🏢</span>
+                    }
+                  </div>
+                  {/* Upload area */}
+                  <div style={{ flex:1 }}>
+                    <label style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
+                      gap:6, border:'2px dashed var(--border)', borderRadius:'var(--r-md)', padding:'16px',
+                      cursor:uploadandoLogo?'not-allowed':'pointer', background:'transparent', transition:'border-color 150ms' }}
+                      onMouseEnter={e=>{ if(!uploadandoLogo) e.currentTarget.style.borderColor='var(--c-primary)' }}
+                      onMouseLeave={e=>{ e.currentTarget.style.borderColor='var(--border)' }}>
+                      <input type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml"
+                        style={{ display:'none' }} disabled={uploadandoLogo}
+                        onChange={async e => {
+                          const file = e.target.files?.[0]
+                          if (!file) return
+                          if (file.size > 2*1024*1024) { setErroLogo('Arquivo excede 2MB'); return }
+                          setUploadandoLogo(true); setErroLogo('')
+                          const fd = new FormData(); fd.append('file', file)
+                          const res  = await fetch('/api/empresa-logo', { method:'POST', body:fd })
+                          const data = await res.json()
+                          if (data.ok) setParams(p => ({ ...p, empresa_logo_url: data.url }))
+                          else setErroLogo(data.error)
+                          setUploadandoLogo(false); e.target.value = ''
+                        }}
+                      />
+                      {uploadandoLogo
+                        ? <><span style={{ fontSize:24 }}>⏳</span><span style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)' }}>Enviando...</span></>
+                        : <><span style={{ fontSize:24 }}>📷</span>
+                          <span style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)', textAlign:'center' }}>
+                            Clique para enviar logo<br/>
+                            <span style={{ fontSize:'var(--fs-sm)' }}>PNG, JPG, SVG · até 2MB · fundo transparente recomendado</span>
+                          </span></>
+                      }
+                    </label>
+                    {erroLogo && <div style={{ color:'var(--c-danger)', fontSize:'var(--fs-sm)', marginTop:4 }}>{erroLogo}</div>}
+                    {params['empresa_logo_url'] && (
+                      <button onClick={async()=>{
+                          if(!confirm('Remover o logotipo atual?')) return
+                          await fetch('/api/empresa-logo', { method:'DELETE' })
+                          setParams(p=>({ ...p, empresa_logo_url:'' }))
+                        }}
+                        style={{ marginTop:8, background:'none', border:'none', color:'var(--c-danger)',
+                          fontSize:'var(--fs-sm)', cursor:'pointer', fontWeight:600 }}>
+                        ✕ Remover logo
+                      </button>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              {/* ── Dados Principais ─────────────────────────────────── */}
+              <div>
+                <div className="ds-section-title">Dados Principais</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginTop:12 }}>
+                  {CAMPOS_EMPRESA.map((f:any) => (
+                    <div key={f.k} style={{ gridColumn: f.full ? 'span 2' : undefined }}>
+                      <FormField label={f.l}>
+                        <input value={params[f.k]??''} onChange={e=>setParams(p=>({...p,[f.k]:e.target.value}))}
+                          className={inpSm} style={f.mono?{fontFamily:'var(--font-mono)'}:undefined}/>
+                      </FormField>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* ── Endereço Desmembrado ──────────────────────────────── */}
+              <div>
+                <div className="ds-section-title">Endereço</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:12, marginTop:12 }}>
+                  <FormField label="CEP">
+                    <input value={params['empresa_cep']??''} className={inpSm}
+                      onChange={e=>setParams(p=>({...p,empresa_cep:e.target.value}))}
+                      onBlur={async e=>{
+                        const cep=e.target.value.replace(/\D/g,'')
+                        if(cep.length!==8) return
+                        const r=await fetch(`https://viacep.com.br/ws/${cep}/json/`)
+                        const d=await r.json()
+                        if(!d.erro) setParams(p=>({...p,
+                          empresa_logradouro: d.logradouro??p.empresa_logradouro,
+                          empresa_bairro:     d.bairro??p.empresa_bairro,
+                          empresa_cidade:     d.localidade??p.empresa_cidade,
+                          empresa_estado:     d.uf??p.empresa_estado,
+                        }))
+                      }}
+                      placeholder="00000-000"
+                    />
+                  </FormField>
+                  <div style={{ gridColumn:'span 2' }}>
+                    <FormField label="Logradouro">
+                      <input value={params['empresa_logradouro']??''} className={inpSm}
+                        onChange={e=>setParams(p=>({...p,empresa_logradouro:e.target.value}))}
+                        placeholder="Av. Rubem Berta" />
                     </FormField>
                   </div>
-                ))}
+                  <FormField label="Número">
+                    <input value={params['empresa_numero']??''} className={inpSm}
+                      onChange={e=>setParams(p=>({...p,empresa_numero:e.target.value}))} placeholder="495" />
+                  </FormField>
+                  <div style={{ gridColumn:'span 2' }}>
+                    <FormField label="Complemento">
+                      <input value={params['empresa_complemento']??''} className={inpSm}
+                        onChange={e=>setParams(p=>({...p,empresa_complemento:e.target.value}))} placeholder="Sala 1, 2º Andar..." />
+                    </FormField>
+                  </div>
+                  <FormField label="Bairro">
+                    <input value={params['empresa_bairro']??''} className={inpSm}
+                      onChange={e=>setParams(p=>({...p,empresa_bairro:e.target.value}))} />
+                  </FormField>
+                  <div style={{ gridColumn:'span 2' }}>
+                    <FormField label="Cidade">
+                      <input value={params['empresa_cidade']??''} className={inpSm}
+                        onChange={e=>setParams(p=>({...p,empresa_cidade:e.target.value}))} />
+                    </FormField>
+                  </div>
+                  <FormField label="Estado (UF)">
+                    <input value={params['empresa_estado']??''} className={inpSm} maxLength={2}
+                      onChange={e=>setParams(p=>({...p,empresa_estado:e.target.value.toUpperCase().slice(0,2)}))}
+                      placeholder="RS" />
+                  </FormField>
+                </div>
               </div>
+
             </div>
           )}
 

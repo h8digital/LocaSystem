@@ -94,12 +94,20 @@ export async function POST(req: NextRequest) {
     const dias  = Math.max(1, Math.ceil((new Date(contrato.data_fim).getTime() - new Date(contrato.data_inicio).getTime()) / 86400000))
     const agora = new Date()
 
-    // Cidade da empresa extraída do endereço
-    const empresaCidade = (() => {
+    // Endereço completo da empresa (usa campos desmembrados se disponíveis)
+    const empresaCidade = p['empresa_cidade'] || (() => {
       const end = p['empresa_endereco'] ?? ''
       const partes = end.split(',').map((s: string) => s.trim())
       return partes.length >= 2 ? partes[partes.length - 2] : ''
     })()
+
+    const empresaEnderecoCompleto = p['empresa_logradouro']
+      ? [p['empresa_logradouro'], p['empresa_numero'], p['empresa_complemento'],
+         p['empresa_bairro'], `${p['empresa_cidade']}/${p['empresa_estado']}`,
+         `CEP: ${p['empresa_cep']}`].filter(Boolean).join(', ')
+      : p['empresa_endereco'] ?? ''
+
+    const empresaLogoUrl = p['empresa_logo_url'] ?? ''
 
     // Gerar tabela de itens — formato Kanoff: Qtd | Patrimônio | Descrição | Aditivo | Val.Equip Unit | Val.Equip Total | Val.Loc Unit | Val.Loc Total
     const itensHtml = (itens ?? []).map((item: any) => {
@@ -132,7 +140,9 @@ export async function POST(req: NextRequest) {
       '{{empresa_cnpj}}':             p['empresa_cnpj'] ?? '',
       '{{empresa_telefone}}':         p['empresa_telefone'] ?? '',
       '{{empresa_email}}':            p['empresa_email'] ?? '',
-      '{{empresa_endereco}}':         p['empresa_endereco'] ?? '',
+      '{{empresa_endereco}}':         empresaEnderecoCompleto,
+      '{{empresa_ie}}':               p['empresa_ie'] ?? '',
+      '{{empresa_logo_url}}':         empresaLogoUrl,
 
       '{{cliente_nome}}':             cliente.nome ?? '',
       '{{cliente_cpf_cnpj}}':         cliente.cpf_cnpj ?? '',
@@ -209,6 +219,15 @@ export async function POST(req: NextRequest) {
 
     // Substituir tags
     let conteudo = template.conteudo
+
+    // Logo: se há URL, substitui placeholder de texto pelo <img>
+    if (empresaLogoUrl) {
+      conteudo = conteudo.replace(
+        '<div class="hdr-logo-txt">{{empresa_nome}}</div>',
+        `<img src="${empresaLogoUrl}" alt="Logo" style="max-width:100px;max-height:60px;object-fit:contain"/>`
+      )
+    }
+
     Object.entries(tags).forEach(([k,v]) => { conteudo = conteudo.replaceAll(k, v) })
 
     // Salvar documento gerado
