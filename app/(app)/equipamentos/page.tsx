@@ -634,7 +634,7 @@ export default function EquipamentosPage() {
                   <FormField label="Categoria">
                     <select {...F('categoria_id')} className={selectCls}>
                       <option value="">— Selecione —</option>
-                      {cats.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
+                      {categorias.map((cat:any) => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
                     </select>
                   </FormField>
                   <FormField label="Marca">
