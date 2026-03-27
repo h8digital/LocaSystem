@@ -14,7 +14,7 @@ const emptyCt  =()=>({nome:'',cargo:'',telefone:'',celular:'',email:'',autorizad
 export default function ClientesPage() {
   const [lista,setLista]         = useState<any[]>([])
   const [loading,setLoading]     = useState(true)
-  const [filters,setFilters]     = useState<Record<string,string>>({busca:'',tipo:''})
+  const [filters,setFilters]     = useState<Record<string,string>>({busca:'',tipo:'',cpf_cnpj:'',telefone:''})
   const [panel,setPanel]         = useState(false)
   const [editId,setEditId]       = useState<number|null>(null)
   const [tab,setTab]             = useState('dados')
@@ -33,8 +33,10 @@ export default function ClientesPage() {
   async function load(){
     setLoading(true)
     let q=supabase.from('clientes').select('id,tipo,nome,cpf_cnpj,email,celular,telefone,cidade,estado,ativo,ultima_consulta_spc,status_spc,rg_ie,limite_credito,observacoes,endereco,numero,complemento,bairro,cep').eq('ativo',1).order('nome')
-    if(filters.busca)q=q.ilike('nome',`%${filters.busca}%`)
-    if(filters.tipo)q=q.eq('tipo',filters.tipo)
+    if(filters.busca)   q=q.ilike('nome',`%${filters.busca}%`)
+    if(filters.tipo)    q=q.eq('tipo',filters.tipo)
+    if(filters.cpf_cnpj)q=q.ilike('cpf_cnpj',`%${filters.cpf_cnpj.replace(/\D/g,'')}%`)
+    if(filters.telefone) q=q.or(`celular.ilike.%${filters.telefone}%,telefone.ilike.%${filters.telefone}%`)
     const{data}=await q;setLista(data??[]);setLoading(false)
   }
   useEffect(()=>{load()},[filters])
@@ -89,32 +91,117 @@ export default function ClientesPage() {
   function alertaSPC(c:any){if(!c.ultima_consulta_spc)return'warning';return Math.floor((Date.now()-new Date(c.ultima_consulta_spc).getTime())/86400000)>spcIntervalo?'warning':'ok'}
   const F=(k:string)=>({value:form[k]??'',onChange:(e:any)=>setForm({...form,[k]:e.target.value})})
 
+  const hasFilter = Object.values(filters).some(Boolean)
+
   return (
-    <div style={{display:'flex',flexDirection:'column',gap:20}}>
-      <PageHeader title="Clientes" subtitle={`${lista.length} cliente(s)`}
-        actions={<Btn onClick={()=>abrir()}>+ Novo Cliente</Btn>} />
+    <div style={{display:'flex',flexDirection:'column',gap:0}}>
 
-      <Filters
-        fields={[
-          {type:'text',key:'busca',placeholder:'Buscar por nome, CPF/CNPJ...',width:'280px'},
-          {type:'select',key:'tipo',placeholder:'Todos os tipos',options:[{value:'PF',label:'Pessoa Física'},{value:'PJ',label:'Pessoa Jurídica'}]},
-        ]}
-        values={filters} onChange={(k,v)=>setFilters(f=>({...f,[k]:v}))} onClear={()=>setFilters({busca:'',tipo:''})}
-      />
+      {/* ── Título + botão ─────────────────────────────────────────────── */}
+      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
+        padding:'10px 0 12px',borderBottom:'1px solid var(--border)',marginBottom:14}}>
+        <div>
+          <h1 style={{fontWeight:700,fontSize:'var(--fs-xl)',color:'var(--t-primary)',margin:0,lineHeight:1.2}}>
+            Clientes
+          </h1>
+          <div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)',marginTop:2}}>
+            {lista.length} cliente(s) cadastrado(s)
+          </div>
+        </div>
+        <Btn onClick={()=>abrir()}>+ Novo Cliente</Btn>
+      </div>
 
-      <DataTable loading={loading} emptyMessage="Nenhum cliente cadastrado."
+      {/* ── Filtros ─────────────────────────────────────────────────────── */}
+      <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:14}}>
+
+        {/* Nome */}
+        <div style={{position:'relative',flex:'2 1 180px',minWidth:160}}>
+          <svg style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',
+            color:'var(--t-muted)',pointerEvents:'none'}}
+            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+          </svg>
+          <input className="ds-input" style={{paddingLeft:32,width:'100%'}}
+            placeholder="Nome do cliente..." value={filters.busca}
+            onChange={e=>setFilters(f=>({...f,busca:e.target.value}))} />
+        </div>
+
+        {/* CPF/CNPJ */}
+        <div style={{position:'relative',flex:'1 1 140px',minWidth:130}}>
+          <svg style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',
+            color:'var(--t-muted)',pointerEvents:'none'}}
+            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
+          </svg>
+          <input className="ds-input" style={{paddingLeft:32,width:'100%'}}
+            placeholder="CPF / CNPJ..." value={filters.cpf_cnpj}
+            onChange={e=>setFilters(f=>({...f,cpf_cnpj:e.target.value}))} />
+        </div>
+
+        {/* Telefone */}
+        <div style={{position:'relative',flex:'1 1 140px',minWidth:130}}>
+          <svg style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',
+            color:'var(--t-muted)',pointerEvents:'none'}}
+            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 012.12 1.18 2 2 0 014.11 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
+          </svg>
+          <input className="ds-input" style={{paddingLeft:32,width:'100%'}}
+            placeholder="Telefone / Celular..." value={filters.telefone}
+            onChange={e=>setFilters(f=>({...f,telefone:e.target.value}))} />
+        </div>
+
+        {/* Tipo PF/PJ */}
+        <select className="ds-input" style={{flex:'0 0 auto',width:'auto',minWidth:140}}
+          value={filters.tipo} onChange={e=>setFilters(f=>({...f,tipo:e.target.value}))}>
+          <option value="">Todos os tipos</option>
+          <option value="PF">Pessoa Física</option>
+          <option value="PJ">Pessoa Jurídica</option>
+        </select>
+
+        {/* Limpar */}
+        {hasFilter && (
+          <button onClick={()=>setFilters({busca:'',tipo:'',cpf_cnpj:'',telefone:''})}
+            style={{background:'none',border:'1px solid var(--border)',borderRadius:'var(--r-md)',
+              padding:'6px 12px',cursor:'pointer',fontSize:'var(--fs-md)',color:'var(--t-muted)',
+              whiteSpace:'nowrap',transition:'all 150ms'}}
+            onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--c-danger)';e.currentTarget.style.color='var(--c-danger)'}}
+            onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.color='var(--t-muted)'}}>
+            ✕ Limpar
+          </button>
+        )}
+      </div>
+
+      <DataTable loading={loading} emptyMessage="Nenhum cliente encontrado."
         columns={[
-          {key:'nome',label:'Nome',render:r=><div><div style={{fontWeight:600}}>{r.nome}</div>{r.email&&<div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)'}}>{r.email}</div>}</div>},
-          {key:'tipo',label:'Tipo',render:r=><Badge value={r.tipo} />},
-          {key:'cpf_cnpj',label:'CPF/CNPJ',render:r=><span style={{fontFamily:'var(--font-mono)',fontSize:'var(--fs-base)'}}>{r.cpf_cnpj||'—'}</span>},
-          {key:'contato',label:'Contato',render:r=>r.celular||r.telefone||'—'},
-          {key:'cidade',label:'Cidade/UF',render:r=>r.cidade?`${r.cidade}${r.estado?` / ${r.estado}`:''}` : '—'},
-          {key:'spc',label:'SPC',render:r=>alertaSPC(r)==='warning'
+          {key:'nome', label:'Nome', render:r=>(
+            <div>
+              <div style={{fontWeight:600}}>{r.nome}</div>
+              {r.email && <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginTop:1}}>{r.email}</div>}
+            </div>
+          )},
+          {key:'tipo', label:'Tipo', render:r=><Badge value={r.tipo} />},
+          {key:'cpf_cnpj', label:'CPF/CNPJ', render:r=>(
+            <span style={{fontFamily:'var(--font-mono)',fontSize:'var(--fs-md)'}}>{r.cpf_cnpj||'—'}</span>
+          )},
+          {key:'contato', label:'Contato', render:r=>(
+            <span style={{fontSize:'var(--fs-md)',color:'var(--t-secondary)'}}>{r.celular||r.telefone||'—'}</span>
+          )},
+          {key:'cidade', label:'Cidade / UF', render:r=>(
+            <span style={{fontSize:'var(--fs-md)',color:'var(--t-secondary)'}}>
+              {r.cidade?`${r.cidade}${r.estado?' / '+r.estado:''}` : '—'}
+            </span>
+          )},
+          {key:'spc', label:'SPC', render:r=>alertaSPC(r)==='warning'
             ?<Badge value="pendente" label={r.ultima_consulta_spc?'SPC Vencido':'Pendente'} dot />
-            :<Badge value="limpo" label={r.status_spc} dot />},
+            :<Badge value={r.status_spc||'limpo'} label={r.status_spc||'Limpo'} dot />
+          },
         ]}
-        data={lista} onRowClick={row=>abrir(row)}
-        actions={row=><ActionButtons onEdit={()=>abrir(row)} onDelete={()=>inativar(row.id)} deleteConfirm="Inativar este cliente?" />}
+        data={lista}
+        onRowClick={row=>abrir(row)}
+        actions={row=>(
+          <div style={{display:'flex',justifyContent:'center'}}>
+            <ActionButtons onDelete={()=>inativar(row.id)} deleteConfirm="Inativar este cliente?" />
+          </div>
+        )}
       />
 
       <SlidePanel open={panel} onClose={()=>setPanel(false)} title={editId?'Editar Cliente':'Novo Cliente'} subtitle={editId?form.nome:'Preencha os dados do cliente'} width="lg"
