@@ -730,7 +730,7 @@ export default function EquipamentosPage() {
           <FormField label="Descrição / Observações">
             <textarea {...F('observacoes')} rows={2} className={textareaCls} placeholder="Descrição, especificações técnicas..." />
           </FormField>
-        </div>{/* end aba dados div */}
+        </div>
       </SlidePanel>
 
       {/* ── Modal de Movimentação de Ativos ───────────────────────────────── */}
