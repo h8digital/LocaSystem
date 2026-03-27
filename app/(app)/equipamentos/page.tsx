@@ -514,7 +514,7 @@ export default function EquipamentosPage() {
           {/* ── Tabs: Dados / Fotos (só aparece em modo edição) ── */}
           {form.id && (
             <div style={{display:'flex',borderBottom:'1px solid var(--border)',marginBottom:4,gap:0,marginTop:-8}}>
-              {([['dados','📋 Dados'],['fotos',`🖼️ Fotos${fotos.length>0?` (${fotos.length})`:''}`]] as const).map(([k,l])=>(
+              {([['dados','📋 Dados'],['fotos',`🖼️ Fotos${fotos.length>0?' ('+fotos.length+')':''}`]] as const).map(([k,l])=>(
                 <button key={k} onClick={()=>setAbaForm(k)}
                   style={{padding:'8px 18px',border:'none',background:'none',cursor:'pointer',
                     fontWeight:abaForm===k?700:400,fontSize:'var(--fs-md)',
@@ -527,7 +527,7 @@ export default function EquipamentosPage() {
             </div>
           )}
 
-          {/* ══ ABA FOTOS ══════════════════════════════════════════════════ */}
+          {/* ══ ABA FOTOS ═══════════════════════════════════════════════════ */}
           {abaForm==='fotos' && form.id && (
             <div style={{display:'flex',flexDirection:'column',gap:16}}>
               {erroFoto && (
@@ -536,13 +536,12 @@ export default function EquipamentosPage() {
                   {erroFoto}
                 </div>
               )}
-              {/* Área de upload */}
               <label style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
                 gap:8,border:'2px dashed var(--border)',borderRadius:'var(--r-md)',padding:'28px 16px',
                 cursor:uploadando?'not-allowed':'pointer',
                 background:uploadando?'var(--bg-header)':'transparent',transition:'border-color 150ms'}}
-                onMouseEnter={e=>!uploadando&&((e.currentTarget.style.borderColor='var(--c-primary)'))}
-                onMouseLeave={e=>(e.currentTarget.style.borderColor='var(--border)')}>
+                onMouseEnter={e=>{ if(!uploadando) e.currentTarget.style.borderColor='var(--c-primary)' }}
+                onMouseLeave={e=>{ e.currentTarget.style.borderColor='var(--border)' }}>
                 <input type="file" accept="image/jpeg,image/png,image/webp" multiple style={{display:'none'}}
                   disabled={uploadando}
                   onChange={async e=>{
@@ -557,31 +556,29 @@ export default function EquipamentosPage() {
                       fd.append('principal',fotos.length===0?'true':'false')
                       const res=await fetch('/api/produto-fotos',{method:'POST',body:fd})
                       const data=await res.json()
-                      if(data.ok) setFotos(p=>[...p,data.data])
+                      if(data.ok) setFotos((p:any[])=>[...p,data.data])
                       else setErroFoto(data.error)
                     }
                     setUploadando(false); e.target.value=''
                   }}
                 />
                 {uploadando
-                  ?<><span style={{fontSize:32}}>⏳</span><span style={{color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Enviando…</span></>
-                  :<><span style={{fontSize:32}}>📷</span>
+                  ? <><span style={{fontSize:32}}>⏳</span><span style={{color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Enviando…</span></>
+                  : <><span style={{fontSize:32}}>📷</span>
                     <span style={{color:'var(--t-muted)',fontSize:'var(--fs-md)',textAlign:'center'}}>
                       Clique para adicionar fotos<br/>
-                      <span style={{fontSize:'var(--fs-sm)'}}>JPG, PNG, WEBP · até 5MB cada · múltiplas permitidas</span>
+                      <span style={{fontSize:'var(--fs-sm)'}}>JPG, PNG, WEBP · até 5MB cada</span>
                     </span></>
                 }
               </label>
-
-              {/* Grid de fotos */}
-              {fotos.length>0?(
+              {fotos.length>0 ? (
                 <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
                   {fotos.map((foto:any)=>(
                     <div key={foto.id} style={{position:'relative',borderRadius:'var(--r-md)',overflow:'hidden',
                       border:`2px solid ${foto.principal?'var(--c-primary)':'var(--border)'}`,
                       aspectRatio:'1',background:'var(--bg-header)'}}>
                       <img src={foto.url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
-                      {foto.principal&&(
+                      {foto.principal && (
                         <div style={{position:'absolute',top:4,left:4,background:'var(--c-primary)',color:'#fff',
                           fontSize:'var(--fs-xs)',fontWeight:700,padding:'2px 6px',borderRadius:'var(--r-sm)'}}>
                           ★ Principal
@@ -589,11 +586,11 @@ export default function EquipamentosPage() {
                       )}
                       <div style={{position:'absolute',bottom:0,left:0,right:0,display:'flex',gap:4,
                         padding:5,background:'linear-gradient(transparent,rgba(0,0,0,0.65))'}}>
-                        {!foto.principal&&(
+                        {!foto.principal && (
                           <button onClick={async()=>{
                               const res=await fetch(`/api/produto-fotos?id=${foto.id}`,{method:'PATCH',
                                 headers:{'Content-Type':'application/json'},body:JSON.stringify({produto_id:form.id})})
-                              if((await res.json()).ok) setFotos(p=>p.map((f:any)=>({...f,principal:f.id===foto.id})))
+                              if((await res.json()).ok) setFotos((p:any[])=>p.map((f:any)=>({...f,principal:f.id===foto.id})))
                             }}
                             style={{flex:1,background:'rgba(255,255,255,0.88)',border:'none',borderRadius:'var(--r-sm)',
                               padding:'3px 0',cursor:'pointer',fontSize:'var(--fs-xs)',fontWeight:700}}>
@@ -603,7 +600,7 @@ export default function EquipamentosPage() {
                         <button onClick={async()=>{
                             if(!confirm('Excluir esta foto?')) return
                             const res=await fetch(`/api/produto-fotos?id=${foto.id}`,{method:'DELETE'})
-                            if((await res.json()).ok) setFotos(p=>p.filter((f:any)=>f.id!==foto.id))
+                            if((await res.json()).ok) setFotos((p:any[])=>p.filter((f:any)=>f.id!==foto.id))
                           }}
                           style={{background:'rgba(220,38,38,0.85)',border:'none',borderRadius:'var(--r-sm)',
                             padding:'3px 8px',cursor:'pointer',color:'#fff',fontSize:'var(--fs-xs)',fontWeight:700}}>
@@ -613,7 +610,7 @@ export default function EquipamentosPage() {
                     </div>
                   ))}
                 </div>
-              ):(
+              ) : (
                 <div style={{textAlign:'center',padding:'12px 0',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>
                   Nenhuma foto ainda. Adicione a primeira acima.
                 </div>
@@ -621,115 +618,110 @@ export default function EquipamentosPage() {
             </div>
           )}
 
-          {/* ══ ABA DADOS (sempre visível para novo produto) ══════════════ */}
-          {(abaForm==='dados'||!form.id)&&<div style={{display:'contents'}}>
+          {/* ══ ABA DADOS ═══════════════════════════════════════════════════ */}
+          {(abaForm==='dados'||!form.id) && (
+            <div style={{display:'contents'}}>
 
-          {/* Identificação */}
-          <div>
-            <div className="ds-section-title">Identificação</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-              <FormField label="Nome do Produto" required style={{ gridColumn:'span 2' }}>
-                <input {...F('nome')} className={inputCls} placeholder="Ex: Andaime Tubular 1,5m" autoFocus />
-              </FormField>
-              <FormField label="Código / SKU">
-                <input {...F('codigo')} className={inputCls} placeholder="Ex: AND-001" />
-              </FormField>
-              <FormField label="Categoria">
-                <select {...F('categoria_id')} className={selectCls}>
-                  <option value="">Sem categoria</option>
-                  {categorias.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                </select>
-              </FormField>
-              <FormField label="Marca">
-                <input {...F('marca')} className={inputCls} />
-              </FormField>
-              <FormField label="Modelo">
-                <input {...F('modelo')} className={inputCls} />
-              </FormField>
-            </div>
-          </div>
-
-          {/* Controle de Estoque */}
-          <div>
-            <div className="ds-section-title">Controle de Estoque</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
-              {[
-                { v:1, l:'Por Patrimônio',  d:'Cada unidade tem número único (série/patrimônio)' },
-                { v:0, l:'Por Quantidade',   d:'Itens sem identificação individual' }
-              ].map(o => (
-                <label key={o.v} onClick={() => setForm({ ...form, controla_patrimonio: o.v })}
-                  style={{
-                    border: `2px solid ${Number(form.controla_patrimonio) === o.v ? 'var(--c-primary)' : 'var(--border)'}`,
-                    background: Number(form.controla_patrimonio) === o.v ? 'var(--c-primary-light)' : 'var(--bg-card)',
-                    borderRadius:'var(--r-md)', padding:'10px 12px', cursor:'pointer', transition:'all 150ms'
-                  }}>
-                  <div style={{ fontWeight:600, fontSize:'var(--fs-base)', marginBottom:2 }}>{o.l}</div>
-                  <div style={{ fontSize:'var(--fs-md)', color:'var(--t-secondary)' }}>{o.d}</div>
-                </label>
-              ))}
-            </div>
-            {Number(form.controla_patrimonio) === 0 && (
-              <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
-                <FormField label="Unidade">
-                  <input {...F('unidade')} className={inputCls} placeholder="un, kg, m, pç..." />
-                </FormField>
-                <FormField label="Estoque Atual">
-                  <div style={{position:'relative'}}>
-                    <input
-                      type="number"
-                      value={form.estoque_total ?? 0}
-                      readOnly
-                      className={inputCls}
-                      style={{background:'var(--bg-header)',color:'var(--t-muted)',cursor:'not-allowed',paddingRight:32}}
-                    />
-                    <span title="Altere o estoque pela tela de Movimentação de Ativos (botão 📦)"
-                      style={{position:'absolute',right:9,top:'50%',transform:'translateY(-50%)',
-                        fontSize:14,cursor:'help',color:'var(--t-muted)'}}>🔒</span>
-                  </div>
-                  <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginTop:3}}>
-                    Altere via Movimentação de Ativos (📦)
-                  </div>
-                </FormField>
-                <FormField label="Estoque Mínimo">
-                  <input type="number" min="0" {...F('estoque_minimo')} className={inputCls} />
-                </FormField>
+              <div>
+                <div className="ds-section-title">Identificação</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                  <FormField label="Nome do Produto" required style={{ gridColumn:'span 2' }}>
+                    <input {...F('nome')} className={inputCls} placeholder="Ex: Andaime Tubular 1,5m" autoFocus />
+                  </FormField>
+                  <FormField label="Código / SKU">
+                    <input {...F('codigo')} className={inputCls} placeholder="Ex: AND-001" />
+                  </FormField>
+                  <FormField label="Categoria">
+                    <select {...F('categoria_id')} className={selectCls}>
+                      <option value="">— Selecione —</option>
+                      {cats.map(cat => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
+                    </select>
+                  </FormField>
+                  <FormField label="Marca">
+                    <input {...F('marca')} className={inputCls} placeholder="Ex: Tramontina" />
+                  </FormField>
+                  <FormField label="Modelo">
+                    <input {...F('modelo')} className={inputCls} placeholder="Ex: Pro 1.5m" />
+                  </FormField>
+                </div>
               </div>
-            )}
-          </div>
 
-          {/* Preços */}
-          <div>
-            <div className="ds-section-title">Preços de Locação por Período</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-              {periodos.map(p => {
-                const campo = campoPreco(p.nome)
-                return (
-                  <FormField key={p.id} label={`${p.nome} (${p.dias}d)${Number(p.desconto_percentual) > 0 ? ` — ${p.desconto_percentual}% desc` : ''}`}>
+              <div>
+                <div className="ds-section-title">Controle de Estoque</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
+                  {[
+                    { v:1, l:'Por Patrimônio',  d:'Cada unidade tem número único (série/patrimônio)' },
+                    { v:0, l:'Por Quantidade',   d:'Itens sem identificação individual' },
+                  ].map(o => (
+                    <div key={o.v} onClick={()=>setForm({...form,controla_patrimonio:o.v})}
+                      style={{ border:`2px solid ${Number(form.controla_patrimonio)===o.v?'var(--c-primary)':'var(--border)'}`,
+                        borderRadius:'var(--r-md)', padding:'10px 14px', cursor:'pointer',
+                        background:Number(form.controla_patrimonio)===o.v?'var(--c-primary-light,#e8f4f8)':'transparent',
+                        transition:'all 150ms' }}>
+                      <div style={{ fontWeight:600, fontSize:'var(--fs-base)', marginBottom:2 }}>{o.l}</div>
+                      <div style={{ fontSize:'var(--fs-md)', color:'var(--t-secondary)' }}>{o.d}</div>
+                    </div>
+                  ))}
+                </div>
+                {Number(form.controla_patrimonio)===0 && (
+                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
+                    <FormField label="Unidade">
+                      <input {...F('unidade')} className={inputCls} placeholder="un, kg, m, pç..." />
+                    </FormField>
+                    <FormField label="Estoque Atual">
+                      <div style={{position:'relative'}}>
+                        <input type="number" value={form.estoque_total??0} readOnly className={inputCls}
+                          style={{background:'var(--bg-header)',color:'var(--t-muted)',cursor:'not-allowed',paddingRight:32}} />
+                        <span title="Altere pela tela de Movimentação de Ativos (📦)"
+                          style={{position:'absolute',right:9,top:'50%',transform:'translateY(-50%)',fontSize:14,cursor:'help',color:'var(--t-muted)'}}>🔒</span>
+                      </div>
+                      <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginTop:3}}>Altere via Movimentação de Ativos (📦)</div>
+                    </FormField>
+                    <FormField label="Estoque Mínimo">
+                      <input type="number" min="0" {...F('estoque_minimo')} className={inputCls} />
+                    </FormField>
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <div className="ds-section-title">Preços de Locação por Período</div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                  {periodos.map(p => {
+                    const campo = campoPreco(p.nome)
+                    return (
+                      <FormField key={p.id} label={`${p.nome} (${p.dias}d)${Number(p.desconto_percentual)>0?` — ${p.desconto_percentual}% desc`:''}`}>
+                        <div style={{ position:'relative' }}>
+                          <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)',
+                            color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
+                          <input type="number" step="0.01" min="0"
+                            value={form[campo]??0}
+                            onChange={e=>setForm({...form,[campo]:e.target.value})}
+                            className={inputCls} style={{ paddingLeft:30 }} />
+                        </div>
+                      </FormField>
+                    )
+                  })}
+                  <FormField label="Prazo de Entrega (dias)">
+                    <input type="number" step="1" min="0" {...F('prazo_entrega_dias')} className={inputCls} placeholder="0" />
+                  </FormField>
+                  <FormField label="Custo de Reposição (perda/dano)">
                     <div style={{ position:'relative' }}>
-                      <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
-                      <input type="number" step="0.01" min="0"
-                        value={form[campo] ?? 0}
-                        onChange={e => setForm({ ...form, [campo]: e.target.value })}
-                        className={inputCls} style={{ paddingLeft:30 }} />
+                      <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)',
+                        color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
+                      <input type="number" step="0.01" min="0" {...F('custo_reposicao')} className={inputCls} style={{ paddingLeft:30 }} />
                     </div>
                   </FormField>
-                )
-              })}
-              <FormField label="Prazo de Entrega (dias)">
-                <input type="number" step="1" min="0" {...F('prazo_entrega_dias')} className={inputCls} placeholder="0" />
-              </FormField>
-              <FormField label="Custo de Reposição (perda/dano)">
-                <div style={{ position:'relative' }}>
-                  <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
-                  <input type="number" step="0.01" min="0" {...F('custo_reposicao')} className={inputCls} style={{ paddingLeft:30 }} />
                 </div>
-              </FormField>
-            </div>
-          </div>
+              </div>
 
-          <FormField label="Descrição / Observações">
-            <textarea {...F('observacoes')} rows={2} className={textareaCls} placeholder="Descrição, especificações técnicas..." />
-          </FormField>
+              <FormField label="Descrição / Observações">
+                <textarea {...F('observacoes')} rows={2} className={textareaCls} placeholder="Descrição, especificações técnicas..." />
+              </FormField>
+
+            </div>
+          )}
+
         </div>
       </SlidePanel>
 
