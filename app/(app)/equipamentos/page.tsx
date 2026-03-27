@@ -85,7 +85,11 @@ export default function EquipamentosPage() {
   // Painel: detalhes/visualizar
   const [panelView, setPanelView]   = useState(false)
   const [viewRow,   setViewRow]     = useState<any>(null)
-  const [abaView,   setAbaView]     = useState<'dados'|'precos'>('dados')
+  const [abaView,       setAbaView]       = useState<'estoque'|'precos'>('estoque')
+  const [viewContratos, setViewContratos] = useState<any[]>([])
+  const [viewOS,        setViewOS]        = useState<any[]>([])
+  const [viewMovs,      setViewMovs]      = useState<any[]>([])
+  const [viewLoadingEx, setViewLoadingEx] = useState(false)
 
   // Painel: preços (acesso rápido pelas ações)
   const [panelPrecos, setPanelPrecos] = useState(false)
@@ -301,10 +305,34 @@ export default function EquipamentosPage() {
     setPanel(true)
   }
 
-  function verDetalhe(row: any, aba: 'dados'|'precos' = 'dados') {
+  async function verDetalhe(row: any, aba: 'estoque'|'precos' = 'estoque') {
     setViewRow(row)
     setAbaView(aba)
     setPanelView(true)
+    // Carregar dados de estoque em paralelo
+    setViewLoadingEx(true)
+    setViewContratos([]); setViewOS([]); setViewMovs([])
+    const [contratosRes, osRes, movsRes] = await Promise.all([
+      supabase.from('contrato_itens')
+        .select('quantidade, preco_unitario, contratos(numero, status, data_inicio, data_fim, clientes(nome))')
+        .eq('produto_id', row.id)
+        .in('contratos.status', ['ativo','em_devolucao','pendente_manutencao']),
+      supabase.from('manutencoes')
+        .select('id, status, tipo, descricao, data_abertura, custo')
+        .eq('produto_id', row.id)
+        .in('status', ['aberto','em_andamento'])
+        .order('data_abertura', { ascending: false })
+        .limit(5),
+      supabase.from('estoque_movimentacoes')
+        .select('tipo, quantidade, observacoes, created_at')
+        .eq('produto_id', row.id)
+        .order('created_at', { ascending: false })
+        .limit(8),
+    ])
+    setViewContratos((contratosRes.data ?? []).filter((ci:any) => ci.contratos))
+    setViewOS(osRes.data ?? [])
+    setViewMovs(movsRes.data ?? [])
+    setViewLoadingEx(false)
   }
 
   async function salvar() {
@@ -465,67 +493,176 @@ export default function EquipamentosPage() {
       >
         {viewRow && (
           <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-            {/* Abas */}
-            <div style={{ display:'flex', gap:2, borderBottom:'2px solid var(--border)' }}>
-              {[{ k:'dados', l:'Dados Gerais' }, { k:'precos', l:'Preços de Locação' }].map((a:any) => (
-                <button key={a.k} onClick={() => setAbaView(a.k)}
-                  style={{
-                    padding:'7px 14px', fontSize:'var(--fs-base)', fontWeight:600, border:'none', cursor:'pointer',
-                    background:'transparent', borderBottom: abaView === a.k ? '2px solid var(--c-primary)' : '2px solid transparent',
-                    color: abaView === a.k ? 'var(--c-primary)' : 'var(--t-muted)', marginBottom:'-2px', transition:'all 150ms'
-                  }}>{a.l}</button>
+            {/* ── Abas ── */}
+            <div style={{display:'flex',gap:2,borderBottom:'2px solid var(--border)'}}>
+              {([['estoque','📦 Estoque'],['precos','💰 Preços']] as const).map(([k,l])=>(
+                <button key={k} onClick={()=>setAbaView(k)}
+                  style={{padding:'7px 14px',fontSize:'var(--fs-base)',fontWeight:600,border:'none',cursor:'pointer',
+                    background:'transparent',marginBottom:'-2px',transition:'all 150ms',
+                    borderBottom:abaView===k?'2px solid var(--c-primary)':'2px solid transparent',
+                    color:abaView===k?'var(--c-primary)':'var(--t-muted)'}}>
+                  {l}
+                </button>
               ))}
             </div>
 
-            {/* Aba Dados Gerais */}
-            {abaView === 'dados' && (
-              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            {/* ══ ABA ESTOQUE ═════════════════════════════════════════════ */}
+            {abaView==='estoque' && (
+              <div style={{display:'flex',flexDirection:'column',gap:14}}>
+
+                {/* KPIs de estoque */}
+                <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
                   {[
-                    { l:'Código',    v: viewRow.codigo || '—' },
-                    { l:'Categoria', v: (viewRow.categorias as any)?.nome || '—' },
-                    { l:'Marca',     v: viewRow.marca || '—' },
-                    { l:'Modelo',    v: viewRow.modelo || '—' },
-                    { l:'Controle',  v: viewRow.controla_patrimonio ? 'Por Patrimônio' : 'Por Quantidade' },
-                    { l:'Unidade',   v: viewRow.unidade || '—' },
-                    { l:'Total',       v: `${viewRow.estoque_total} ${viewRow.unidade}`,      destaque: false },
-                    { l:'Locado',      v: `${viewRow.qtd_locada ?? 0} ${viewRow.unidade}`,        destaque: false },
-                    { l:'Disponível',  v: `${viewRow.estoque_disponivel ?? viewRow.estoque_total} ${viewRow.unidade}`, destaque: true },
-                    { l:'Estoque Mínimo',  v: viewRow.controla_patrimonio ? '—' : `${viewRow.estoque_minimo} ${viewRow.unidade}` },
-                    { l:'Custo Reposição', v: fmt.money(viewRow.custo_reposicao) },
-                  { l:'Prazo Entrega', v: viewRow.prazo_entrega_dias > 0 ? `${viewRow.prazo_entrega_dias} dia(s)` : '—' },
-                  ].map(item => (
-                    <div key={item.l} style={{ background:'var(--bg-header)', borderRadius:'var(--r-md)', padding:'10px 12px', border:'1px solid var(--border)' }}>
-                      <div style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)', marginBottom:2 }}>{item.l}</div>
-                      <div style={{ fontWeight:600, color: (item as any).destaque ? 'var(--c-primary)' : 'var(--t-primary)' }}>{item.v}</div>
+                    {l:'Total',      v:`${viewRow.estoque_total??0} ${viewRow.unidade}`,     c:'var(--t-primary)'},
+                    {l:'Locado',     v:`${viewRow.qtd_locada??0} ${viewRow.unidade}`,         c:'var(--c-warning,#f59e0b)'},
+                    {l:'Disponível', v:`${viewRow.estoque_disponivel??viewRow.estoque_total??0} ${viewRow.unidade}`, c:'var(--c-primary)'},
+                    {l:'Mínimo',     v:viewRow.controla_patrimonio?'—':`${viewRow.estoque_minimo??0} ${viewRow.unidade}`, c:'var(--t-muted)'},
+                  ].map(k=>(
+                    <div key={k.l} style={{background:'var(--bg-header)',borderRadius:'var(--r-md)',
+                      padding:'10px 12px',border:'1px solid var(--border)',textAlign:'center'}}>
+                      <div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)',marginBottom:4}}>{k.l}</div>
+                      <div style={{fontWeight:700,fontSize:'var(--fs-lg)',color:k.c}}>{k.v}</div>
                     </div>
                   ))}
                 </div>
-                {viewRow.descricao && (
-                  <div style={{ background:'var(--bg-header)', borderRadius:'var(--r-md)', padding:'10px 12px', border:'1px solid var(--border)' }}>
-                    <div style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)', marginBottom:4 }}>Descrição / Observações</div>
-                    <div style={{ fontSize:'var(--fs-base)', color:'var(--t-secondary)', lineHeight:1.6 }}>{viewRow.descricao}</div>
+
+                {/* Info básica do produto */}
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:8}}>
+                  {[
+                    {l:'Código',          v:viewRow.codigo||'—'},
+                    {l:'Categoria',       v:(viewRow.categorias as any)?.nome||'—'},
+                    {l:'Controle',        v:viewRow.controla_patrimonio?'Por Patrimônio':'Por Quantidade'},
+                    {l:'Custo Reposição', v:fmt.money(viewRow.custo_reposicao)},
+                    {l:'Prazo Entrega',   v:viewRow.prazo_entrega_dias>0?`${viewRow.prazo_entrega_dias} dia(s)`:'—'},
+                    {l:'Marca / Modelo',  v:[viewRow.marca,viewRow.modelo].filter(Boolean).join(' · ')||'—'},
+                  ].map(k=>(
+                    <div key={k.l} style={{background:'var(--bg-header)',borderRadius:'var(--r-md)',
+                      padding:'8px 12px',border:'1px solid var(--border)'}}>
+                      <div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)',marginBottom:2}}>{k.l}</div>
+                      <div style={{fontWeight:600,fontSize:'var(--fs-md)'}}>{k.v}</div>
+                    </div>
+                  ))}
+                </div>
+
+                {/* Contratos ativos */}
+                <div style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',overflow:'hidden'}}>
+                  <div style={{padding:'8px 12px',background:'var(--bg-header)',fontWeight:700,
+                    fontSize:'var(--fs-md)',borderBottom:'1px solid var(--border)',
+                    display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                    <span>Itens Locados em Contratos Ativos</span>
+                    <span style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)',fontWeight:400}}>
+                      {viewContratos.length} contrato(s)
+                    </span>
+                  </div>
+                  {viewLoadingEx ? (
+                    <div style={{padding:'16px',textAlign:'center',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Carregando…</div>
+                  ) : viewContratos.length===0 ? (
+                    <div style={{padding:'16px',textAlign:'center',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Nenhum item locado no momento.</div>
+                  ) : (
+                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:'var(--fs-md)'}}>
+                      <thead>
+                        <tr style={{background:'var(--bg-header)'}}>
+                          {['Contrato','Cliente','Qtd','Status'].map(h=>(
+                            <th key={h} style={{padding:'6px 10px',textAlign:'left',fontWeight:600,
+                              color:'var(--t-muted)',fontSize:'var(--fs-sm)',borderBottom:'1px solid var(--border)'}}>{h}</th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {viewContratos.map((ci:any,i:number)=>(
+                          <tr key={i} style={{borderBottom:'1px solid var(--border)'}}>
+                            <td style={{padding:'6px 10px',fontFamily:'var(--font-mono)',fontWeight:600,fontSize:'var(--fs-sm)'}}>
+                              {(ci.contratos as any)?.numero}
+                            </td>
+                            <td style={{padding:'6px 10px'}}>{(ci.contratos as any)?.clientes?.nome??'—'}</td>
+                            <td style={{padding:'6px 10px',fontWeight:700}}>{ci.quantidade}</td>
+                            <td style={{padding:'6px 10px'}}>
+                              <span style={{fontSize:'var(--fs-xs)',fontWeight:700,padding:'2px 7px',borderRadius:'var(--r-sm)',
+                                background:'var(--c-success-light,#dcfce7)',color:'var(--c-success,#16a34a)'}}>
+                                {(ci.contratos as any)?.status}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  )}
+                </div>
+
+                {/* OS abertas */}
+                {(viewLoadingEx || viewOS.length>0) && (
+                  <div style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',overflow:'hidden'}}>
+                    <div style={{padding:'8px 12px',background:'var(--bg-header)',fontWeight:700,
+                      fontSize:'var(--fs-md)',borderBottom:'1px solid var(--border)',color:'var(--c-warning,#f59e0b)'}}>
+                      ⚠ Ordens de Serviço em Aberto ({viewOS.length})
+                    </div>
+                    {viewOS.map((os:any)=>(
+                      <div key={os.id} style={{padding:'8px 12px',borderBottom:'1px solid var(--border)',fontSize:'var(--fs-md)'}}>
+                        <div style={{fontWeight:600}}>{os.tipo?.toUpperCase()} — {os.status}</div>
+                        <div style={{color:'var(--t-muted)',fontSize:'var(--fs-sm)'}}>{os.descricao||'—'}</div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {/* Últimas movimentações */}
+                <div style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',overflow:'hidden'}}>
+                  <div style={{padding:'8px 12px',background:'var(--bg-header)',fontWeight:700,
+                    fontSize:'var(--fs-md)',borderBottom:'1px solid var(--border)'}}>
+                    Últimas Movimentações
+                  </div>
+                  {viewLoadingEx ? (
+                    <div style={{padding:'16px',textAlign:'center',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Carregando…</div>
+                  ) : viewMovs.length===0 ? (
+                    <div style={{padding:'16px',textAlign:'center',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Nenhuma movimentação registrada.</div>
+                  ) : (
+                    viewMovs.map((m:any,i:number)=>(
+                      <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',
+                        padding:'7px 12px',borderBottom:'1px solid var(--border)',fontSize:'var(--fs-md)'}}>
+                        <div style={{display:'flex',alignItems:'center',gap:8}}>
+                          <span style={{fontSize:16}}>{m.tipo==='entrada'?'📥':'📤'}</span>
+                          <div>
+                            <div style={{fontWeight:600,textTransform:'capitalize'}}>{m.tipo}</div>
+                            <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)'}}>{m.observacoes||'—'}</div>
+                          </div>
+                        </div>
+                        <div style={{textAlign:'right'}}>
+                          <div style={{fontWeight:700,color:m.tipo==='entrada'?'var(--c-success,#16a34a)':'var(--c-danger)'}}>
+                            {m.tipo==='entrada'?'+':'-'}{m.quantidade}
+                          </div>
+                          <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)'}}>{new Date(m.created_at).toLocaleDateString('pt-BR')}</div>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+
+                {viewRow.observacoes && (
+                  <div style={{background:'var(--bg-header)',borderRadius:'var(--r-md)',padding:'10px 12px',border:'1px solid var(--border)'}}>
+                    <div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)',marginBottom:4}}>Observações</div>
+                    <div style={{fontSize:'var(--fs-md)',color:'var(--t-secondary)',lineHeight:1.6}}>{viewRow.observacoes}</div>
                   </div>
                 )}
               </div>
             )}
 
-            {/* Aba Preços */}
-            {abaView === 'precos' && (
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+            {/* ══ ABA PREÇOS ══════════════════════════════════════════════ */}
+            {abaView==='precos' && (
+              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
                 {[
-                  { l:'Diário',        v: viewRow.preco_locacao_diario },
-                  { l:'Final de Sem.', v: viewRow.preco_fds },
-                  { l:'Semanal',       v: viewRow.preco_locacao_semanal },
-                  { l:'Quinzenal',     v: viewRow.preco_quinzenal },
-                  { l:'Mensal',        v: viewRow.preco_locacao_mensal },
-                  { l:'Trimestral',    v: viewRow.preco_trimestral },
-                  { l:'Semestral',     v: viewRow.preco_semestral },
-                  { l:'Custo Reposição', v: viewRow.custo_reposicao },
-                ].map(item => (
-                  <div key={item.l} style={{ background:'var(--bg-header)', borderRadius:'var(--r-md)', padding:'12px 14px', border:'1px solid var(--border)' }}>
-                    <div style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)', marginBottom:4 }}>{item.l}</div>
-                    <div style={{ fontWeight:700, fontSize:'var(--fs-lg)', color: item.v > 0 ? 'var(--c-primary)' : 'var(--t-light)' }}>
+                  {l:'Diário',          v:viewRow.preco_locacao_diario},
+                  {l:'Final de Sem.',   v:viewRow.preco_fds},
+                  {l:'Semanal',         v:viewRow.preco_locacao_semanal},
+                  {l:'Quinzenal',       v:viewRow.preco_quinzenal},
+                  {l:'Mensal',          v:viewRow.preco_locacao_mensal},
+                  {l:'Trimestral',      v:viewRow.preco_trimestral},
+                  {l:'Semestral',       v:viewRow.preco_semestral},
+                  {l:'Custo Reposição', v:viewRow.custo_reposicao},
+                ].map(item=>(
+                  <div key={item.l} style={{background:'var(--bg-header)',borderRadius:'var(--r-md)',
+                    padding:'12px 14px',border:'1px solid var(--border)'}}>
+                    <div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)',marginBottom:4}}>{item.l}</div>
+                    <div style={{fontWeight:700,fontSize:'var(--fs-lg)',color:item.v>0?'var(--c-primary)':'var(--t-light)'}}>
                       {fmt.money(item.v)}
                     </div>
                   </div>
