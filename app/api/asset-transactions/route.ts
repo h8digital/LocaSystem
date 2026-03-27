@@ -72,11 +72,53 @@ export async function POST(req: NextRequest) {
   }
 }
 
+// PATCH /api/asset-transactions/check — verifica disponibilidade de patrimônio
+// Usado pelo modal antes do submit para dar feedback imediato ao usuário
+export async function PATCH(req: NextRequest) {
+  try {
+    const { numero_patrimonio } = await req.json()
+    if (!numero_patrimonio) return NextResponse.json({ ok: true, disponivel: true })
+
+    const { data } = await sb
+      .from('patrimonios')
+      .select('id, status, deleted_at')
+      .eq('numero_patrimonio', numero_patrimonio.trim())
+      .is('deleted_at', null)
+      .maybeSingle()
+
+    if (!data) return NextResponse.json({ ok: true, disponivel: true })
+    return NextResponse.json({
+      ok: true,
+      disponivel: false,
+      status: data.status,
+      mensagem: `Patrimônio "${numero_patrimonio}" já existe com status: ${data.status}`,
+    })
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e.message })
+  }
+}
+
 export async function DELETE(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const id = searchParams.get('id')
   if (!id) return NextResponse.json({ ok: false, error: 'ID obrigatório' })
+
+  // Buscar a transação antes de deletar para saber o patrimônio vinculado
+  const { data: tx } = await sb.from('asset_transactions')
+    .select('tipo, patrimonio_id').eq('id', Number(id)).single()
+
   const { error } = await sb.from('asset_transactions').delete().eq('id', Number(id))
   if (error) return NextResponse.json({ ok: false, error: error.message })
+
+  // Se era uma compra, o trigger já soft-deleta o patrimônio.
+  // Garantia extra: se o trigger falhar por algum motivo, fazemos via API também.
+  if (tx?.tipo === 'compra' && tx?.patrimonio_id) {
+    await sb.from('patrimonios')
+      .update({ deleted_at: new Date().toISOString(), status: 'descartado' })
+      .eq('id', tx.patrimonio_id)
+      .neq('status', 'locado')
+      .is('deleted_at', null)
+  }
+
   return NextResponse.json({ ok: true })
 }

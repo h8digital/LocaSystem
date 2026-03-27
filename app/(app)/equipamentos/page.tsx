@@ -123,6 +123,7 @@ export default function EquipamentosPage() {
   const [formMov,      setFormMov]      = useState<any>(emptyMov())
   // Linhas de entrada em lote (compra)
   const [linhasEntrada, setLinhasEntrada] = useState<{numero_patrimonio:string,numero_serie:string}[]>([emptyPatLine()])
+  const [conflitos,     setConflitos]     = useState<Record<number,string>>({})
 
   async function abrirMovimentacao(prod: any) {
     setMovProduto(prod)
@@ -136,7 +137,10 @@ export default function EquipamentosPage() {
     setMovTransacoes(data.ok ? data.data : [])
     // Carregar patrimônios do produto
     const { data: pats } = await supabase.from('patrimonios')
-      .select('id,numero_patrimonio,numero_serie,status').eq('produto_id', prod.id).order('numero_patrimonio')
+      .select('id,numero_patrimonio,numero_serie,status')
+      .eq('produto_id', prod.id)
+      .is('deleted_at', null)
+      .order('numero_patrimonio')
     setPatrimoniosMov(pats ?? [])
     setMovLoading(false)
   }
@@ -198,6 +202,20 @@ export default function EquipamentosPage() {
         const linhasValidas = linhasEntrada.filter(l => l.numero_patrimonio.trim())
         if (linhasValidas.length === 0) throw new Error('Informe ao menos um número de patrimônio.')
 
+        // Verificar conflitos de unicidade antes de salvar
+        const checkResults = await Promise.all(linhasValidas.map(l =>
+          fetch('/api/asset-transactions', {
+            method: 'PATCH', headers: {'Content-Type':'application/json'},
+            body: JSON.stringify({ numero_patrimonio: l.numero_patrimonio.trim() })
+          }).then(r => r.json())
+        ))
+        const conflitosEncontrados = checkResults
+          .map((r, i) => r.disponivel === false ? linhasValidas[i].numero_patrimonio : null)
+          .filter(Boolean)
+        if (conflitosEncontrados.length > 0) {
+          throw new Error('Patrimônio(s) já existente(s): ' + conflitosEncontrados.join(', ') + '. Exclua a movimentação anterior antes de recadastrar.')
+        }
+
         for (const linha of linhasValidas) {
           // 1. Criar o patrimônio
           const { data: pat, error: patErr } = await supabase
@@ -240,7 +258,10 @@ export default function EquipamentosPage() {
       const data2 = await res2.json()
       setMovTransacoes(data2.ok ? data2.data : [])
       const { data: pats } = await supabase.from('patrimonios')
-        .select('id,numero_patrimonio,numero_serie,status').eq('produto_id', movProduto.id).order('numero_patrimonio')
+        .select('id,numero_patrimonio,numero_serie,status')
+        .eq('produto_id', movProduto.id)
+        .is('deleted_at', null)
+        .order('numero_patrimonio')
       setPatrimoniosMov(pats ?? [])
       setFormMov(emptyMov())
       setLinhasEntrada([emptyPatLine()])
@@ -1154,14 +1175,41 @@ export default function EquipamentosPage() {
                           <div key={idx} style={{display:'grid',gridTemplateColumns:'1fr 1fr 32px',gap:6,
                             padding:'6px 12px',borderBottom:'1px solid var(--border)',alignItems:'center',
                             background:idx%2===0?'transparent':'var(--bg-header)'}}>
-                            <input className={inputCls} style={{fontSize:'var(--fs-md)',padding:'4px 8px'}}
+                            <div style={{position:'relative',flex:1}}>
+                            <input className={inputCls} style={{fontSize:'var(--fs-md)',padding:'4px 8px',
+                              borderColor:conflitos[idx]?'var(--c-danger)':undefined,width:'100%'}}
                               placeholder={`PAT-${String(idx+1).padStart(3,'0')}`}
                               value={linha.numero_patrimonio}
                               onChange={e=>{
                                 const novo=[...linhasEntrada]
                                 novo[idx]={...novo[idx],numero_patrimonio:e.target.value}
                                 setLinhasEntrada(novo)
-                              }} />
+                                // Limpar conflito ao editar
+                                setConflitos(p=>({...p,[idx]:''}))
+                              }}
+                              onBlur={async e=>{
+                                const val = e.target.value.trim()
+                                if (!val) return
+                                const res = await fetch('/api/asset-transactions',{
+                                  method:'PATCH',headers:{'Content-Type':'application/json'},
+                                  body:JSON.stringify({numero_patrimonio:val})
+                                })
+                                const data = await res.json()
+                                if (data.disponivel===false) {
+                                  setConflitos(p=>({...p,[idx]:data.mensagem}))
+                                } else {
+                                  setConflitos(p=>({...p,[idx]:''}))
+                                }
+                              }}
+                            />
+                            {conflitos[idx] && (
+                              <div style={{position:'absolute',top:'100%',left:0,right:0,zIndex:10,
+                                background:'var(--c-danger)',color:'#fff',fontSize:'var(--fs-xs)',
+                                padding:'3px 7px',borderRadius:'0 0 var(--r-sm) var(--r-sm)',fontWeight:600}}>
+                                ⚠ {conflitos[idx]}
+                              </div>
+                            )}
+                            </div>
                             <input className={inputCls} style={{fontSize:'var(--fs-md)',padding:'4px 8px'}}
                               placeholder="Serial (opcional)"
                               value={linha.numero_serie}
