@@ -38,22 +38,24 @@ export default function VerContratoPage() {
   const [templateSel,setTemplateSel]= useState('')
   const [gerando,    setGerando]    = useState(false)
   const [docLink,    setDocLink]    = useState('')
-  const [aba,        setAba]        = useState('dados')
-  // ── Pagamento / Fatura ──────────────────────────────────
-  const [painelPgto,    setPainelPgto]    = useState(false)
+  // E-mail
   const [painelEmail,   setPainelEmail]   = useState(false)
+  const [emailLog,      setEmailLog]      = useState<any[]>([])
   const [envEmail,      setEnvEmail]      = useState({ para:'', cc:'', assunto:'', corpo:'' })
   const [enviandoEmail, setEnviandoEmail] = useState(false)
   const [erroEmail,     setErroEmail]     = useState('')
   const [okEmail,       setOkEmail]       = useState('')
-  const [painelFatura,  setPainelFatura]  = useState(false)
-  const [faturaAlvo,    setFaturaAlvo]    = useState<any>(null)  // fatura sendo paga
+  const [aba,        setAba]        = useState('dados')
+  // ── Pagamento / Fatura ──────────────────────────────────
+  const [painelPgto,    setPainelPgto]    = useState(false)
+  const [faturaAlvo,    setFaturaAlvo]    = useState<any>(null)
   const [salvandoPgto,  setSalvandoPgto]  = useState(false)
   const [erroPgto,      setErroPgto]      = useState('')
   const [formPgto, setFormPgto] = useState<any>({
     valor_pago: 0, data_pagamento: new Date().toISOString().split('T')[0],
     forma_pagamento: 'pix', observacoes: ''
   })
+  const [painelFatura,  setPainelFatura]  = useState(false)
   const [formNovaFatura, setFormNovaFatura] = useState<any>({
     tipo: 'antecipacao', valor: 0, data_vencimento: new Date().toISOString().split('T')[0],
     forma_pagamento: 'pix', descricao: '', observacoes: ''
@@ -77,15 +79,16 @@ export default function VerContratoPage() {
 
   useEffect(() => {
     async function load() {
-      const [{ data:c },{ data:i },{ data:f }, s,{ data:t },{ data:d }] = await Promise.all([
+      const [{ data:c },{ data:i },{ data:f }, s,{ data:t },{ data:d },{ data:el }] = await Promise.all([
         supabase.from('contratos').select('*, clientes(*), usuarios(nome)').eq('id', id).single(),
         supabase.from('contrato_itens').select('*, produtos(nome), patrimonios(numero_patrimonio)').eq('contrato_id', id),
         supabase.from('faturas').select('*').eq('contrato_id', id).order('data_vencimento'),
         supabase.from('contrato_saldo').select('*').eq('contrato_id', id).maybeSingle(),
         supabase.from('doc_templates').select('id,nome,tipo').eq('ativo',1).order('tipo').order('nome'),
         supabase.from('devolucoes').select('*, usuarios(nome)').eq('contrato_id', id).order('created_at',{ascending:false}),
+        supabase.from('email_log').select('*, usuarios(nome)').eq('contrato_id', id).order('created_at',{ascending:false}).limit(20),
       ])
-      setContrato(c); setItens(i??[]); setFaturas(f??[]); setSaldoInfo(s?.data ?? s ?? null)
+      setContrato(c); setItens(i??[]); setFaturas(f??[]); setSaldoInfo(s?.data ?? s ?? null); setEmailLog(el??[])
       setTemplates(t??[]); setDevolucoes(d??[]); setLoading(false)
       const pad = t?.find((x:any)=>x.padrao===1&&x.tipo==='contrato')
       if(pad) setTemplateSel(String(pad.id))
@@ -779,6 +782,7 @@ Atenciosamente,`,
 
           {/* ════ DOCUMENTOS ═══════════════════════════════════════════ */}
           {aba==='documentos'&&(
+            <div style={{display:'flex',flexDirection:'column',gap:20}}>
             <div style={{maxWidth:460}}>
               <div className="ds-section-title">Gerar Documento</div>
               <div style={{display:'flex',flexDirection:'column',gap:14}}>
@@ -810,6 +814,38 @@ Atenciosamente,`,
                 }
               </div>
             </div>
+
+            <div style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',overflow:'hidden'}}>
+              <div style={{padding:'10px 14px',background:'var(--bg-header)',borderBottom:'1px solid var(--border)',fontWeight:700,fontSize:'var(--fs-md)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                <span>E-mails Enviados</span>
+                <span style={{fontWeight:400,fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>{emailLog.length} registro(s)</span>
+              </div>
+              {emailLog.length === 0
+                ? <div style={{padding:'20px',textAlign:'center',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Nenhum e-mail enviado ainda.</div>
+                : <table style={{width:'100%',borderCollapse:'collapse',fontSize:'var(--fs-md)'}}>
+                    <thead><tr style={{background:'var(--bg-header)'}}>
+                      {['Data','Para','Assunto','Usuario','Status'].map(h=>(
+                        <th key={h} style={{padding:'6px 12px',textAlign:'left',fontWeight:600,color:'var(--t-muted)',fontSize:'var(--fs-sm)',borderBottom:'1px solid var(--border)'}}>{h}</th>
+                      ))}
+                    </tr></thead>
+                    <tbody>
+                      {emailLog.map((log:any,ix:number)=>(
+                        <tr key={log.id} style={{borderBottom:'1px solid var(--border)',background:ix%2===0?'transparent':'var(--bg-header)'}}>
+                          <td style={{padding:'7px 12px',color:'var(--t-muted)',fontSize:'var(--fs-sm)'}}>{new Date(log.created_at).toLocaleDateString('pt-BR')}</td>
+                          <td style={{padding:'7px 12px',fontWeight:500}}>{log.para}</td>
+                          <td style={{padding:'7px 12px',color:'var(--t-secondary)'}}>{log.assunto}</td>
+                          <td style={{padding:'7px 12px',color:'var(--t-muted)',fontSize:'var(--fs-sm)'}}>{log.usuarios?.nome??'---'}</td>
+                          <td style={{padding:'7px 12px',fontWeight:600,fontSize:'var(--fs-sm)',color:log.status==='enviado'?'var(--c-success,#16a34a)':'var(--c-danger)'}}>
+                            {log.status==='enviado'?'Enviado':'Erro'}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+              }
+            </div>
+            </div>
+
           )}
 
         </div>
@@ -891,7 +927,73 @@ Atenciosamente,`,
         </div>
       </SlidePanel>
 
-      {/* ── Painel: Registrar Pagamento ──────────────────────────────────── */}
+
+      {/* Painel: Enviar por E-mail */}
+      <SlidePanel
+        open={painelEmail}
+        onClose={() => setPainelEmail(false)}
+        title="Enviar por E-mail"
+        subtitle={'Contrato ' + (contrato?.numero ?? '')}
+        width="md"
+        footer={
+          <div style={{ display:'flex', gap:10, width:'100%' }}>
+            <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPainelEmail(false)}>Cancelar</Btn>
+            <Btn style={{ flex:2 }} loading={enviandoEmail} onClick={enviarEmail}>Enviar</Btn>
+          </div>
+        }
+      >
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          {erroEmail && (
+            <div style={{ background:'var(--c-danger-light)', border:'1px solid var(--c-danger)',
+              borderRadius:'var(--r-md)', padding:'10px 14px', color:'var(--c-danger-text)', fontWeight:600 }}>
+              {erroEmail}
+            </div>
+          )}
+          {okEmail && (
+            <div style={{ background:'var(--c-success-light)', border:'1px solid var(--c-success)',
+              borderRadius:'var(--r-md)', padding:'10px 14px', color:'var(--c-success-text)', fontWeight:600 }}>
+              {okEmail}
+            </div>
+          )}
+          <FormField label="Para (destinatario) *">
+            <input className={inputCls} type="email"
+              value={envEmail.para}
+              onChange={e => setEnvEmail(v=>({...v,para:e.target.value}))}
+              placeholder="cliente@email.com.br" />
+          </FormField>
+          <FormField label="CC (copia) - opcional">
+            <input className={inputCls} type="email"
+              value={envEmail.cc}
+              onChange={e => setEnvEmail(v=>({...v,cc:e.target.value}))}
+              placeholder="outro@email.com.br" />
+          </FormField>
+          <FormField label="Assunto">
+            <input className={inputCls}
+              value={envEmail.assunto}
+              onChange={e => setEnvEmail(v=>({...v,assunto:e.target.value}))} />
+          </FormField>
+          <FormField label="Mensagem">
+            <textarea className={textareaCls} rows={7}
+              value={envEmail.corpo}
+              onChange={e => setEnvEmail(v=>({...v,corpo:e.target.value}))} />
+          </FormField>
+          {docLink && (
+            <div style={{ background:'var(--bg-header)', border:'1px solid var(--border)',
+              borderRadius:'var(--r-md)', padding:'10px 14px', fontSize:'var(--fs-md)',
+              color:'var(--t-secondary)', display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:18 }}>Link do documento sera incluido automaticamente.</span>
+            </div>
+          )}
+          {!docLink && (
+            <div style={{ background:'#fef3c7', border:'1px solid #f59e0b',
+              borderRadius:'var(--r-md)', padding:'10px 14px', fontSize:'var(--fs-md)', color:'#92400e' }}>
+              Gere o documento antes de enviar para incluir o link.
+            </div>
+          )}
+        </div>
+      </SlidePanel>
+
+      {/* -- Painel: Registrar Pagamento ──────────────────────────────────── */}
       <SlidePanel
         open={painelPgto}
         onClose={()=>setPainelPgto(false)}
