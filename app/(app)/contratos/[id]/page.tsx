@@ -41,6 +41,11 @@ export default function VerContratoPage() {
   const [aba,        setAba]        = useState('dados')
   // ── Pagamento / Fatura ──────────────────────────────────
   const [painelPgto,    setPainelPgto]    = useState(false)
+  const [painelEmail,   setPainelEmail]   = useState(false)
+  const [envEmail,      setEnvEmail]      = useState({ para:'', cc:'', assunto:'', corpo:'' })
+  const [enviandoEmail, setEnviandoEmail] = useState(false)
+  const [erroEmail,     setErroEmail]     = useState('')
+  const [okEmail,       setOkEmail]       = useState('')
   const [painelFatura,  setPainelFatura]  = useState(false)
   const [faturaAlvo,    setFaturaAlvo]    = useState<any>(null)  // fatura sendo paga
   const [salvandoPgto,  setSalvandoPgto]  = useState(false)
@@ -148,6 +153,49 @@ export default function VerContratoPage() {
     const { error } = await supabase.from('contratos').delete().eq('id', id)
     if (error) { alert('Erro ao excluir: ' + error.message); return }
     router.push('/contratos')
+  }
+
+  // ── Abrir modal de envio de e-mail ──────────────────────────
+  function abrirEmail() {
+    const emailCliente = (contrato as any)?.clientes?.email ?? ''
+    const nomeCliente  = (contrato as any)?.clientes?.nome  ?? ''
+    setEnvEmail({
+      para:    emailCliente,
+      cc:      '',
+      assunto: `Contrato de Locação Nº ${contrato?.numero}`,
+      corpo:   `Olá ${nomeCliente},
+
+Segue o contrato de locação Nº ${contrato?.numero}.
+
+${docLink ? `Link para visualização: ${docLink}` : ''}
+
+Em caso de dúvidas, estamos à disposição.
+
+Atenciosamente,`,
+    })
+    setErroEmail(''); setOkEmail('')
+    setPainelEmail(true)
+  }
+
+  async function enviarEmail() {
+    if (!envEmail.para) { setErroEmail('Informe o e-mail do destinatário'); return }
+    setEnviandoEmail(true); setErroEmail(''); setOkEmail('')
+    const res = await fetch('/api/email', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json' },
+      body: JSON.stringify({
+        para:        envEmail.para,
+        cc:          envEmail.cc || undefined,
+        assunto:     envEmail.assunto,
+        corpo:       envEmail.corpo,
+        contrato_id: Number(id),
+        html: envEmail.corpo.split('\n').join('<br/>') + (docLink ? '<br/><br/><a href="' + docLink + '" style="background:#17A2B8;color:#fff;padding:10px 20px;border-radius:6px;text-decoration:none;font-weight:bold">Abrir Documento</a>' : ''),
+      }),
+    })
+    const data = await res.json()
+    setEnviandoEmail(false)
+    if (data.ok) { setOkEmail(data.msg); }
+    else setErroEmail(data.error)
   }
 
   // ── Ativar contrato (DRAFT → ACTIVE) ─────────────────────
@@ -753,7 +801,8 @@ export default function VerContratoPage() {
                     </div>
                     <div style={{display:'flex',gap:8}}>
                       <a href={docLink} target="_blank" rel="noopener" style={{flex:1}}><Btn variant="secondary" style={{width:'100%'}}>Visualizar</Btn></a>
-                      <Btn style={{flex:1}} onClick={()=>window.open(`https://wa.me/?text=${encodeURIComponent(`Olá! Segue o link do seu contrato:\n\n${docLink}`)}`, '_blank')}>WhatsApp</Btn>
+                      <Btn style={{flex:1}} onClick={abrirEmail}>📧 Enviar por E-mail</Btn>
+                      <Btn variant="secondary" style={{flex:1}} onClick={()=>window.open(`https://wa.me/?text=${encodeURIComponent(`Olá! Segue o link do seu contrato:\n\n${docLink}`)}`, '_blank')}>WhatsApp</Btn>
                     </div>
                     <Btn variant="secondary" onClick={()=>setDocLink('')} style={{alignSelf:'flex-start'}}>Gerar Novamente</Btn>
                     <div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)'}}>Link válido por 30 dias.</div>
@@ -765,6 +814,82 @@ export default function VerContratoPage() {
 
         </div>
       </div>
+
+      {/* ── Painel: Enviar por E-mail ─────────────────────────────────────── */}
+      <SlidePanel
+        open={painelEmail}
+        onClose={() => setPainelEmail(false)}
+        title="Enviar por E-mail"
+        subtitle={`Contrato ${contrato?.numero}`}
+        width="md"
+        footer={
+          <div style={{ display:'flex', gap:10, width:'100%' }}>
+            <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPainelEmail(false)}>Cancelar</Btn>
+            <Btn style={{ flex:2 }} loading={enviandoEmail} onClick={enviarEmail}>
+              📧 Enviar
+            </Btn>
+          </div>
+        }
+      >
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          {erroEmail && (
+            <div style={{ background:'var(--c-danger-light)', border:'1px solid var(--c-danger)',
+              borderRadius:'var(--r-md)', padding:'10px 14px', color:'var(--c-danger-text)',
+              fontSize:'var(--fs-md)', fontWeight:600 }}>
+              ❌ {erroEmail}
+            </div>
+          )}
+          {okEmail && (
+            <div style={{ background:'var(--c-success-light)', border:'1px solid var(--c-success)',
+              borderRadius:'var(--r-md)', padding:'10px 14px', color:'var(--c-success-text)',
+              fontSize:'var(--fs-md)', fontWeight:600 }}>
+              ✅ {okEmail}
+            </div>
+          )}
+          <FormField label="Para (destinatário) *">
+            <input className={inputCls} type="email"
+              value={envEmail.para}
+              onChange={e => setEnvEmail(v=>({...v,para:e.target.value}))}
+              placeholder="cliente@email.com.br" />
+          </FormField>
+          <FormField label="CC (cópia) — opcional">
+            <input className={inputCls} type="email"
+              value={envEmail.cc}
+              onChange={e => setEnvEmail(v=>({...v,cc:e.target.value}))}
+              placeholder="outro@email.com.br" />
+          </FormField>
+          <FormField label="Assunto">
+            <input className={inputCls}
+              value={envEmail.assunto}
+              onChange={e => setEnvEmail(v=>({...v,assunto:e.target.value}))} />
+          </FormField>
+          <FormField label="Mensagem">
+            <textarea className={textareaCls} rows={8}
+              value={envEmail.corpo}
+              onChange={e => setEnvEmail(v=>({...v,corpo:e.target.value}))} />
+          </FormField>
+          {docLink && (
+            <div style={{ background:'var(--bg-header)', border:'1px solid var(--border)',
+              borderRadius:'var(--r-md)', padding:'10px 14px', fontSize:'var(--fs-md)',
+              color:'var(--t-secondary)', display:'flex', alignItems:'center', gap:8 }}>
+              <span style={{ fontSize:18 }}>📄</span>
+              <div>
+                <div style={{ fontWeight:600 }}>Link do documento será incluído</div>
+                <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginTop:2 }}>
+                  Um botão de acesso ao documento será adicionado automaticamente ao e-mail.
+                </div>
+              </div>
+            </div>
+          )}
+          {!docLink && (
+            <div style={{ background:'var(--c-warning-light,#fef3c7)', border:'1px solid var(--c-warning,#f59e0b)',
+              borderRadius:'var(--r-md)', padding:'10px 14px', fontSize:'var(--fs-md)',
+              color:'var(--c-warning-text,#92400e)' }}>
+              ⚠ Nenhum documento gerado ainda. Gere o documento na aba <strong>Documentos</strong> antes de enviar para incluir o link.
+            </div>
+          )}
+        </div>
+      </SlidePanel>
 
       {/* ── Painel: Registrar Pagamento ──────────────────────────────────── */}
       <SlidePanel

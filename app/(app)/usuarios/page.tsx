@@ -93,7 +93,9 @@ export default function UsuariosPage() {
 
   const [form, setForm] = useState<any>({
     nome:'', email:'', perfis:['operador'], comissao_percentual:0,
-    telefone:'', ativo:1, senha:''
+    telefone:'', ativo:1, senha:'',
+    smtp_ativo:false, smtp_host:'', smtp_porta:587, smtp_usuario:'',
+    smtp_senha:'', smtp_seguro:true, smtp_de_nome:'', smtp_de_email:''
   })
 
   async function load() {
@@ -129,10 +131,18 @@ export default function UsuariosPage() {
     const payload: any = {
       nome:               form.nome,
       email:              form.email,
-      perfil:             joinPerfis(form.perfis),   // salva como "admin,vendedor"
+      perfil:             joinPerfis(form.perfis),
       comissao_percentual:Number(form.comissao_percentual) || 0,
       telefone:           form.telefone || null,
       ativo:              Number(form.ativo),
+      smtp_ativo:         !!form.smtp_ativo,
+      smtp_host:          form.smtp_host || null,
+      smtp_porta:         form.smtp_porta ? Number(form.smtp_porta) : null,
+      smtp_usuario:       form.smtp_usuario || null,
+      smtp_senha:         form.smtp_senha  || null,
+      smtp_seguro:        !!form.smtp_seguro,
+      smtp_de_nome:       form.smtp_de_nome  || null,
+      smtp_de_email:      form.smtp_de_email || null,
     }
     if (form.senha) {
       const res = await fetch('/api/auth/hash', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ senha: form.senha }) })
@@ -281,6 +291,74 @@ export default function UsuariosPage() {
               style={{ accentColor:'var(--c-primary)', width:14, height:14 }} />
             <span style={{ fontWeight:500, color:'var(--t-secondary)' }}>Usuário ativo no sistema</span>
           </label>
+
+          {/* ── Configuração SMTP pessoal ── */}
+          <div style={{ borderTop:'1px solid var(--border)', paddingTop:16, marginTop:4 }}>
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+              <div>
+                <div style={{ fontWeight:700, fontSize:'var(--fs-base)', color:'var(--t-primary)' }}>📧 E-mail / SMTP Pessoal</div>
+                <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginTop:2 }}>
+                  Quando ativo, este usuário enviará e-mails pelo seu próprio servidor.
+                </div>
+              </div>
+              <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer' }}>
+                <input type="checkbox" checked={!!form.smtp_ativo}
+                  onChange={e => setForm({...form, smtp_ativo: e.target.checked})}
+                  style={{ accentColor:'var(--c-primary)', width:16, height:16 }} />
+                <span style={{ fontWeight:600, fontSize:'var(--fs-md)',
+                  color: form.smtp_ativo ? 'var(--c-primary)' : 'var(--t-muted)' }}>
+                  {form.smtp_ativo ? 'Ativo' : 'Inativo'}
+                </span>
+              </label>
+            </div>
+
+            {form.smtp_ativo && (
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10,
+                background:'var(--bg-header)', borderRadius:'var(--r-md)', padding:14,
+                border:'1px solid var(--border)' }}>
+                <div style={{ gridColumn:'span 2' }}>
+                  <FormField label="Servidor SMTP (Host)">
+                    <input value={form.smtp_host} className={inputCls}
+                      onChange={e=>setForm({...form,smtp_host:e.target.value})}
+                      placeholder="smtp.gmail.com" />
+                  </FormField>
+                </div>
+                <FormField label="Porta">
+                  <input type="number" value={form.smtp_porta} className={inputCls}
+                    onChange={e=>setForm({...form,smtp_porta:e.target.value})}
+                    placeholder="587" />
+                </FormField>
+                <FormField label="Segurança">
+                  <select value={form.smtp_seguro?'true':'false'} className={inputCls}
+                    onChange={e=>setForm({...form,smtp_seguro:e.target.value==='true'})}>
+                    <option value="false">STARTTLS (porta 587)</option>
+                    <option value="true">SSL/TLS (porta 465)</option>
+                  </select>
+                </FormField>
+                <FormField label="Usuário / Login">
+                  <input value={form.smtp_usuario} className={inputCls}
+                    onChange={e=>setForm({...form,smtp_usuario:e.target.value})}
+                    placeholder="seu@email.com.br" />
+                </FormField>
+                <FormField label="Senha">
+                  <input type="password" value={form.smtp_senha} className={inputCls}
+                    onChange={e=>setForm({...form,smtp_senha:e.target.value})}
+                    placeholder="••••••••" />
+                </FormField>
+                <FormField label="Nome do remetente">
+                  <input value={form.smtp_de_nome} className={inputCls}
+                    onChange={e=>setForm({...form,smtp_de_nome:e.target.value})}
+                    placeholder="João Silva" />
+                </FormField>
+                <FormField label="E-mail do remetente">
+                  <input value={form.smtp_de_email} className={inputCls}
+                    onChange={e=>setForm({...form,smtp_de_email:e.target.value})}
+                    placeholder="joao@empresa.com.br" />
+                </FormField>
+              </div>
+            )}
+          </div>
+
         </div>
       </SlidePanel>
     </div>

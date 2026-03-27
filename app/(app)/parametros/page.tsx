@@ -26,6 +26,37 @@ const TD = ({ children, center, muted }: { children?: React.ReactNode; center?: 
     fontSize: 'var(--fs-base)' }}>{children}</td>
 )
 
+// ── Botão de Teste SMTP ──────────────────────────────────────────────────────
+function TesteSMTPBtn({ usar }: { usar: 'global'|'usuario' }) {
+  const [testando, setTestando] = useState(false)
+  const [resultado, setResultado] = useState<{ok:boolean,msg?:string,error?:string}|null>(null)
+
+  async function testar() {
+    setTestando(true); setResultado(null)
+    const res = await fetch(`/api/email?usar=${usar}`)
+    const data = await res.json()
+    setResultado(data)
+    setTestando(false)
+  }
+
+  return (
+    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+      <button onClick={testar} disabled={testando}
+        style={{ background:'var(--c-primary)', color:'#fff', border:'none',
+          borderRadius:'var(--r-md)', padding:'6px 16px', cursor:testando?'not-allowed':'pointer',
+          fontWeight:600, fontSize:'var(--fs-md)', opacity:testando?0.7:1, transition:'opacity 150ms' }}>
+        {testando ? '⏳ Testando...' : '🔌 Testar Conexão'}
+      </button>
+      {resultado && (
+        <span style={{ fontSize:'var(--fs-md)', fontWeight:600,
+          color: resultado.ok ? 'var(--c-success,#16a34a)' : 'var(--c-danger)' }}>
+          {resultado.ok ? '✅' : '❌'} {resultado.msg || resultado.error}
+        </span>
+      )}
+    </div>
+  )
+}
+
 export default function ParametrosPage() {
   const [params,     setParams]     = useState<Record<string,string>>({})
   const [periodos,   setPeriodos]   = useState<any[]>([])
@@ -61,6 +92,7 @@ export default function ParametrosPage() {
     { key:'periodos',   label:'Períodos'              },
     { key:'categorias', label:'Categorias'            },
     { key:'enderecos',  label:'Tipos de Endereço'    },
+    { key:'email',      label:'E-mail / SMTP'          },
     { key:'locais',     label:'Locais de Armazenagem' },
   ]
 
@@ -388,6 +420,79 @@ export default function ParametrosPage() {
               <div style={{ background:'var(--c-info-light)', border:'1px solid var(--c-info)', borderRadius:'var(--r-md)', padding:'12px 16px', fontSize:'var(--fs-md)', color:'var(--c-info-text)' }}>
                 <strong>SPC:</strong> O sistema alertará quando a última consulta do cliente ultrapassar o intervalo configurado.
               </div>
+            </div>
+          )}
+
+          {/* ═══ E-MAIL / SMTP ══════════════════════════════════════════ */}
+          {aba === 'email' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
+
+              {/* ── Configuração Global ── */}
+              <div>
+                <div className="ds-section-title">Configuração Global de E-mail</div>
+                <div style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)', marginTop:4, marginBottom:14 }}>
+                  Usada por todos os usuários que não possuem configuração própria.
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                  <div style={{ gridColumn:'span 2' }}>
+                    <FormField label="Servidor SMTP (Host)">
+                      <input value={params['email_host']??''} className={inpSm}
+                        onChange={e=>setParams(p=>({...p,email_host:e.target.value}))}
+                        placeholder="smtp.exemplo.com.br" />
+                    </FormField>
+                  </div>
+                  <FormField label="Porta">
+                    <input type="number" value={params['email_port']??'587'} className={inpSm}
+                      onChange={e=>setParams(p=>({...p,email_port:e.target.value}))}
+                      placeholder="587" />
+                  </FormField>
+                  <FormField label="Segurança">
+                    <select value={params['email_secure']??'false'} className={inpSm}
+                      onChange={e=>setParams(p=>({...p,email_secure:e.target.value}))}>
+                      <option value="false">STARTTLS (porta 587)</option>
+                      <option value="true">SSL/TLS (porta 465)</option>
+                    </select>
+                  </FormField>
+                  <FormField label="Usuário (e-mail de login)">
+                    <input value={params['email_user']??''} className={inpSm}
+                      onChange={e=>setParams(p=>({...p,email_user:e.target.value}))}
+                      placeholder="noreply@suaempresa.com.br" />
+                  </FormField>
+                  <FormField label="Senha">
+                    <input type="password" value={params['email_pass']??''} className={inpSm}
+                      onChange={e=>setParams(p=>({...p,email_pass:e.target.value}))}
+                      placeholder="••••••••" />
+                  </FormField>
+                  <FormField label="Nome do Remetente">
+                    <input value={params['email_from_name']??''} className={inpSm}
+                      onChange={e=>setParams(p=>({...p,email_from_name:e.target.value}))}
+                      placeholder="Kanoff Soluções" />
+                  </FormField>
+                  <FormField label="E-mail do Remetente">
+                    <input value={params['email_from_email']??''} className={inpSm}
+                      onChange={e=>setParams(p=>({...p,email_from_email:e.target.value}))}
+                      placeholder="contato@suaempresa.com.br" />
+                  </FormField>
+                  <FormField label="Reply-To (opcional)" style={{ gridColumn:'span 2' }}>
+                    <input value={params['email_reply_to']??''} className={inpSm}
+                      onChange={e=>setParams(p=>({...p,email_reply_to:e.target.value}))}
+                      placeholder="Deixe vazio para usar o remetente" />
+                  </FormField>
+                </div>
+                <div style={{ marginTop:14, display:'flex', gap:10 }}>
+                  <TesteSMTPBtn usar="global" />
+                </div>
+              </div>
+
+              {/* ── Dica ── */}
+              <div style={{ background:'var(--bg-header)', border:'1px solid var(--border)',
+                borderRadius:'var(--r-md)', padding:'12px 16px', fontSize:'var(--fs-md)', color:'var(--t-secondary)' }}>
+                <strong>💡 Configuração por usuário</strong><br/>
+                Cada usuário pode ter seu próprio SMTP configurado em <strong>Parâmetros → Usuários → Editar</strong>.
+                Quando ativo, o SMTP do usuário tem prioridade sobre esta configuração global.
+                Isso permite que cada vendedor envie e-mails do seu próprio endereço.
+              </div>
+
             </div>
           )}
 
