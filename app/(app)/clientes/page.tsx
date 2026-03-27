@@ -7,7 +7,7 @@ import { SlidePanel, PageHeader, DataTable, Filters, Badge, ActionButtons, Btn, 
 
 function toTitle(s:string){if(!s)return'';const m=new Set(['de','da','do','das','dos','e','a','o','em','com','por','para']);return s.toLowerCase().split(' ').map((w,i)=>(!m.has(w)||i===0)?w.charAt(0).toUpperCase()+w.slice(1):w).join(' ')}
 
-const emptyForm=()=>({tipo:'PF',nome:'',cpf_cnpj:'',rg_ie:'',email:'',telefone:'',celular:'',limite_credito:0,observacoes:'',endereco:'',numero:'',complemento:'',bairro:'',cidade:'',estado:'',cep:''})
+const emptyForm=()=>({tipo:'PF',nome:'',cpf_cnpj:'',rg_ie:'',email:'',telefone:'',celular:'',limite_credito:0,observacoes:'',endereco:'',numero:'',complemento:'',bairro:'',cidade:'',estado:'',cep:'',papeis:['cliente'] as string[]})
 const emptyEnd =()=>({tipo:'Residencial',cep:'',logradouro:'',numero:'',complemento:'',bairro:'',cidade:'',estado:'',ibge:'',principal:false,referencia:'',observacoes:''})
 const emptyCt  =()=>({nome:'',cargo:'',telefone:'',celular:'',email:'',autorizado_retirada:false,principal:false,observacoes:''})
 
@@ -32,7 +32,7 @@ export default function ClientesPage() {
 
   async function load(){
     setLoading(true)
-    let q=supabase.from('clientes').select('id,tipo,nome,cpf_cnpj,email,celular,telefone,cidade,estado,ativo,ultima_consulta_spc,status_spc,rg_ie,limite_credito,observacoes,endereco,numero,complemento,bairro,cep').eq('ativo',1).order('nome')
+    let q=supabase.from('clientes').select('id,tipo,nome,cpf_cnpj,email,celular,telefone,cidade,estado,ativo,ultima_consulta_spc,status_spc,rg_ie,limite_credito,observacoes,endereco,numero,complemento,bairro,cep,papeis').eq('ativo',1).order('nome')
     if(filters.busca)   q=q.ilike('nome',`%${filters.busca}%`)
     if(filters.tipo)    q=q.eq('tipo',filters.tipo)
     if(filters.cpf_cnpj)q=q.ilike('cpf_cnpj',`%${filters.cpf_cnpj.replace(/\D/g,'')}%`)
@@ -50,7 +50,7 @@ export default function ClientesPage() {
 
   async function abrir(c?:any){
     setErro('');setTab('dados')
-    if(c){setForm({tipo:c.tipo??'PF',nome:c.nome??'',cpf_cnpj:c.cpf_cnpj??'',rg_ie:c.rg_ie??'',email:c.email??'',telefone:c.telefone??'',celular:c.celular??'',limite_credito:c.limite_credito??0,observacoes:c.observacoes??'',endereco:c.endereco??'',numero:c.numero??'',complemento:c.complemento??'',bairro:c.bairro??'',cidade:c.cidade??'',estado:c.estado??'',cep:c.cep??''});setEditId(c.id);const[{data:ends},{data:cts},{data:spcs}]=await Promise.all([supabase.from('cliente_enderecos').select('*').eq('cliente_id',c.id).eq('ativo',1).order('principal',{ascending:false}),supabase.from('cliente_contatos').select('*').eq('cliente_id',c.id).eq('ativo',1).order('principal',{ascending:false}),supabase.from('cliente_spc').select('*').eq('cliente_id',c.id).order('data_consulta',{ascending:false})]);setEnderecos(ends?.length?ends:[emptyEnd()]);setContatos(cts?.length?cts:[emptyCt()]);setSpcData(spcs??[])}
+    if(c){setForm({tipo:c.tipo??'PF',nome:c.nome??'',cpf_cnpj:c.cpf_cnpj??'',rg_ie:c.rg_ie??'',email:c.email??'',telefone:c.telefone??'',celular:c.celular??'',limite_credito:c.limite_credito??0,observacoes:c.observacoes??'',endereco:c.endereco??'',numero:c.numero??'',complemento:c.complemento??'',bairro:c.bairro??'',cidade:c.cidade??'',estado:c.estado??'',cep:c.cep??'',papeis:c.papeis??['cliente']});setEditId(c.id);const[{data:ends},{data:cts},{data:spcs}]=await Promise.all([supabase.from('cliente_enderecos').select('*').eq('cliente_id',c.id).eq('ativo',1).order('principal',{ascending:false}),supabase.from('cliente_contatos').select('*').eq('cliente_id',c.id).eq('ativo',1).order('principal',{ascending:false}),supabase.from('cliente_spc').select('*').eq('cliente_id',c.id).order('data_consulta',{ascending:false})]);setEnderecos(ends?.length?ends:[emptyEnd()]);setContatos(cts?.length?cts:[emptyCt()]);setSpcData(spcs??[])}
     else{setForm(emptyForm());setEditId(null);setEnderecos([emptyEnd()]);setContatos([emptyCt()]);setSpcData([])}
     setPanel(true)
   }
@@ -66,7 +66,7 @@ export default function ClientesPage() {
     }
     setSaving(true);setErro('')
     try{
-      const payload={tipo:form.tipo,nome:form.nome.trim(),cpf_cnpj:form.cpf_cnpj||null,rg_ie:form.rg_ie||null,email:form.email||null,telefone:form.telefone||null,celular:form.celular||null,limite_credito:Number(form.limite_credito)||0,observacoes:form.observacoes||null,endereco:form.endereco||null,numero:form.numero||null,complemento:form.complemento||null,bairro:form.bairro||null,cidade:form.cidade||null,estado:form.estado||null,cep:form.cep||null,ativo:1,updated_at:new Date().toISOString()}
+      const payload={tipo:form.tipo,nome:form.nome.trim(),cpf_cnpj:form.cpf_cnpj||null,rg_ie:form.rg_ie||null,email:form.email||null,telefone:form.telefone||null,celular:form.celular||null,limite_credito:Number(form.limite_credito)||0,observacoes:form.observacoes||null,endereco:form.endereco||null,numero:form.numero||null,complemento:form.complemento||null,bairro:form.bairro||null,cidade:form.cidade||null,estado:form.estado||null,cep:form.cep||null,ativo:1,updated_at:new Date().toISOString(),papeis:(form.papeis??[]).length>0?form.papeis:['cliente']}
       let id=editId
       if(editId){const{error}=await supabase.from('clientes').update(payload).eq('id',editId);if(error)throw new Error(error.message)}
       else{const{data,error}=await supabase.from('clientes').insert(payload).select('id').single();if(error)throw new Error(error.message);id=data.id}
@@ -179,6 +179,21 @@ export default function ClientesPage() {
             </div>
           )},
           {key:'tipo', label:'Tipo', render:r=><Badge value={r.tipo} />},
+          {key:'papeis', label:'Papéis', render:r=>{
+            const icons:Record<string,string>={cliente:'👤',fornecedor:'📦',transportador:'🚛',funcionario:'👷',representante:'🤝'}
+            const papeis=(r.papeis??['cliente']) as string[]
+            return (
+              <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                {papeis.map((p:string)=>(
+                  <span key={p} style={{display:'inline-flex',alignItems:'center',gap:3,
+                    padding:'2px 8px',borderRadius:'var(--r-sm)',fontSize:'var(--fs-xs)',fontWeight:600,
+                    background:'var(--c-primary-light,#e8f4f8)',color:'var(--c-primary)',border:'1px solid var(--c-primary)'}}>
+                    {icons[p]??'•'} {p.charAt(0).toUpperCase()+p.slice(1)}
+                  </span>
+                ))}
+              </div>
+            )
+          }},
           {key:'cpf_cnpj', label:'CPF/CNPJ', render:r=>(
             <span style={{fontFamily:'var(--font-mono)',fontSize:'var(--fs-md)'}}>{r.cpf_cnpj||'—'}</span>
           )},
@@ -217,6 +232,42 @@ export default function ClientesPage() {
                   <div style={{display:'flex',gap:8}}><input value={form.cpf_cnpj||''} onChange={e=>setForm({...form,cpf_cnpj:formatarDoc(e.target.value,form.tipo)})} onBlur={e=>{if(form.tipo==='PJ')buscarCNPJ(e.target.value)}} className={`${inputCls} flex-1`} style={{fontFamily:'var(--font-mono)'}} placeholder={form.tipo==='PJ'?'00.000.000/0001-00':'000.000.000-00'}/>{form.tipo==='PJ'&&<Btn size="sm" variant="secondary" onClick={()=>buscarCNPJ(form.cpf_cnpj)} loading={loadingCNPJ}>🔍</Btn>}</div>
                 </FormField>
               </div>
+
+              {/* ── Papéis ── */}
+              <FormField label="Papéis">
+                <div style={{display:'flex',gap:8,flexWrap:'wrap',padding:'2px 0'}}>
+                  {([
+                    {v:'cliente',       l:'Cliente',       icon:'👤'},
+                    {v:'fornecedor',    l:'Fornecedor',    icon:'📦'},
+                    {v:'transportador', l:'Transportador', icon:'🚛'},
+                    {v:'funcionario',   l:'Funcionário',   icon:'👷'},
+                    {v:'representante', l:'Representante', icon:'🤝'},
+                  ]).map((p:any)=>{
+                    const ativo=(form.papeis??[]).includes(p.v)
+                    return (
+                      <label key={p.v}
+                        style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',userSelect:'none',
+                          padding:'5px 12px',borderRadius:'var(--r-md)',transition:'all 150ms',
+                          fontWeight:ativo?600:400,fontSize:'var(--fs-md)',
+                          border:`1px solid ${ativo?'var(--c-primary)':'var(--border)'}`,
+                          background:ativo?'var(--c-primary-light,#e8f4f8)':'transparent',
+                          color:ativo?'var(--c-primary)':'var(--t-secondary)'}}>
+                        <input type="checkbox" checked={ativo}
+                          onChange={e=>{
+                            const curr=(form.papeis??[]) as string[]
+                            setForm({...form, papeis: e.target.checked
+                              ? [...curr, p.v]
+                              : curr.filter((x:string)=>x!==p.v)
+                            })
+                          }}
+                          style={{accentColor:'var(--c-primary)',width:14,height:14}} />
+                        {p.icon} {p.l}
+                      </label>
+                    )
+                  })}
+                </div>
+              </FormField>
+
               <FormField label="Nome / Razão Social" required><input {...F('nome')} className={inputCls} /></FormField>
               <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
                 <FormField label={form.tipo==='PJ'?'Insc. Estadual':'RG'}><input {...F('rg_ie')} className={inputCls} /></FormField>
