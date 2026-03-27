@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase, fmt } from '@/lib/supabase'
 import { SlidePanel, PageHeader, DataTable, Filters, Badge, ActionButtons, Ico, Btn, FormField, inputCls, selectCls, textareaCls } from '@/components/ui'
+import LookupField from '@/components/ui/LookupField'
 import type { AcaoSecundaria } from '@/components/ui/ActionButtons'
 
 const emptyForm = () => ({
@@ -21,6 +22,49 @@ function campoPreco(nomeP: string) {
   if (n.toLowerCase().includes('final') || n.toLowerCase().includes('fds') || n.toLowerCase().includes('weekend')) return 'preco_fds'
   if (n.includes('seman'))  return 'preco_locacao_semanal'
   return 'preco_locacao_diario'
+}
+
+// ── Mini-componente para criar categoria inline ───────────────────────────────
+function CriarCategoriaPanel({ onClose, onCreated }: { onClose:()=>void; onCreated:(r:any)=>void }) {
+  const [nome,     setNome]     = useState('')
+  const [salvando, setSalvando] = useState(false)
+  const [erro,     setErro]     = useState('')
+
+  async function salvar() {
+    if (!nome.trim()) { setErro('Informe o nome da categoria.'); return }
+    setSalvando(true); setErro('')
+    const { data, error } = await supabase
+      .from('categorias')
+      .insert({ nome: nome.trim(), ativo: 1 })
+      .select().single()
+    setSalvando(false)
+    if (error) { setErro(error.message); return }
+    onCreated(data)
+  }
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:16, padding:'4px 0' }}>
+      {erro && (
+        <div style={{ background:'var(--c-danger-light)', border:'1px solid var(--c-danger)',
+          borderRadius:'var(--r-md)', padding:'10px 14px', color:'var(--c-danger-text)',
+          fontSize:'var(--fs-md)' }}>{erro}</div>
+      )}
+      <FormField label="Nome da Categoria" required>
+        <input
+          className={inputCls}
+          placeholder="Ex: Andaimes e Escadas"
+          value={nome}
+          onChange={e => setNome(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') salvar() }}
+          autoFocus
+        />
+      </FormField>
+      <div style={{ display:'flex', gap:10, marginTop:8 }}>
+        <Btn variant="secondary" style={{ flex:1 }} onClick={onClose}>Cancelar</Btn>
+        <Btn style={{ flex:2 }} loading={salvando} onClick={salvar}>Criar Categoria</Btn>
+      </div>
+    </div>
+  )
 }
 
 export default function EquipamentosPage() {
@@ -49,6 +93,7 @@ export default function EquipamentosPage() {
 
   // ── Fotos ─────────────────────────────────────────────────────────────────
   const [abaForm,      setAbaForm]      = useState<'dados'|'fotos'>('dados')
+  const [catNome,      setCatNome]      = useState('')  // display value para LookupField de categoria
   const [fotos,        setFotos]        = useState<any[]>([])
   const [uploadando,   setUploadando]   = useState(false)
   const [erroFoto,     setErroFoto]     = useState('')
@@ -632,10 +677,24 @@ export default function EquipamentosPage() {
                     <input {...F('codigo')} className={inputCls} placeholder="Ex: AND-001" />
                   </FormField>
                   <FormField label="Categoria">
-                    <select {...F('categoria_id')} className={selectCls}>
-                      <option value="">— Selecione —</option>
-                      {categorias.map((cat:any) => <option key={cat.id} value={cat.id}>{cat.nome}</option>)}
-                    </select>
+                    <LookupField
+                      value={form.categoria_id || null}
+                      displayValue={catNome}
+                      onChange={(id, row) => {
+                        setForm((f:any) => ({ ...f, categoria_id: id }))
+                        setCatNome(row?.nome ?? '')
+                      }}
+                      table="categorias"
+                      searchColumn="nome"
+                      filter={{ ativo: 1 }}
+                      orderBy="nome"
+                      placeholder="Buscar ou criar categoria..."
+                      createPanelTitle="Nova Categoria"
+                      createPanelWidth="sm"
+                      createPanel={({ onClose, onCreated }: { onClose:()=>void; onCreated:(r:any)=>void }) => (
+                        <CriarCategoriaPanel onClose={onClose} onCreated={onCreated} />
+                      )}
+                    />
                   </FormField>
                   <FormField label="Marca">
                     <input {...F('marca')} className={inputCls} placeholder="Ex: Tramontina" />
