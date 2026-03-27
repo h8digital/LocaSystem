@@ -90,6 +90,7 @@ export default function EquipamentosPage() {
   const [viewOS,        setViewOS]        = useState<any[]>([])
   const [viewMovs,      setViewMovs]      = useState<any[]>([])
   const [viewLoadingEx, setViewLoadingEx] = useState(false)
+  const [viewPats,      setViewPats]      = useState<any[]>([])
 
   // Painel: preços (acesso rápido pelas ações)
   const [panelPrecos, setPanelPrecos] = useState(false)
@@ -344,8 +345,8 @@ export default function EquipamentosPage() {
     setPanelView(true)
     // Carregar dados de estoque em paralelo
     setViewLoadingEx(true)
-    setViewContratos([]); setViewOS([]); setViewMovs([])
-    const [contratosRes, osRes, movsRes] = await Promise.all([
+    setViewContratos([]); setViewOS([]); setViewMovs([]); setViewPats([])
+    const [contratosRes, osRes, movsRes, patsRes] = await Promise.all([
       supabase.from('contrato_itens')
         .select('quantidade, preco_unitario, contratos(numero, status, data_inicio, data_fim, clientes(nome))')
         .eq('produto_id', row.id)
@@ -361,10 +362,16 @@ export default function EquipamentosPage() {
         .eq('produto_id', row.id)
         .order('created_at', { ascending: false })
         .limit(8),
+      supabase.from('patrimonios')
+        .select('id, numero_patrimonio, numero_serie, status, data_aquisicao, valor_aquisicao, contrato_itens(contratos(numero,status))')
+        .eq('produto_id', row.id)
+        .is('deleted_at', null)
+        .order('numero_patrimonio'),
     ])
     setViewContratos((contratosRes.data ?? []).filter((ci:any) => ci.contratos))
     setViewOS(osRes.data ?? [])
     setViewMovs(movsRes.data ?? [])
+    setViewPats(patsRes.data ?? [])
     setViewLoadingEx(false)
   }
 
@@ -685,6 +692,78 @@ export default function EquipamentosPage() {
                     </table>
                   )}
                 </div>
+
+                {/* Patrimônios / Inventário */}
+                {viewRow?.controla_patrimonio===1 && (
+                  <div style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',overflow:'hidden'}}>
+                    <div style={{padding:'8px 12px',background:'var(--bg-header)',fontWeight:700,
+                      fontSize:'var(--fs-md)',borderBottom:'1px solid var(--border)',
+                      display:'flex',justifyContent:'space-between',alignItems:'center'}}>
+                      <span>Inventário de Patrimônios</span>
+                      <span style={{fontWeight:400,fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>
+                        {viewPats.filter((p:any)=>p.status==='disponivel').length} disponível /
+                        {' '}{viewPats.filter((p:any)=>p.status==='locado').length} locado /
+                        {' '}{viewPats.length} total
+                      </span>
+                    </div>
+                    {viewLoadingEx ? (
+                      <div style={{padding:'16px',textAlign:'center',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Carregando…</div>
+                    ) : viewPats.length === 0 ? (
+                      <div style={{padding:'16px',textAlign:'center',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>
+                        Nenhum patrimônio cadastrado. Use o botão <strong>+ Movimentação</strong> para registrar entradas.
+                      </div>
+                    ) : (
+                      <table style={{width:'100%',borderCollapse:'collapse',fontSize:'var(--fs-md)'}}>
+                        <thead>
+                          <tr style={{background:'var(--bg-header)'}}>
+                            {['Nº Patrimônio','Nº Série','Status','Aquisição','Contrato Atual'].map(h=>(
+                              <th key={h} style={{padding:'6px 10px',textAlign:'left',fontWeight:600,
+                                color:'var(--t-muted)',fontSize:'var(--fs-sm)',borderBottom:'1px solid var(--border)'}}>{h}</th>
+                            ))}
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {viewPats.map((pat:any,i:number)=>{
+                            const contratoAtivo = (pat.contrato_itens ?? [])
+                              .find((ci:any) => ['ativo','em_devolucao','pendente_manutencao'].includes(ci.contratos?.status))
+                            const statusColor = pat.status==='disponivel'?'var(--c-success,#16a34a)':
+                              pat.status==='locado'?'var(--c-primary)':
+                              pat.status==='manutencao'?'var(--c-warning,#f59e0b)':'var(--t-muted)'
+                            return (
+                              <tr key={pat.id} style={{borderBottom:'1px solid var(--border)',
+                                background:i%2===0?'transparent':'var(--bg-header)'}}>
+                                <td style={{padding:'7px 10px',fontFamily:'var(--font-mono)',fontWeight:700,fontSize:'var(--fs-sm)'}}>
+                                  {pat.numero_patrimonio}
+                                </td>
+                                <td style={{padding:'7px 10px',color:'var(--t-muted)',fontFamily:'var(--font-mono)',fontSize:'var(--fs-sm)'}}>
+                                  {pat.numero_serie || '—'}
+                                </td>
+                                <td style={{padding:'7px 10px'}}>
+                                  <span style={{fontWeight:600,fontSize:'var(--fs-xs)',
+                                    padding:'2px 8px',borderRadius:'var(--r-sm)',
+                                    background:statusColor+'22',color:statusColor,textTransform:'capitalize'}}>
+                                    {pat.status}
+                                  </span>
+                                </td>
+                                <td style={{padding:'7px 10px',color:'var(--t-muted)',fontSize:'var(--fs-sm)'}}>
+                                  {pat.data_aquisicao ? new Date(pat.data_aquisicao).toLocaleDateString('pt-BR') : '—'}
+                                </td>
+                                <td style={{padding:'7px 10px',fontSize:'var(--fs-sm)'}}>
+                                  {contratoAtivo
+                                    ? <span style={{fontFamily:'var(--font-mono)',fontWeight:600,color:'var(--c-primary)'}}>
+                                        {contratoAtivo.contratos?.numero}
+                                      </span>
+                                    : <span style={{color:'var(--t-muted)'}}>—</span>
+                                  }
+                                </td>
+                              </tr>
+                            )
+                          })}
+                        </tbody>
+                      </table>
+                    )}
+                  </div>
+                )}
 
                 {/* OS abertas */}
                 {(viewLoadingEx || viewOS.length>0) && (

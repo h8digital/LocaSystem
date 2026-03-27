@@ -72,6 +72,7 @@ export default function VerContratoPage() {
   const [itemProdNome,  setItemProdNome]  = useState('')
   const [patrimonios,   setPatrimonios]   = useState<any[]>([])
   const [loadingPats,   setLoadingPats]   = useState(false)
+  const [periodos,     setPeriodos]     = useState<any[]>([])
   const [painelEditar, setPainelEditar] = useState(false)
   const [salvandoEdicao, setSalvandoEdicao] = useState(false)
   const [erroEdicao, setErroEdicao] = useState('')
@@ -79,16 +80,17 @@ export default function VerContratoPage() {
 
   useEffect(() => {
     async function load() {
-      const [{ data:c },{ data:i },{ data:f }, s,{ data:t },{ data:d },{ data:el }] = await Promise.all([
+      const [{ data:c },{ data:i },{ data:f }, s,{ data:t },{ data:d },{ data:el },{ data:per }] = await Promise.all([
         supabase.from('contratos').select('*, clientes(*), usuarios(nome)').eq('id', id).single(),
         supabase.from('contrato_itens').select('*, produtos(nome), patrimonios(numero_patrimonio)').eq('contrato_id', id),
         supabase.from('faturas').select('*').eq('contrato_id', id).order('data_vencimento'),
         supabase.from('contrato_saldo').select('*').eq('contrato_id', id).maybeSingle(),
         supabase.from('doc_templates').select('id,nome,tipo').eq('ativo',1).order('tipo').order('nome'),
+        supabase.from('periodos_locacao').select('*').eq('ativo',1).order('dias'),
         supabase.from('devolucoes').select('*, usuarios(nome)').eq('contrato_id', id).order('created_at',{ascending:false}),
         supabase.from('email_log').select('*, usuarios(nome)').eq('contrato_id', id).order('created_at',{ascending:false}).limit(20),
       ])
-      setContrato(c); setItens(i??[]); setFaturas(f??[]); setSaldoInfo(s?.data ?? s ?? null); setEmailLog(el??[])
+      setContrato(c); setItens(i??[]); setFaturas(f??[]); setSaldoInfo(s?.data ?? s ?? null); setEmailLog(el??[]); setPeriodos(per??[])
       setTemplates(t??[]); setDevolucoes(d??[]); setLoading(false)
       const pad = t?.find((x:any)=>x.padrao===1&&x.tipo==='contrato')
       if(pad) setTemplateSel(String(pad.id))
@@ -104,6 +106,7 @@ export default function VerContratoPage() {
 
   function abrirEditar() {
     setFormEdicao({
+      periodo_id:         contrato.periodo_id        ?? '',
       data_inicio:        contrato.data_inicio      ?? '',
       data_fim:           contrato.data_fim          ?? '',
       forma_pagamento:    contrato.forma_pagamento   ?? 'pix',
@@ -123,9 +126,59 @@ export default function VerContratoPage() {
   async function salvarEdicao() {
     if (!formEdicao.data_inicio || !formEdicao.data_fim) { setErroEdicao('Datas de início e fim são obrigatórias.'); return }
     setSalvandoEdicao(true); setErroEdicao('')
-    const subtotal = itens.reduce((s: number, i: any) => s + Number(i.preco_unitario ?? 0) * Number(i.quantidade ?? 1), 0)
+
+    // Recalcular preços dos itens se período mudou
+    const periodoMudou = formEdicao.periodo_id && formEdicao.periodo_id !== contrato?.periodo_id
+    const periodoDias  = periodos.find((p:any) => String(p.id) === String(formEdicao.periodo_id))?.dias ?? 1
+    const nomePeríodo  = (periodos.find((p:any) => String(p.id) === String(formEdicao.periodo_id))?.nome ?? '').toLowerCase()
+    const isFDS        = nomePeríodo.includes('final') || nomePeríodo.includes('fds')
+    const diasTotal    = Math.max(1, Math.ceil(
+      (new Date(formEdicao.data_fim).getTime() - new Date(formEdicao.data_inicio).getTime()) / 86400000
+    ))
+
+    let itensAtualizados = itens
+    if (periodoMudou && itens.length > 0) {
+      // Buscar preços atualizados dos produtos
+      const prodIds = [...new Set(itens.map((i:any) => i.produto_id))]
+      const { data: prods } = await supabase
+        .from('produtos')
+        .select('id,preco_locacao_diario,preco_fds,preco_locacao_semanal,preco_quinzenal,preco_locacao_mensal,preco_trimestral,preco_semestral')
+        .in('id', prodIds)
+      const prodMap: Record<number,any> = {}
+      prods?.forEach((p:any) => { prodMap[p.id] = p })
+
+      itensAtualizados = itens.map((it:any) => {
+        const p = prodMap[it.produto_id]
+        if (!p) return it
+        let preco = 0
+        const d = periodoDias
+        if      (isFDS && p.preco_fds > 0)                    preco = Number(p.preco_fds)
+        else if (d >= 180 && p.preco_semestral > 0)           preco = Number(p.preco_semestral)
+        else if (d >= 90  && p.preco_trimestral > 0)          preco = Number(p.preco_trimestral)
+        else if (d >= 30  && p.preco_locacao_mensal > 0)      preco = Number(p.preco_locacao_mensal)
+        else if (d >= 15  && p.preco_quinzenal > 0)           preco = Number(p.preco_quinzenal)
+        else if (d >= 7   && p.preco_locacao_semanal > 0)     preco = Number(p.preco_locacao_semanal)
+        else                                                   preco = Number(p.preco_locacao_diario ?? 0)
+        const novoTotal = preco * Number(it.quantidade ?? 1)
+        return { ...it, preco_unitario: preco, total: novoTotal }
+      })
+
+      // Salvar novos preços nos itens
+      for (const it of itensAtualizados) {
+        if (it.id) {
+          await supabase.from('contrato_itens').update({
+            preco_unitario: it.preco_unitario,
+            total:          it.total,
+          }).eq('id', it.id)
+        }
+      }
+      setItens(itensAtualizados)
+    }
+
+    const subtotal = itensAtualizados.reduce((s: number, i: any) => s + Number(i.total ?? (Number(i.preco_unitario ?? 0) * Number(i.quantidade ?? 1))), 0)
     const total = subtotal - Number(formEdicao.desconto) + Number(formEdicao.acrescimo) + Number(formEdicao.frete)
     const { error } = await supabase.from('contratos').update({
+      periodo_id:           formEdicao.periodo_id || null,
       data_inicio:          formEdicao.data_inicio,
       data_fim:             formEdicao.data_fim,
       forma_pagamento:      formEdicao.forma_pagamento,
@@ -1276,6 +1329,33 @@ Atenciosamente,`,
       >
         {erroEdicao && <div className="ds-alert-error" style={{ marginBottom:14 }}>{erroEdicao}</div>}
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+
+          {/* Período */}
+          <FormField label="Período de Locação">
+            <select value={formEdicao.periodo_id ?? ''}
+              onChange={e => {
+                const pid = e.target.value
+                const per = periodos.find((p:any) => String(p.id) === pid)
+                if (per && formEdicao.data_inicio) {
+                  const fim = new Date(formEdicao.data_inicio)
+                  fim.setDate(fim.getDate() + per.dias)
+                  setFormEdicao((f:any) => ({ ...f, periodo_id: pid, data_fim: fim.toISOString().split('T')[0] }))
+                } else {
+                  setFormEdicao((f:any) => ({ ...f, periodo_id: pid }))
+                }
+              }}
+              className={selectCls}>
+              <option value="">-- Selecione um período --</option>
+              {periodos.map((p:any) => (
+                <option key={p.id} value={p.id}>{p.nome} ({p.dias} dias)</option>
+              ))}
+            </select>
+            {formEdicao.periodo_id && formEdicao.periodo_id !== contrato?.periodo_id && (
+              <div style={{ marginTop:4, fontSize:'var(--fs-sm)', color:'var(--c-warning,#f59e0b)', fontWeight:600 }}>
+                Período alterado — os preços dos itens serão recalculados automaticamente ao salvar.
+              </div>
+            )}
+          </FormField>
 
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
             <FormField label="Data de Início" required>
