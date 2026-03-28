@@ -137,8 +137,8 @@ export default function ClientesPage() {
         columns={[
           {key:'nome', label:'Nome', render:r=>(
             <div>
-              <div style={{fontWeight:600}}>{r.nome}</div>
-              {r.email && <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginTop:1}}>{r.email}</div>}
+              <div className="tbl-cell-main">{r.nome}</div>
+              {r.email && <div className="tbl-cell-sub">{r.email}</div>}
             </div>
           )},
           {key:'tipo', label:'Tipo', render:r=><Badge value={r.tipo} />},
@@ -158,7 +158,7 @@ export default function ClientesPage() {
             )
           }},
           {key:'cpf_cnpj', label:'CPF/CNPJ', render:r=>(
-            <span style={{fontFamily:'var(--font-mono)',fontSize:'var(--fs-md)'}}>{r.cpf_cnpj||'—'}</span>
+            <span className="tbl-mono">{r.cpf_cnpj||'—'}</span>
           )},
           {key:'contato', label:'Contato', render:r=>(
             <span style={{fontSize:'var(--fs-md)',color:'var(--t-secondary)'}}>{r.celular||r.telefone||'—'}</span>
@@ -188,7 +188,7 @@ export default function ClientesPage() {
         {erro&&<div className="ds-alert-error" style={{marginTop:12}}>{erro}</div>}
         <div style={{marginTop:16}}>
           {tab==='dados'&&(
-            <div style={{display:'flex',flexDirection:'column',gap:16}}>
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
               <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:12}}>
                 <FormField label="Tipo"><select value={form.tipo} onChange={e=>setForm({...form,tipo:e.target.value,cpf_cnpj:''})} className={selectCls}><option value="PF">Pessoa Física</option><option value="PJ">Pessoa Jurídica</option></select></FormField>
                 <FormField label={form.tipo==='PJ'?'CNPJ':'CPF'}>
@@ -232,7 +232,7 @@ export default function ClientesPage() {
               </FormField>
 
               <FormField label="Nome / Razão Social" required><input {...F('nome')} className={inputCls} /></FormField>
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+              <div className="form-grid-2">
                 <FormField label={form.tipo==='PJ'?'Insc. Estadual':'RG'}><input {...F('rg_ie')} className={inputCls} /></FormField>
                 <FormField label="Email"><input type="email" {...F('email')} onChange={e=>setForm({...form,email:e.target.value.toLowerCase()})} className={inputCls} /></FormField>
                 <FormField label="Telefone"><input value={form.telefone||''} onChange={e=>setForm({...form,telefone:formatarPhone(e.target.value)})} className={inputCls} placeholder="(00) 0000-0000" /></FormField>
@@ -305,7 +305,7 @@ export default function ClientesPage() {
                     </div>
                     {contatos.length>1&&<button onClick={()=>setContatos(prev=>prev.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--c-danger)',cursor:'pointer',fontSize:'var(--fs-base)'}}>× Remover</button>}
                   </div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                  <div className="form-grid-2">
                     <div><label className="ds-label">Nome *</label><input value={ct.nome||''} onChange={e=>{const a=[...contatos];a[i].nome=e.target.value;setContatos(a)}} className={inputCls} /></div>
                     <div><label className="ds-label">Cargo</label><input value={ct.cargo||''} onChange={e=>{const a=[...contatos];a[i].cargo=e.target.value;setContatos(a)}} className={inputCls} /></div>
                     <div><label className="ds-label">Celular</label><input value={ct.celular||''} onChange={e=>{const a=[...contatos];a[i].celular=formatarPhone(e.target.value);setContatos(a)}} className={inputCls} placeholder="(00) 00000-0000" /></div>
@@ -329,12 +329,12 @@ export default function ClientesPage() {
             </div>
           )}
           {tab==='spc'&&(
-            <div style={{display:'flex',flexDirection:'column',gap:16}}>
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
               {editId?(
                 <>
                   <div className="ds-inset">
                     <div style={{fontSize:'var(--fs-md)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em',color:'var(--t-muted)',marginBottom:12}}>Nova Consulta SPC</div>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+                    <div className="form-grid-2">
                       <FormField label="Resultado"><select value={novaSpc.resultado} onChange={e=>setNovaSpc({...novaSpc,resultado:e.target.value})} className={selectCls}><option value="limpo">✅ Limpo</option><option value="restrito">⚠️ Restrito</option><option value="negativado">❌ Negativado</option></select></FormField>
                       <FormField label="Data"><input type="date" value={new Date().toISOString().split('T')[0]} readOnly className={inputCls} style={{opacity:0.6}} /></FormField>
                       <FormField label="Protocolo / Obs." style={{gridColumn:"span 2"}}><input value={novaSpc.observacoes} onChange={e=>setNovaSpc({...novaSpc,observacoes:e.target.value})} className={inputCls} placeholder="Número do protocolo..." /></FormField>
@@ -345,7 +345,7 @@ export default function ClientesPage() {
                     {spcData.length===0?<div style={{textAlign:'center',padding:'24px',color:'var(--t-muted)',fontSize:'var(--fs-base)'}}>Nenhuma consulta registrada.</div>
                     :spcData.map(s=>(
                       <div key={s.id} style={{display:'flex',alignItems:'center',justifyContent:'space-between',padding:'12px 14px',borderRadius:'var(--r-lg)',background:s.resultado==='limpo'?'var(--c-success-light)':s.resultado==='restrito'?'var(--c-warning-light)':'var(--c-danger-light)',border:`1px solid ${s.resultado==='limpo'?'rgba(52,199,89,0.2)':s.resultado==='restrito'?'rgba(255,149,0,0.2)':'rgba(255,59,48,0.2)'}`}}>
-                        <div><div style={{fontWeight:600,fontSize:'var(--fs-base)'}}>{s.resultado==='limpo'?'✅':s.resultado==='restrito'?'⚠️':'❌'} {s.resultado.charAt(0).toUpperCase()+s.resultado.slice(1)}</div>{s.observacoes&&<div style={{fontSize:'var(--fs-md)',color:'var(--t-secondary)',marginTop:2}}>{s.observacoes}</div>}</div>
+                        <div><div className="tbl-cell-main">{s.resultado==='limpo'?'✅':s.resultado==='restrito'?'⚠️':'❌'} {s.resultado.charAt(0).toUpperCase()+s.resultado.slice(1)}</div>{s.observacoes&&<div style={{fontSize:'var(--fs-md)',color:'var(--t-secondary)',marginTop:2}}>{s.observacoes}</div>}</div>
                         <div style={{fontSize:'var(--fs-md)',fontWeight:600,color:'var(--t-secondary)'}}>{fmt.date(s.data_consulta)}</div>
                       </div>
                     ))}

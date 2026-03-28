@@ -117,7 +117,7 @@ export default function ContratosPage() {
   }
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
       <PageHeader
         title="Contratos"
         subtitle={`${totais.total} contrato(s) — ${totais.ativos} ativo(s)`}
@@ -130,21 +130,27 @@ export default function ContratosPage() {
       />
 
       {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:14 }}>
-        {[
-          { label:'Total de Contratos',  value: totais.total,              color:'var(--t-primary)'  },
-          { label:'Contratos Ativos',    value: totais.ativos,             color:'var(--c-success)'  },
-          { label:'Valor em Aberto',     value: fmt.money(totais.valor),   color:'var(--c-primary)'  },
-          { label:'Retorno Vencido',     value: totais.vencidos ?? 0,      color: (totais.vencidos ?? 0) > 0 ? 'var(--c-danger)'  : 'var(--t-muted)' },
-          { label:'Pend. Manutenção',    value: totais.pendente_manutencao ?? 0, color: (totais.pendente_manutencao ?? 0) > 0 ? 'var(--c-warning)' : 'var(--t-muted)' },
-        ].map(k => (
-          <div key={k.label} style={{ background:'var(--bg-card)', borderRadius:'var(--r-md)',
-            boxShadow:'var(--shadow-sm)', padding:'18px 20px', border:'1px solid var(--border)' }}>
-            <div style={{ fontSize:'var(--fs-md)', fontWeight:600, color:'var(--t-muted)',
-              textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>{k.label}</div>
-            <div style={{ fontSize:'var(--fs-kpi)', fontWeight:700, color:k.color, lineHeight:1 }}>{k.value}</div>
-          </div>
-        ))}
+      <div className="kpi-grid" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
+        <div className="kpi-card">
+          <div className="kpi-label">Total de Contratos</div>
+          <div className="kpi-value">{totais.total}</div>
+        </div>
+        <div className="kpi-card kpi-card-success">
+          <div className="kpi-label">Contratos Ativos</div>
+          <div className="kpi-value" style={{color:'var(--c-success)'}}>{totais.ativos}</div>
+        </div>
+        <div className="kpi-card kpi-card-accent">
+          <div className="kpi-label">Valor em Aberto</div>
+          <div className="kpi-value" style={{color:'var(--c-primary)'}}>{fmt.money(totais.valor)}</div>
+        </div>
+        <div className={(totais.vencidos??0)>0?'kpi-card kpi-card-danger':'kpi-card'}>
+          <div className="kpi-label">Retorno Vencido</div>
+          <div className="kpi-value" style={{color:(totais.vencidos??0)>0?'var(--c-danger)':'var(--t-muted)'}}>{totais.vencidos??0}</div>
+        </div>
+        <div className={(totais.pendente_manutencao??0)>0?'kpi-card kpi-card-warning':'kpi-card'}>
+          <div className="kpi-label">Pend. Manutenção</div>
+          <div className="kpi-value" style={{color:(totais.pendente_manutencao??0)>0?'var(--c-warning)':'var(--t-muted)'}}>{totais.pendente_manutencao??0}</div>
+        </div>
       </div>
 
       <Filters

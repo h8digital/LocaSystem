@@ -141,7 +141,7 @@ export default function ManutencoesPage() {
           )},
           { key:'equip', label:'Equipamento', render: r => (
             <div>
-              <div style={{ fontWeight:600 }}>{(r.produtos as any)?.nome}</div>
+              <div className="tbl-cell-main">{(r.produtos as any)?.nome}</div>
               {(r.patrimonios as any)?.numero_patrimonio && (
                 <div style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)', fontFamily:'var(--font-mono)' }}>
                   Pat: {(r.patrimonios as any)?.numero_patrimonio}
@@ -200,7 +200,7 @@ export default function ManutencoesPage() {
         subtitle="Registro de manutenção de equipamento"
         width="md"
         footer={
-          <div style={{ display:'flex', gap:10, width:'100%' }}>
+          <div className="panel-footer-2btn">
             <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPanel(false)}>Cancelar</Btn>
             <Btn style={{ flex:2 }} loading={saving} onClick={salvar}>✓ Abrir OS</Btn>
           </div>
@@ -242,7 +242,7 @@ export default function ManutencoesPage() {
             />
           )}
 
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          <div className="form-grid-2">
             <FormField label="Tipo de Manutenção">
               <select {...F('tipo')} className={selectCls}>
                 {tipoOpts.map(t => <option key={t.value} value={t.value}>{t.label}</option>)}

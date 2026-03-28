@@ -493,7 +493,7 @@ Atenciosamente,`,
   ]
 
   return(
-    <div style={{display:'flex',flexDirection:'column',gap:16}}>
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
 
       {/* ── Cabeçalho ────────────────────────────────────────────────── */}
       <div style={{display:'flex',alignItems:'center',gap:12}}>
@@ -707,12 +707,12 @@ Atenciosamente,`,
               </div>
 
               {/* Recebido / Em aberto */}
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              <div className="form-grid-2">
                 {/* Saldo discriminado (PRD 5.4) */}
               {saldoInfo && (
                 <div style={{background:'var(--bg-header)',border:'1px solid var(--border)',borderRadius:'var(--r-md)',padding:'12px 16px'}}>
                   <div style={{fontSize:'var(--fs-md)',fontWeight:700,color:'var(--t-secondary)',marginBottom:10,textTransform:'uppercase',letterSpacing:'.04em'}}>Consolidação Financeira</div>
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:12}}>
+                  <div className="form-grid-3">
                     {[
                       {l:'Locação',          v:saldoInfo.fat_locacao,     c:'var(--t-primary)'},
                       {l:'Multa/Atraso',     v:saldoInfo.fat_multa,       c:Number(saldoInfo.fat_multa)>0?'var(--c-danger)':'var(--t-muted)'},
@@ -740,7 +740,7 @@ Atenciosamente,`,
                 </div>
               )}
 
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              <div className="form-grid-2">
                 <div style={{background:'var(--c-success-light)',borderRadius:'var(--r-md)',padding:'12px 16px',border:'1px solid var(--c-success)'}}>
                   <div style={{fontSize:'var(--fs-md)',color:'var(--c-success-text)',marginBottom:4}}>Recebido</div>
                   <div style={{fontWeight:700,fontSize:'var(--fs-lg)',color:'var(--c-success-text)'}}>{fmt.money(totalPago)}</div>
@@ -859,7 +859,7 @@ Atenciosamente,`,
             <div style={{display:'flex',flexDirection:'column',gap:20}}>
             <div style={{maxWidth:460}}>
               <div className="ds-section-title">Gerar Documento</div>
-              <div style={{display:'flex',flexDirection:'column',gap:14}}>
+              <div style={{display:"flex",flexDirection:"column",gap:14}}>
                 <div>
                   <div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)',marginBottom:6}}>Template</div>
                   <select value={templateSel} onChange={e=>{setTemplateSel(e.target.value);setDocLink('')}} className="ds-input" style={{width:'100%'}}>
@@ -869,7 +869,7 @@ Atenciosamente,`,
                 </div>
                 {!docLink
                   ?<Btn loading={gerando} onClick={gerarDocumento} style={{alignSelf:'flex-start'}}>Gerar Documento</Btn>
-                  :<div style={{display:'flex',flexDirection:'column',gap:12}}>
+                  :<div style={{display:"flex",flexDirection:"column",gap:14}}>
                     <div style={{background:'var(--c-success-light)',border:'1px solid var(--c-success)',borderRadius:'var(--r-md)',padding:'14px 16px'}}>
                       <div style={{fontWeight:600,color:'var(--c-success-text)',marginBottom:8}}>Documento gerado com sucesso!</div>
                       <div style={{display:'flex',gap:8}}>
@@ -889,14 +889,14 @@ Atenciosamente,`,
               </div>
             </div>
 
-            <div style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',overflow:'hidden'}}>
+            <div className="panel-section">
               <div style={{padding:'10px 14px',background:'var(--bg-header)',borderBottom:'1px solid var(--border)',fontWeight:700,fontSize:'var(--fs-md)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
                 <span>E-mails Enviados</span>
                 <span style={{fontWeight:400,fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>{emailLog.length} registro(s)</span>
               </div>
               {emailLog.length === 0
                 ? <div style={{padding:'20px',textAlign:'center',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Nenhum e-mail enviado ainda.</div>
-                : <table style={{width:'100%',borderCollapse:'collapse',fontSize:'var(--fs-md)'}}>
+                : <table className="ds-table">
                     <thead><tr style={{background:'var(--bg-header)'}}>
                       {['Data','Para','Assunto','Usuario','Status'].map(h=>(
                         <th key={h} style={{padding:'6px 12px',textAlign:'left',fontWeight:600,color:'var(--t-muted)',fontSize:'var(--fs-sm)',borderBottom:'1px solid var(--border)'}}>{h}</th>
@@ -933,7 +933,7 @@ Atenciosamente,`,
         subtitle={`Contrato ${contrato?.numero}`}
         width="md"
         footer={
-          <div style={{ display:'flex', gap:10, width:'100%' }}>
+          <div className="panel-footer-2btn">
             <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPainelEmail(false)}>Cancelar</Btn>
             <Btn style={{ flex:2 }} loading={enviandoEmail} onClick={enviarEmail}>
               📧 Enviar
@@ -941,7 +941,7 @@ Atenciosamente,`,
           </div>
         }
       >
-        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
           {erroEmail && (
             <div style={{ background:'var(--c-danger-light)', border:'1px solid var(--c-danger)',
               borderRadius:'var(--r-md)', padding:'10px 14px', color:'var(--c-danger-text)',
@@ -984,7 +984,7 @@ Atenciosamente,`,
               color:'var(--t-secondary)', display:'flex', alignItems:'center', gap:8 }}>
               <span style={{ fontSize:18 }}>📄</span>
               <div>
-                <div style={{ fontWeight:600 }}>Link do documento será incluído</div>
+                <div className="tbl-cell-main">Link do documento será incluído</div>
                 <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginTop:2 }}>
                   Um botão de acesso ao documento será adicionado automaticamente ao e-mail.
                 </div>
@@ -1064,13 +1064,13 @@ Atenciosamente,`,
         subtitle={'Contrato ' + (contrato?.numero ?? '')}
         width="md"
         footer={
-          <div style={{ display:'flex', gap:10, width:'100%' }}>
+          <div className="panel-footer-2btn">
             <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPainelEmail(false)}>Cancelar</Btn>
             <Btn style={{ flex:2 }} loading={enviandoEmail} onClick={enviarEmail}>Enviar</Btn>
           </div>
         }
       >
-        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
           {erroEmail && (
             <div style={{ background:'var(--c-danger-light)', border:'1px solid var(--c-danger)',
               borderRadius:'var(--r-md)', padding:'10px 14px', color:'var(--c-danger-text)', fontWeight:600 }}>
@@ -1129,14 +1129,14 @@ Atenciosamente,`,
         subtitle={faturaAlvo?.numero}
         width="sm"
         footer={
-          <div style={{display:'flex',gap:10,width:'100%'}}>
+          <div className="panel-footer-2btn">
             <Btn variant="secondary" style={{flex:1}} onClick={()=>setPainelPgto(false)}>Cancelar</Btn>
             <Btn style={{flex:2}} loading={salvandoPgto} onClick={confirmarPagamento}>Confirmar Pagamento</Btn>
           </div>
         }
       >
         {erroPgto&&<div className="ds-alert-error" style={{marginBottom:14}}>{erroPgto}</div>}
-        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
 
           {/* Resumo da fatura */}
           <div style={{background:'var(--bg-header)',border:'1px solid var(--border)',borderRadius:'var(--r-md)',padding:'12px 16px',display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
@@ -1150,7 +1150,7 @@ Atenciosamente,`,
             </div>
             <div>
               <div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)',marginBottom:3}}>Vencimento</div>
-              <div style={{fontWeight:600}}>{fmt.date(faturaAlvo?.data_vencimento)}</div>
+              <div className="tbl-cell-main">{fmt.date(faturaAlvo?.data_vencimento)}</div>
             </div>
             <div>
               <div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)',marginBottom:3}}>Tipo</div>
@@ -1165,7 +1165,7 @@ Atenciosamente,`,
               className={inputCls}/>
           </FormField>
 
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <div className="form-grid-2">
             <FormField label="Data do Pagamento" required>
               <input type="date" value={formPgto.data_pagamento}
                 onChange={e=>setFormPgto((f:any)=>({...f,data_pagamento:e.target.value}))}
@@ -1203,14 +1203,14 @@ Atenciosamente,`,
         subtitle={contrato?.numero}
         width="sm"
         footer={
-          <div style={{display:'flex',gap:10,width:'100%'}}>
+          <div className="panel-footer-2btn">
             <Btn variant="secondary" style={{flex:1}} onClick={()=>setPainelFatura(false)}>Cancelar</Btn>
             <Btn style={{flex:2}} loading={salvandoFatura} onClick={criarFaturaAvulsa}>Criar Fatura</Btn>
           </div>
         }
       >
         {erroFatura&&<div className="ds-alert-error" style={{marginBottom:14}}>{erroFatura}</div>}
-        <div style={{display:'flex',flexDirection:'column',gap:14}}>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
 
           <FormField label="Tipo de Fatura">
             <select value={formNovaFatura.tipo}
@@ -1227,7 +1227,7 @@ Atenciosamente,`,
             </select>
           </FormField>
 
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+          <div className="form-grid-2">
             <FormField label="Valor (R$)" required>
               <input type="number" step="0.01" min="0"
                 value={formNovaFatura.valor}
@@ -1279,7 +1279,7 @@ Atenciosamente,`,
         subtitle={contrato?.numero}
         width="sm"
         footer={
-          <div style={{ display:'flex', gap:10, width:'100%' }}>
+          <div className="panel-footer-2btn">
             <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPainelItem(false)}>Cancelar</Btn>
             <Btn style={{ flex:2 }} loading={salvandoItem} onClick={salvarItem}>
               {editandoItem ? 'Salvar Alterações' : 'Adicionar'}
@@ -1297,7 +1297,7 @@ Atenciosamente,`,
           </div>
         )}
 
-        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
           <LookupField
             label="Produto / Equipamento" required
             table="produtos" searchColumn="nome"
@@ -1347,7 +1347,7 @@ Atenciosamente,`,
             </FormField>
           )}
 
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          <div className="form-grid-2">
             <FormField label="Quantidade">
               <input type="number" min="1" step="1"
                 value={formItem.quantidade ?? 1}
@@ -1396,14 +1396,14 @@ Atenciosamente,`,
         subtitle={`Contrato ${contrato?.numero}`}
         width="md"
         footer={
-          <div style={{ display:'flex', gap:10, width:'100%' }}>
+          <div className="panel-footer-2btn">
             <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPainelEditar(false)}>Cancelar</Btn>
             <Btn style={{ flex:2 }} loading={salvandoEdicao} onClick={salvarEdicao}>Salvar Alterações</Btn>
           </div>
         }
       >
         {erroEdicao && <div className="ds-alert-error" style={{ marginBottom:14 }}>{erroEdicao}</div>}
-        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
 
           {/* Período */}
           <FormField label="Período de Locação">
@@ -1432,7 +1432,7 @@ Atenciosamente,`,
             )}
           </FormField>
 
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          <div className="form-grid-2">
             <FormField label="Data de Início" required>
               <input type="date" value={formEdicao.data_inicio ?? ''}
                 onChange={e => setFormEdicao((f: any) => ({ ...f, data_inicio: e.target.value }))}
@@ -1445,7 +1445,7 @@ Atenciosamente,`,
             </FormField>
           </div>
 
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          <div className="form-grid-2">
             <FormField label="Forma de Pagamento">
               <select value={formEdicao.forma_pagamento ?? ''}
                 onChange={e => setFormEdicao((f: any) => ({ ...f, forma_pagamento: e.target.value }))}
@@ -1462,7 +1462,7 @@ Atenciosamente,`,
             </FormField>
           </div>
 
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+          <div className="form-grid-3">
             <FormField label="Desconto (R$)">
               <input type="number" step="0.01" min="0" value={formEdicao.desconto ?? 0}
                 onChange={e => setFormEdicao((f: any) => ({ ...f, desconto: e.target.value }))}
@@ -1480,7 +1480,7 @@ Atenciosamente,`,
             </FormField>
           </div>
 
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+          <div className="form-grid-2">
             <FormField label="Caução (R$)">
               <input type="number" step="0.01" min="0" value={formEdicao.caucao ?? 0}
                 onChange={e => setFormEdicao((f: any) => ({ ...f, caucao: e.target.value }))}

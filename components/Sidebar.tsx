@@ -26,12 +26,12 @@ export default function Sidebar({ user }: { user: any }) {
   return (
     <aside className="ds-sidebar">
       {/* Brand */}
-      <div style={{padding:'12px 16px 10px',borderBottom:'1px solid rgba(255,255,255,0.08)',background:'linear-gradient(135deg,#1E2A38,#2C3E50)'}}>
-        <div style={{display:'flex',alignItems:'center',gap:9}}>
-          <div style={{width:30,height:30,borderRadius:'4px',background:'#17A2B8',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'var(--fs-lg)',flexShrink:0}}>⚙️</div>
+      <div style={{padding:'16px',borderBottom:'1px solid rgba(255,255,255,0.06)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10}}>
+          <div style={{width:28,height:28,borderRadius:'6px',background:'#0EA5E9',display:'flex',alignItems:'center',justifyContent:'center',fontSize:14,flexShrink:0,fontWeight:700,color:'#fff'}}>L</div>
           <div>
-            <div style={{color:'#fff',fontWeight:700,fontSize:'var(--fs-base)',lineHeight:1.2}}>LocaSystem</div>
-            <div style={{color:'rgba(255,255,255,0.4)',fontSize:'var(--fs-xs)',letterSpacing:'0.02em'}}>Gestão de Locações</div>
+            <div style={{color:'#fff',fontWeight:700,fontSize:14,lineHeight:1.2,letterSpacing:'-0.01em'}}>LocaSystem</div>
+            <div style={{color:'rgba(255,255,255,0.35)',fontSize:10,letterSpacing:'0.06em',textTransform:'uppercase',marginTop:1}}>Gestão de Locações</div>
           </div>
         </div>
       </div>
@@ -53,7 +53,7 @@ export default function Sidebar({ user }: { user: any }) {
       </nav>
 
       {/* User footer */}
-      <div style={{padding:'10px 14px',borderTop:'1px solid rgba(255,255,255,0.08)',display:'flex',alignItems:'center',gap:9,background:'rgba(0,0,0,0.15)'}}>
+      <div style={{padding:'12px 14px',borderTop:'1px solid rgba(255,255,255,0.06)',display:'flex',alignItems:'center',gap:9}}>
         <div style={{width:28,height:28,borderRadius:'50%',background:'#17A2B8',color:'#fff',display:'flex',alignItems:'center',justifyContent:'center',fontSize:'var(--fs-md)',fontWeight:700,flexShrink:0}}>{user.nome.charAt(0).toUpperCase()}</div>
         <div style={{flex:1,minWidth:0}}>
           <div style={{color:'rgba(255,255,255,0.85)',fontSize:'var(--fs-md)',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.nome}</div>

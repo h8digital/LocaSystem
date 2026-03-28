@@ -168,7 +168,7 @@ export default function UsuariosPage() {
   const inativos = lista.filter(u => !u.ativo).length
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+    <div style={{display:"flex",flexDirection:"column",gap:14}}>
       <PageHeader
         title="Usuários"
         subtitle={`${ativos} ativo(s)${inativos ? ` · ${inativos} inativo(s)` : ''}`}
@@ -199,7 +199,7 @@ export default function UsuariosPage() {
                 fontSize:'var(--fs-base)', fontWeight:700, flexShrink:0
               }}>{r.nome.charAt(0).toUpperCase()}</div>
               <div>
-                <div style={{ fontWeight:600 }}>{r.nome}</div>
+                <div className="tbl-cell-main">{r.nome}</div>
                 <div style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)' }}>{r.email}</div>
               </div>
             </div>
@@ -235,7 +235,7 @@ export default function UsuariosPage() {
         subtitle={editId ? form.email : 'Preencha os dados do usuário'}
         width="sm"
         footer={
-          <div style={{ display:'flex', gap:10, width:'100%' }}>
+          <div className="panel-footer-2btn">
             <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPanel(false)}>Cancelar</Btn>
             <Btn style={{ flex:2 }} loading={saving} onClick={salvar}>
               {editId ? 'Atualizar' : 'Criar Usuário'}
@@ -244,7 +244,7 @@ export default function UsuariosPage() {
         }
       >
         {erro && <div className="ds-alert-error" style={{ marginBottom:14 }}>{erro}</div>}
-        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
 
           <FormField label="Nome Completo" required>
             <input value={form.nome} onChange={e => setForm({...form, nome:e.target.value})}

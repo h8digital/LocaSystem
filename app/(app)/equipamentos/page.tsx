@@ -522,7 +522,7 @@ export default function EquipamentosPage() {
           )},
           { key:'nome', label:'Produto', render: r => (
             <div>
-              <div style={{ fontWeight:600 }}>{r.nome}</div>
+              <div className="tbl-cell-main">{r.nome}</div>
               {r.codigo && (
                 <div style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)', fontFamily:'var(--font-mono)',
                   marginTop:1, letterSpacing:'.02em' }}>
@@ -589,14 +589,14 @@ export default function EquipamentosPage() {
         subtitle={[viewRow?.marca, viewRow?.modelo].filter(Boolean).join(' · ') || 'Detalhes do produto'}
         width="md"
         footer={
-          <div style={{ display:'flex', gap:8, width:'100%' }}>
+          <div className="panel-footer-2btn">
             <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPanelView(false)}>Fechar</Btn>
             <Btn style={{ flex:2 }} onClick={() => { setPanelView(false); abrir(viewRow) }}>Editar Produto</Btn>
           </div>
         }
       >
         {viewRow && (
-          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
             {/* ── Abas ── */}
             <div style={{display:'flex',gap:2,borderBottom:'2px solid var(--border)'}}>
               {([['estoque','📦 Estoque'],['precos','💰 Preços']] as const).map(([k,l])=>(
@@ -612,10 +612,10 @@ export default function EquipamentosPage() {
 
             {/* ══ ABA ESTOQUE ═════════════════════════════════════════════ */}
             {abaView==='estoque' && (
-              <div style={{display:'flex',flexDirection:'column',gap:16}}>
+              <div style={{display:"flex",flexDirection:"column",gap:16}}>
 
                 {/* KPIs de estoque */}
-                <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
+                <div className="kpi-grid">
                   {[
                     {l:'Total',      v:`${viewRow.estoque_total??0} ${viewRow.unidade}`,     c:'var(--t-primary)'},
                     {l:'Locado',     v:`${viewRow.qtd_locada??0} ${viewRow.unidade}`,         c:'var(--c-warning,#f59e0b)'},
@@ -649,7 +649,7 @@ export default function EquipamentosPage() {
                 </div>
 
                 {/* Contratos ativos */}
-                <div style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',overflow:'hidden'}}>
+                <div className="panel-section">
                   <div style={{padding:'8px 12px',background:'var(--bg-header)',fontWeight:700,
                     fontSize:'var(--fs-md)',borderBottom:'1px solid var(--border)',
                     display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -663,7 +663,7 @@ export default function EquipamentosPage() {
                   ) : viewContratos.length===0 ? (
                     <div style={{padding:'16px',textAlign:'center',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Nenhum item locado no momento.</div>
                   ) : (
-                    <table style={{width:'100%',borderCollapse:'collapse',fontSize:'var(--fs-md)'}}>
+                    <table className="ds-table">
                       <thead>
                         <tr style={{background:'var(--bg-header)'}}>
                           {['Contrato','Cliente','Qtd','Status'].map(h=>(
@@ -695,7 +695,7 @@ export default function EquipamentosPage() {
 
                 {/* Patrimônios / Inventário */}
                 {viewRow?.controla_patrimonio===1 && (
-                  <div style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',overflow:'hidden'}}>
+                  <div className="panel-section">
                     <div style={{padding:'8px 12px',background:'var(--bg-header)',fontWeight:700,
                       fontSize:'var(--fs-md)',borderBottom:'1px solid var(--border)',
                       display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -713,7 +713,7 @@ export default function EquipamentosPage() {
                         Nenhum patrimônio cadastrado. Use o botão <strong>+ Movimentação</strong> para registrar entradas.
                       </div>
                     ) : (
-                      <table style={{width:'100%',borderCollapse:'collapse',fontSize:'var(--fs-md)'}}>
+                      <table className="ds-table">
                         <thead>
                           <tr style={{background:'var(--bg-header)'}}>
                             {['Nº Patrimônio','Nº Série','Status','Aquisição','Contrato Atual'].map(h=>(
@@ -767,14 +767,14 @@ export default function EquipamentosPage() {
 
                 {/* OS abertas */}
                 {(viewLoadingEx || viewOS.length>0) && (
-                  <div style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',overflow:'hidden'}}>
+                  <div className="panel-section">
                     <div style={{padding:'8px 12px',background:'var(--bg-header)',fontWeight:700,
                       fontSize:'var(--fs-md)',borderBottom:'1px solid var(--border)',color:'var(--c-warning,#f59e0b)'}}>
                       ⚠ Ordens de Serviço em Aberto ({viewOS.length})
                     </div>
                     {viewOS.map((os:any)=>(
                       <div key={os.id} style={{padding:'8px 12px',borderBottom:'1px solid var(--border)',fontSize:'var(--fs-md)'}}>
-                        <div style={{fontWeight:600}}>{os.tipo?.toUpperCase()} — {os.status}</div>
+                        <div className="tbl-cell-main">{os.tipo?.toUpperCase()} — {os.status}</div>
                         <div style={{color:'var(--t-muted)',fontSize:'var(--fs-sm)'}}>{os.descricao||'—'}</div>
                       </div>
                     ))}
@@ -782,7 +782,7 @@ export default function EquipamentosPage() {
                 )}
 
                 {/* Últimas movimentações */}
-                <div style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',overflow:'hidden'}}>
+                <div className="panel-section">
                   <div style={{padding:'8px 12px',background:'var(--bg-header)',fontWeight:700,
                     fontSize:'var(--fs-md)',borderBottom:'1px solid var(--border)',
                     display:'flex',justifyContent:'space-between',alignItems:'center'}}>
@@ -832,7 +832,7 @@ export default function EquipamentosPage() {
 
             {/* ══ ABA PREÇOS ══════════════════════════════════════════════ */}
             {abaView==='precos' && (
-              <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              <div className="form-grid-2">
                 {[
                   {l:'Diário',          v:viewRow.preco_locacao_diario},
                   {l:'Final de Sem.',   v:viewRow.preco_fds},
@@ -865,7 +865,7 @@ export default function EquipamentosPage() {
         subtitle={editId ? form.nome : 'Preencha os dados do produto'}
         width="lg"
         footer={
-          <div style={{ display:'flex', gap:10, width:'100%' }}>
+          <div className="panel-footer-2btn">
             <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPanel(false)}>Cancelar</Btn>
             <Btn style={{ flex:2 }} loading={saving} onClick={salvar}>
               {editId ? 'Atualizar Produto' : 'Salvar Produto'}
@@ -875,7 +875,7 @@ export default function EquipamentosPage() {
       >
         {erro && <div className="ds-alert-error" style={{ marginBottom:14 }}>{erro}</div>}
 
-        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
 
           {/* ── Tabs: Dados / Fotos (só aparece em modo edição) ── */}
           {form.id && (
@@ -895,7 +895,7 @@ export default function EquipamentosPage() {
 
           {/* ══ ABA FOTOS ═══════════════════════════════════════════════════ */}
           {abaForm==='fotos' && form.id && (
-            <div style={{display:'flex',flexDirection:'column',gap:16}}>
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
               {erroFoto && (
                 <div style={{background:'var(--c-danger-light)',border:'1px solid var(--c-danger)',
                   borderRadius:'var(--r-md)',padding:'10px 14px',color:'var(--c-danger-text)',fontSize:'var(--fs-md)'}}>
@@ -938,7 +938,7 @@ export default function EquipamentosPage() {
                 }
               </label>
               {fotos.length>0 ? (
-                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:10}}>
+                <div className="kpi-grid">
                   {fotos.map((foto:any)=>(
                     <div key={foto.id} style={{position:'relative',borderRadius:'var(--r-md)',overflow:'hidden',
                       border:`2px solid ${foto.principal?'var(--c-primary)':'var(--border)'}`,
@@ -990,7 +990,7 @@ export default function EquipamentosPage() {
 
               <div>
                 <div className="ds-section-title">Identificação</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div className="form-grid-2">
                   <FormField label="Nome do Produto" required style={{ gridColumn:'span 2' }}>
                     <input {...F('nome')} className={inputCls} placeholder="Ex: Andaime Tubular 1,5m" autoFocus />
                   </FormField>
@@ -1044,7 +1044,7 @@ export default function EquipamentosPage() {
                   ))}
                 </div>
                 {Number(form.controla_patrimonio)===0 && (
-                  <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
+                  <div className="kpi-grid">
                     <FormField label="Unidade">
                       <input {...F('unidade')} className={inputCls} placeholder="un, kg, m, pç..." />
                     </FormField>
@@ -1066,7 +1066,7 @@ export default function EquipamentosPage() {
 
               <div>
                 <div className="ds-section-title">Preços de Locação por Período</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div className="form-grid-2">
                   {periodos.map(p => {
                     const campo = campoPreco(p.nome)
                     return (
@@ -1138,7 +1138,7 @@ export default function EquipamentosPage() {
               {movTab==='historico' && (
                 movLoading ? <div style={{textAlign:'center',padding:30,color:'var(--t-muted)'}}>Carregando…</div> :
                 movTransacoes.length===0 ? <div style={{textAlign:'center',padding:30,color:'var(--t-muted)'}}>Nenhuma movimentação registrada.</div> :
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize:'var(--fs-md)'}}>
+                <table className="ds-table">
                   <thead>
                     <tr style={{background:'var(--bg-header)'}}>
                       {['Data','Tipo','Patrimônio','Valor','NF','Garantia até','Responsável',''].map(h=>(
@@ -1177,7 +1177,7 @@ export default function EquipamentosPage() {
                 const rastreavel = movProduto?.controla_patrimonio === 1
                 const isEntrada  = formMov.tipo === 'compra'
                 return (
-                <div style={{display:'flex',flexDirection:'column',gap:16}}>
+                <div style={{display:"flex",flexDirection:"column",gap:16}}>
                   {movErro && <div style={{background:'var(--c-danger-light)',border:'1px solid var(--c-danger)',borderRadius:'var(--r-md)',padding:'10px 14px',color:'var(--c-danger-text)'}}>{movErro}</div>}
 
                   {/* ── Badge indicando modo de controle ── */}
@@ -1195,7 +1195,7 @@ export default function EquipamentosPage() {
                   </div>
 
                   {/* ── Linha 1: Tipo + Data ── */}
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                  <div className="form-grid-2">
                     <FormField label="Tipo de Movimentação *">
                       <select className={selectCls} value={formMov.tipo}
                         onChange={e=>{ setFormMov({...formMov,tipo:e.target.value}); setLinhasEntrada([emptyPatLine()]) }}>
@@ -1213,7 +1213,7 @@ export default function EquipamentosPage() {
 
                   {/* ── NÃO RASTREÁVEL: campo de quantidade ── */}
                   {!rastreavel && (
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                    <div className="form-grid-2">
                       <FormField label={isEntrada ? 'Quantidade a Adicionar *' : 'Quantidade a Remover *'}>
                         <input type="number" min="1" step="1" className={inputCls}
                           value={formMov.quantidade}
@@ -1231,7 +1231,7 @@ export default function EquipamentosPage() {
 
                   {/* ── RASTREÁVEL: ENTRADA EM LOTE ── */}
                   {rastreavel && isEntrada && (
-                    <div style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',overflow:'hidden'}}>
+                    <div className="panel-section">
                       <div style={{background:'var(--bg-header)',padding:'8px 12px',fontWeight:700,fontSize:'var(--fs-md)',
                         display:'flex',justifyContent:'space-between',alignItems:'center',borderBottom:'1px solid var(--border)'}}>
                         <span>Patrimônios a cadastrar <span style={{color:'var(--c-primary)',fontWeight:800}}>{linhasEntrada.filter(l=>l.numero_patrimonio.trim()).length}</span> item(ns)</span>
@@ -1323,7 +1323,7 @@ export default function EquipamentosPage() {
                   )}
 
                   {/* ── Campos comuns ── */}
-                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12}}>
+                  <div className="form-grid-2">
                     <FormField label={isEntrada ? 'Valor unitário de compra (R$)' : 'Valor (R$)'}>
                       <input type="number" step="0.01" min="0" className={inputCls}
                         value={formMov.valor} onChange={e=>setFormMov({...formMov,valor:e.target.value})}

@@ -10,15 +10,14 @@ const fmtTipo  = (v: string) => v?.replace(/_/g,' ').replace(/\b\w/g, c => c.toU
 // ─── KPI Card ────────────────────────────────────────────────────────────────
 function KpiCard({ label, value, color, sub }: { label: string; value: string; color: string; sub?: string }) {
   return (
-    <div style={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:'var(--r-md)',
-      boxShadow:'var(--shadow-sm)', padding:'16px 20px' }}>
-      <div style={{ fontSize:'var(--fs-md)', fontWeight:600, color:'var(--t-muted)',
-        textTransform:'uppercase', letterSpacing:'.06em', marginBottom:6 }}>{label}</div>
-      <div style={{ fontSize:'var(--fs-kpi)', fontWeight:800, color, lineHeight:1 }}>{value}</div>
-      {sub && <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginTop:4 }}>{sub}</div>}
+    <div className="kpi-card">
+      <div className="kpi-label">{label}</div>
+      <div className="kpi-value" style={{ color }}>{value}</div>
+      {sub && <div className="kpi-sub">{sub}</div>}
     </div>
   )
 }
+
 
 export default function FinanceiroPage() {
   const [faturas,   setFaturas]   = useState<any[]>([])
@@ -401,14 +400,14 @@ export default function FinanceiroPage() {
   const saldo = faturaAlvo ? Number(faturaAlvo.saldo_restante ?? faturaAlvo.valor) : 0
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
       <PageHeader
         title="Financeiro"
         subtitle="Faturas e recebimentos"
       />
 
       {/* KPIs */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:14 }}>
+      <div className="kpi-grid">
         <KpiCard label="Total Faturado"   value={fmt.money(kpis.total)}    color="var(--t-primary)" />
         <KpiCard label="Recebido"         value={fmt.money(kpis.recebido)} color="var(--c-success)" />
         <KpiCard label="Em Aberto"        value={fmt.money(kpis.pendente)} color="var(--c-primary)" />
@@ -528,7 +527,7 @@ export default function FinanceiroPage() {
         width="md"
         footer={
           faturaAlvo?.status !== 'pago' ? (
-            <div style={{ display:'flex', gap:10, width:'100%' }}>
+            <div className="panel-footer-2btn">
               <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPainel(false)}>Fechar</Btn>
               <Btn style={{ flex:2 }} loading={salvando} onClick={confirmarRecebimento}>
                 Confirmar Recebimento
@@ -539,13 +538,13 @@ export default function FinanceiroPage() {
           )
         }
       >
-        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+        <div style={{display:"flex",flexDirection:"column",gap:16}}>
 
           {/* Resumo da fatura */}
           {faturaAlvo && (
             <div style={{ background:'var(--bg-header)', border:'1px solid var(--border)',
               borderRadius:'var(--r-md)', padding:'14px 16px' }}>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+              <div className="form-grid-3">
                 {[
                   { l:'Fatura',     v: faturaAlvo.numero },
                   { l:'Cliente',    v: (faturaAlvo.contratos as any)?.clientes?.nome ?? '—' },
@@ -574,11 +573,11 @@ export default function FinanceiroPage() {
 
           {/* Formulário de novo recebimento */}
           {faturaAlvo?.status !== 'pago' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
               <div className="ds-section-title">Novo Recebimento</div>
               {erro && <div className="ds-alert-error">{erro}</div>}
 
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+              <div className="form-grid-2">
                 <FormField label="Valor a Receber (R$)" required>
                   <input type="number" step="0.01" min="0.01" max={saldo}
                     value={formRec.valor}
@@ -705,14 +704,14 @@ export default function FinanceiroPage() {
         subtitle={faturaEdit?.numero}
         width="sm"
         footer={
-          <div style={{ display:'flex', gap:10, width:'100%' }}>
+          <div className="panel-footer-2btn">
             <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPainelEdit(false)}>Cancelar</Btn>
             <Btn style={{ flex:2 }} loading={salvandoEdit} onClick={salvarEdicao}>Salvar</Btn>
           </div>
         }
       >
         {faturaEdit && (
-          <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+          <div style={{display:"flex",flexDirection:"column",gap:14}}>
             {erroEdit && <div style={{background:'var(--c-danger-light)',border:'1px solid var(--c-danger)',borderRadius:'var(--r-md)',padding:'10px 14px',color:'var(--c-danger-text)',fontSize:'var(--fs-md)'}}>{erroEdit}</div>}
             <FormField label="Descrição">
               <input className={inputCls} value={formEdit.descricao} onChange={e=>setFormEdit({...formEdit,descricao:e.target.value})} placeholder="Descrição da fatura" />

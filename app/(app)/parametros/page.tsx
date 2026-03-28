@@ -261,7 +261,7 @@ export default function ParametrosPage() {
   const locaisFiltrados = locais.filter(l => !buscaLoc || l.nome.toLowerCase().includes(buscaLoc.toLowerCase()))
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+    <div style={{display:"flex",flexDirection:"column",gap:16}}>
       <PageHeader
         title="Parâmetros do Sistema"
         subtitle="Configurações globais do LocaSystem"
@@ -496,7 +496,7 @@ export default function ParametrosPage() {
           {aba === 'financeiro' && (
             <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
               <div className="ds-section-title">Regras Financeiras e SPC</div>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+              <div className="form-grid-2">
                 {CAMPOS_FIN.map(f => (
                   <FormField key={f.k} label={f.l}>
                     <input value={params[f.k]??''} onChange={e=>setParams(p=>({...p,[f.k]:e.target.value}))} className={inpSm}/>
@@ -519,7 +519,7 @@ export default function ParametrosPage() {
                 <div style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)', marginTop:4, marginBottom:14 }}>
                   Usada por todos os usuários que não possuem configuração própria.
                 </div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <div className="form-grid-2">
                   <div style={{ gridColumn:'span 2' }}>
                     <FormField label="Servidor SMTP (Host)">
                       <input value={params['email_host']??''} className={inpSm}
@@ -583,7 +583,7 @@ export default function ParametrosPage() {
 
           {/* ═══ PERÍODOS ═════════════════════════════════════════════ */}
           {aba === 'periodos' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                 <div>
                   <div className="ds-section-title" style={{ marginBottom:4 }}>Períodos de Locação</div>
@@ -623,7 +623,7 @@ export default function ParametrosPage() {
 
           {/* ═══ CATEGORIAS ═══════════════════════════════════════════ */}
           {aba === 'categorias' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
               {/* Barra de ação */}
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <input value={buscaCat} onChange={e=>setBuscaCat(e.target.value)} className={inpSm}
@@ -662,7 +662,7 @@ export default function ParametrosPage() {
 
           {/* ═══ TIPOS DE ENDEREÇO ════════════════════════════════════ */}
           {aba === 'enderecos' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
               {/* Barra de ação */}
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <input value={buscaEnd} onChange={e=>setBuscaEnd(e.target.value)} className={inpSm}
@@ -712,7 +712,7 @@ export default function ParametrosPage() {
 
           {/* ═══ LOCAIS DE ARMAZENAGEM ════════════════════════════════ */}
           {aba === 'locais' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+            <div style={{display:"flex",flexDirection:"column",gap:16}}>
               {/* Barra de ação */}
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <input value={buscaLoc} onChange={e=>setBuscaLoc(e.target.value)} className={inpSm}
@@ -759,7 +759,7 @@ export default function ParametrosPage() {
         subtitle="Categorias de equipamentos"
         width="sm"
         footer={
-          <div style={{ display:'flex', gap:10, width:'100%' }}>
+          <div className="panel-footer-2btn">
             <Btn variant="secondary" style={{ flex:1 }} onClick={()=>setPainelCat(false)}>Cancelar</Btn>
             <Btn style={{ flex:2 }} loading={salvando} onClick={salvarCat}>{editandoCat?'Salvar Alterações':'Criar Categoria'}</Btn>
           </div>
@@ -778,7 +778,7 @@ export default function ParametrosPage() {
         subtitle="Tipos disponíveis no cadastro de clientes"
         width="sm"
         footer={
-          <div style={{ display:'flex', gap:10, width:'100%' }}>
+          <div className="panel-footer-2btn">
             <Btn variant="secondary" style={{ flex:1 }} onClick={()=>setPainelEnd(false)}>Cancelar</Btn>
             <Btn style={{ flex:2 }} loading={salvando} onClick={salvarEnd}>{editandoEnd?'Salvar Alterações':'Criar Tipo'}</Btn>
           </div>
@@ -797,13 +797,13 @@ export default function ParametrosPage() {
         subtitle="Locais de estoque e patrimônio"
         width="sm"
         footer={
-          <div style={{ display:'flex', gap:10, width:'100%' }}>
+          <div className="panel-footer-2btn">
             <Btn variant="secondary" style={{ flex:1 }} onClick={()=>setPainelLoc(false)}>Cancelar</Btn>
             <Btn style={{ flex:2 }} loading={salvando} onClick={salvarLoc}>{editandoLoc?'Salvar Alterações':'Criar Local'}</Btn>
           </div>
         }>
         {erroPainel&&<div className="ds-alert-error" style={{ marginBottom:14 }}>{erroPainel}</div>}
-        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+        <div style={{display:"flex",flexDirection:"column",gap:14}}>
           <FormField label="Nome do Local" required>
             <input value={formLoc.nome} onChange={e=>setFormLoc(f=>({...f,nome:e.target.value}))}
               className={inpSm} autoFocus placeholder="Ex: Galpão A, Prateleira 01, Depósito..."/>
