@@ -117,7 +117,7 @@ export default function ContratosPage() {
   }
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
       <PageHeader
         title="Contratos"
         subtitle={`${totais.total} contrato(s) — ${totais.ativos} ativo(s)`}

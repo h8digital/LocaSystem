@@ -412,7 +412,7 @@ export default function EquipamentosPage() {
   function acoesProduto(row: any): AcaoSecundaria[] {
     return [
       {
-        icon: <Ico.Download />,
+        icon: <Ico.Archive />,
         label: 'Preços de Locação',
         grupo: 1,
         onClick: () => verDetalhe(row, 'precos')
@@ -612,7 +612,7 @@ export default function EquipamentosPage() {
 
             {/* ══ ABA ESTOQUE ═════════════════════════════════════════════ */}
             {abaView==='estoque' && (
-              <div style={{display:'flex',flexDirection:'column',gap:14}}>
+              <div style={{display:'flex',flexDirection:'column',gap:16}}>
 
                 {/* KPIs de estoque */}
                 <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:8}}>
@@ -875,7 +875,7 @@ export default function EquipamentosPage() {
       >
         {erro && <div className="ds-alert-error" style={{ marginBottom:14 }}>{erro}</div>}
 
-        <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
 
           {/* ── Tabs: Dados / Fotos (só aparece em modo edição) ── */}
           {form.id && (
@@ -1177,7 +1177,7 @@ export default function EquipamentosPage() {
                 const rastreavel = movProduto?.controla_patrimonio === 1
                 const isEntrada  = formMov.tipo === 'compra'
                 return (
-                <div style={{display:'flex',flexDirection:'column',gap:14}}>
+                <div style={{display:'flex',flexDirection:'column',gap:16}}>
                   {movErro && <div style={{background:'var(--c-danger-light)',border:'1px solid var(--c-danger)',borderRadius:'var(--r-md)',padding:'10px 14px',color:'var(--c-danger-text)'}}>{movErro}</div>}
 
                   {/* ── Badge indicando modo de controle ── */}

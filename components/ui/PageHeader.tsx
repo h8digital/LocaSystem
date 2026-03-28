@@ -1,12 +1,24 @@
-interface PageHeaderProps { title:string; subtitle?:string; actions?:React.ReactNode }
-export default function PageHeader({ title, subtitle, actions }: PageHeaderProps) {
+'use client'
+import React from 'react'
+
+interface PageHeaderProps {
+  title: string
+  subtitle?: string
+  actions?: React.ReactNode
+  icon?: string
+}
+
+export default function PageHeader({ title, subtitle, actions, icon }: PageHeaderProps) {
   return (
     <div className="ds-page-header">
       <div>
-        <div className="ds-page-title">{title}</div>
-        {subtitle&&<div className="ds-page-subtitle">{subtitle}</div>}
+        <h1 className="ds-page-title">
+          {icon && <span style={{ marginRight: 8 }}>{icon}</span>}
+          {title}
+        </h1>
+        {subtitle && <p className="ds-page-subtitle">{subtitle}</p>}
       </div>
-      {actions&&<div style={{display:'flex',alignItems:'center',gap:6,flexShrink:0}}>{actions}</div>}
+      {actions && <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>{actions}</div>}
     </div>
   )
 }

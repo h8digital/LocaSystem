@@ -401,7 +401,7 @@ export default function FinanceiroPage() {
   const saldo = faturaAlvo ? Number(faturaAlvo.saldo_restante ?? faturaAlvo.valor) : 0
 
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+    <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
       <PageHeader
         title="Financeiro"
         subtitle="Faturas e recebimentos"
@@ -574,7 +574,7 @@ export default function FinanceiroPage() {
 
           {/* Formulário de novo recebimento */}
           {faturaAlvo?.status !== 'pago' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
               <div className="ds-section-title">Novo Recebimento</div>
               {erro && <div className="ds-alert-error">{erro}</div>}
 

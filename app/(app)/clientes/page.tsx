@@ -94,77 +94,40 @@ export default function ClientesPage() {
   const hasFilter = Object.values(filters).some(Boolean)
 
   return (
-    <div style={{display:'flex',flexDirection:'column',gap:0}}>
+    <div>
 
-      {/* ── Título + botão ─────────────────────────────────────────────── */}
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',
-        padding:'10px 0 12px',borderBottom:'1px solid var(--border)',marginBottom:14}}>
-        <div>
-          <h1 style={{fontWeight:700,fontSize:'var(--fs-xl)',color:'var(--t-primary)',margin:0,lineHeight:1.2}}>
-            Clientes
-          </h1>
-          <div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)',marginTop:2}}>
-            {lista.length} cliente(s) cadastrado(s)
-          </div>
-        </div>
-        <Btn onClick={()=>abrir()}>+ Novo Cliente</Btn>
-      </div>
+      <PageHeader
+        title="👤 Clientes"
+        subtitle={`${lista.length} cliente(s) cadastrado(s)`}
+        actions={<Btn onClick={() => abrir()}>+ Novo Cliente</Btn>}
+      />
 
       {/* ── Filtros ─────────────────────────────────────────────────────── */}
-      <div style={{display:'flex',gap:8,alignItems:'center',flexWrap:'wrap',marginBottom:14}}>
-
-        {/* Nome */}
+      <div className="filter-row">
         <div style={{position:'relative',flex:'2 1 180px',minWidth:160}}>
-          <svg style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',
-            color:'var(--t-muted)',pointerEvents:'none'}}
-            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"/><path d="M21 21l-4.35-4.35"/>
+          <svg style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}}
+            width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t-light)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
           </svg>
-          <input className="ds-input" style={{paddingLeft:32,width:'100%'}}
+          <input className="ds-input" style={{paddingLeft:32}}
             placeholder="Nome do cliente..." value={filters.busca}
             onChange={e=>setFilters(f=>({...f,busca:e.target.value}))} />
         </div>
-
-        {/* CPF/CNPJ */}
-        <div style={{position:'relative',flex:'1 1 140px',minWidth:130}}>
-          <svg style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',
-            color:'var(--t-muted)',pointerEvents:'none'}}
-            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/>
-          </svg>
-          <input className="ds-input" style={{paddingLeft:32,width:'100%'}}
-            placeholder="CPF / CNPJ..." value={filters.cpf_cnpj}
-            onChange={e=>setFilters(f=>({...f,cpf_cnpj:e.target.value}))} />
-        </div>
-
-        {/* Telefone */}
-        <div style={{position:'relative',flex:'1 1 140px',minWidth:130}}>
-          <svg style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',
-            color:'var(--t-muted)',pointerEvents:'none'}}
-            width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M22 16.92v3a2 2 0 01-2.18 2 19.79 19.79 0 01-8.63-3.07A19.5 19.5 0 013.07 9.81 19.79 19.79 0 012.12 1.18 2 2 0 014.11 0h3a2 2 0 012 1.72c.127.96.361 1.903.7 2.81a2 2 0 01-.45 2.11L8.09 7.91a16 16 0 006 6l1.27-1.27a2 2 0 012.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0122 16.92z"/>
-          </svg>
-          <input className="ds-input" style={{paddingLeft:32,width:'100%'}}
-            placeholder="Telefone / Celular..." value={filters.telefone}
-            onChange={e=>setFilters(f=>({...f,telefone:e.target.value}))} />
-        </div>
-
-        {/* Tipo PF/PJ */}
-        <select className="ds-input" style={{flex:'0 0 auto',width:'auto',minWidth:140}}
+        <input className="ds-input" style={{flex:'1 1 140px',minWidth:130}}
+          placeholder="CPF / CNPJ..." value={filters.cpf_cnpj}
+          onChange={e=>setFilters(f=>({...f,cpf_cnpj:e.target.value}))} />
+        <input className="ds-input" style={{flex:'1 1 140px',minWidth:130}}
+          placeholder="Telefone..." value={filters.telefone}
+          onChange={e=>setFilters(f=>({...f,telefone:e.target.value}))} />
+        <select className="ds-select" style={{flex:'0 0 auto',width:'auto',minWidth:130}}
           value={filters.tipo} onChange={e=>setFilters(f=>({...f,tipo:e.target.value}))}>
           <option value="">Todos os tipos</option>
           <option value="PF">Pessoa Física</option>
           <option value="PJ">Pessoa Jurídica</option>
         </select>
-
-        {/* Limpar */}
         {hasFilter && (
-          <button onClick={()=>setFilters({busca:'',tipo:'',cpf_cnpj:'',telefone:''})}
-            style={{background:'none',border:'1px solid var(--border)',borderRadius:'var(--r-md)',
-              padding:'6px 12px',cursor:'pointer',fontSize:'var(--fs-md)',color:'var(--t-muted)',
-              whiteSpace:'nowrap',transition:'all 150ms'}}
-            onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--c-danger)';e.currentTarget.style.color='var(--c-danger)'}}
-            onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.color='var(--t-muted)'}}>
+          <button className="btn-clear-filter"
+            onClick={()=>setFilters({busca:'',tipo:'',cpf_cnpj:'',telefone:''})}>
             ✕ Limpar
           </button>
         )}
@@ -225,7 +188,7 @@ export default function ClientesPage() {
         {erro&&<div className="ds-alert-error" style={{marginTop:12}}>{erro}</div>}
         <div style={{marginTop:16}}>
           {tab==='dados'&&(
-            <div style={{display:'flex',flexDirection:'column',gap:14}}>
+            <div style={{display:'flex',flexDirection:'column',gap:16}}>
               <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:12}}>
                 <FormField label="Tipo"><select value={form.tipo} onChange={e=>setForm({...form,tipo:e.target.value,cpf_cnpj:''})} className={selectCls}><option value="PF">Pessoa Física</option><option value="PJ">Pessoa Jurídica</option></select></FormField>
                 <FormField label={form.tipo==='PJ'?'CNPJ':'CPF'}>
@@ -292,7 +255,7 @@ export default function ClientesPage() {
             </div>
           )}
           {tab==='enderecos'&&(
-            <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            <div style={{display:'flex', flexDirection:'column', gap:14}}>
               {enderecos.map((end,i)=>(
                 <div key={i} style={{border:'1px solid var(--border)',borderRadius:'var(--r-lg)',padding:'14px'}}>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
@@ -330,7 +293,7 @@ export default function ClientesPage() {
             </div>
           )}
           {tab==='contatos'&&(
-            <div style={{display:'flex',flexDirection:'column',gap:12}}>
+            <div style={{display:'flex', flexDirection:'column', gap:14}}>
               {contatos.map((ct,i)=>(
                 <div key={i} style={{border:'1px solid var(--border)',borderRadius:'var(--r-lg)',padding:'14px'}}>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
@@ -366,7 +329,7 @@ export default function ClientesPage() {
             </div>
           )}
           {tab==='spc'&&(
-            <div style={{display:'flex',flexDirection:'column',gap:14}}>
+            <div style={{display:'flex',flexDirection:'column',gap:16}}>
               {editId?(
                 <>
                   <div className="ds-inset">

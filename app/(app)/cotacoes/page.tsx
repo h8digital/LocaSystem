@@ -70,7 +70,7 @@ export default function CotacoesPage() {
   ]
 
   return (
-    <div style={{display:'flex',flexDirection:'column',gap:12}}>
+    <div style={{display:'flex', flexDirection:'column', gap:14}}>
       <PageHeader
         title="📋 Cotações"
         subtitle={`${lista.length} cotação(ões)`}
