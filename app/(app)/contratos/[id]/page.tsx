@@ -41,6 +41,7 @@ export default function VerContratoPage() {
   // E-mail
   const [painelEmail,   setPainelEmail]   = useState(false)
   const [emailLog,      setEmailLog]      = useState<any[]>([])
+  const [timeline,      setTimeline]      = useState<any[]>([])
   const [envEmail,      setEnvEmail]      = useState({ para:'', cc:'', assunto:'', corpo:'' })
   const [enviandoEmail, setEnviandoEmail] = useState(false)
   const [erroEmail,     setErroEmail]     = useState('')
@@ -91,6 +92,10 @@ export default function VerContratoPage() {
         supabase.from('email_log').select('*, usuarios(nome)').eq('contrato_id', id).order('created_at',{ascending:false}).limit(20),
       ])
       setContrato(c); setItens(i??[]); setFaturas(f??[]); setSaldoInfo(s?.data ?? s ?? null); setEmailLog(el??[]); setPeriodos(per??[])
+      // Carregar timeline
+      const tlRes = await fetch('/api/contrato-timeline?contrato_id=' + id)
+      const tlData = await tlRes.json()
+      setTimeline(tlData.ok ? tlData.data : [])
       setTemplates(t??[]); setDevolucoes(d??[]); setLoading(false)
       const pad = t?.find((x:any)=>x.padrao===1&&x.tipo==='contrato')
       if(pad) setTemplateSel(String(pad.id))
@@ -102,6 +107,16 @@ export default function VerContratoPage() {
     if(!confirm('Cancelar este contrato? Esta ação não pode ser desfeita.'))return
     await supabase.from('contratos').update({status:'cancelado'}).eq('id',id)
     router.push('/contratos')
+  }
+
+  async function registrarTimeline(tipo:string, descricao:string, detalhes?:any) {
+    await fetch('/api/contrato-timeline', {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ contrato_id: id, tipo, descricao, detalhes })
+    })
+    const res = await fetch('/api/contrato-timeline?contrato_id=' + id)
+    const data = await res.json()
+    if (data.ok) setTimeline(data.data)
   }
 
   function abrirEditar() {
@@ -195,6 +210,11 @@ export default function VerContratoPage() {
     }).eq('id', id)
     if (error) { setErroEdicao('Erro ao salvar: ' + error.message); setSalvandoEdicao(false); return }
     setSalvandoEdicao(false); setPainelEditar(false)
+    // Registrar na timeline
+    const descTimeline = periodoMudou
+      ? 'Contrato alterado — período atualizado e preços recalculados'
+      : 'Dados do contrato alterados'
+    await registrarTimeline('alteracao', descTimeline)
     // Recarregar contrato
     const { data: c } = await supabase.from('contratos').select('*, clientes(*), usuarios(nome)').eq('id', id).single()
     if (c) setContrato(c)
@@ -468,7 +488,8 @@ Atenciosamente,`,
     {key:'itens',      label:'Itens',      count:itens.length},
     {key:'financeiro', label:'Financeiro', count:faturas.length},
     {key:'devolucoes', label:'Devoluções', count:devolucoes.length},
-    {key:'documentos', label:'Documentos'},
+    {key:'documentos',   label:'Documentos'},
+    {key:'timeline',     label:'Histórico'},
   ]
 
   return(
@@ -980,6 +1001,60 @@ Atenciosamente,`,
         </div>
       </SlidePanel>
 
+
+          {aba==='timeline'&&(
+            <div style={{display:'flex',flexDirection:'column',gap:0}}>
+              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
+                <div className="ds-section-title" style={{marginBottom:0}}>Histórico do Contrato</div>
+                <button onClick={()=>registrarTimeline('sistema','Entrada manual na timeline',{})}
+                  style={{display:'none'}} />
+              </div>
+              {timeline.length === 0
+                ? <div style={{textAlign:'center',padding:'32px',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>
+                    Nenhum evento registrado ainda.
+                  </div>
+                : <div style={{position:'relative',paddingLeft:28}}>
+                    {/* Linha vertical */}
+                    <div style={{position:'absolute',left:10,top:0,bottom:0,width:2,background:'var(--border)'}} />
+                    {timeline.map((ev:any,i:number)=>{
+                      const icone:Record<string,string>={
+                        criacao:'📄',ativacao:'✅',alteracao:'✏️',pagamento:'💰',
+                        devolucao:'↩️',manutencao:'🔧',documento:'📋',email:'📧',
+                        encerramento:'🏁',sistema:'⚙️'
+                      }
+                      return (
+                        <div key={ev.id} style={{position:'relative',paddingBottom:20}}>
+                          {/* Ícone no círculo */}
+                          <div style={{position:'absolute',left:-28,top:0,width:20,height:20,
+                            borderRadius:'50%',background:'var(--bg-card)',border:'2px solid var(--border)',
+                            display:'flex',alignItems:'center',justifyContent:'center',fontSize:10}}>
+                            {icone[ev.tipo]??'•'}
+                          </div>
+                          {/* Conteúdo */}
+                          <div style={{background:'var(--bg-header)',borderRadius:'var(--r-md)',
+                            padding:'10px 14px',border:'1px solid var(--border)'}}>
+                            <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
+                              <div style={{fontWeight:600,fontSize:'var(--fs-md)',color:'var(--t-primary)'}}>
+                                {ev.descricao}
+                              </div>
+                              <span style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',whiteSpace:'nowrap',flexShrink:0}}>
+                                {new Date(ev.created_at).toLocaleDateString('pt-BR')}{' '}
+                                {new Date(ev.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
+                              </span>
+                            </div>
+                            {ev.usuarios?.nome && (
+                              <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginTop:4}}>
+                                por {ev.usuarios.nome}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+              }
+            </div>
+          )}
 
       {/* Painel: Enviar por E-mail */}
       <SlidePanel

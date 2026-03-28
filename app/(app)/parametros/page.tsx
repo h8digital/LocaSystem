@@ -64,8 +64,11 @@ export default function ParametrosPage() {
   const [tiposEnd,   setTiposEnd]   = useState<any[]>([])
   const [locais,     setLocais]     = useState<any[]>([])
   const [saving,     setSaving]     = useState(false)
-  const [aba,        setAba]        = useState('empresa')
+  const [aba,        setAba]        = useState<string>('empresa')
   const [uploadandoLogo, setUploadandoLogo] = useState(false)
+  const [tabelas,       setTabelas]       = useState<any[]>([])
+  const [formTabela,    setFormTabela]    = useState({ nome:'', descricao:'', padrao:false })
+  const [salvandoTab,   setSalvandoTab]   = useState(false)
   const [erroLogo,       setErroLogo]       = useState('')
 
   // ── Pesquisa por aba ────────────────────────────────────────────────────────
@@ -93,6 +96,7 @@ export default function ParametrosPage() {
     { key:'categorias', label:'Categorias'            },
     { key:'enderecos',  label:'Tipos de Endereço'    },
     { key:'email',      label:'E-mail / SMTP'          },
+    { key:'tabelas',    label:'Tabelas de Preço'       },
     { key:'locais',     label:'Locais de Armazenagem' },
   ]
 
@@ -128,6 +132,8 @@ export default function ParametrosPage() {
     p?.forEach(x => { map[x.chave] = x.valor ?? '' })
     setParams(map); setPeriodos(per??[]); setCategorias(cat??[])
     setTiposEnd(te??[]); setLocais(lo??[])
+    // Carregar tabelas de preço
+    fetch('/api/tabelas-preco').then(r=>r.json()).then(d=>{ if(d.ok) setTabelas(d.data) })
   }
 
   async function salvar() {
@@ -406,6 +412,86 @@ export default function ParametrosPage() {
             </div>
           )}
 
+
+
+
+          {/* ══ TABELAS DE PREÇO ═══════════════════════════════════════════ */}
+          {aba === 'tabelas' && (
+            <div style={{display:'flex',flexDirection:'column',gap:20}}>
+              <div className="ds-section-title">Tabelas de Preço por Segmento</div>
+              <div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)',marginTop:-14}}>
+                Crie tabelas diferenciadas por tipo de cliente (ex: Padrão, Grandes Construtoras, Parceiros).
+                Associe a tabela no cadastro do cliente.
+              </div>
+
+              {/* Nova tabela */}
+              <div style={{background:'var(--bg-header)',border:'1px solid var(--border)',borderRadius:'var(--r-md)',padding:16,display:'flex',gap:10,alignItems:'flex-end',flexWrap:'wrap'}}>
+                <FormField label="Nome da tabela *" style={{flex:'2 1 160px'}}>
+                  <input className={inpSm} value={formTabela.nome}
+                    onChange={e=>setFormTabela(f=>({...f,nome:e.target.value}))}
+                    placeholder="Ex: Tabela Grandes Construtoras" />
+                </FormField>
+                <FormField label="Descrição" style={{flex:'3 1 200px'}}>
+                  <input className={inpSm} value={formTabela.descricao}
+                    onChange={e=>setFormTabela(f=>({...f,descricao:e.target.value}))}
+                    placeholder="Uso interno" />
+                </FormField>
+                <label style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',fontSize:'var(--fs-md)',paddingBottom:2}}>
+                  <input type="checkbox" checked={formTabela.padrao}
+                    onChange={e=>setFormTabela(f=>({...f,padrao:e.target.checked}))}
+                    style={{accentColor:'var(--c-primary)'}} />
+                  Tabela padrão
+                </label>
+                <Btn size="sm" loading={salvandoTab} onClick={async()=>{
+                  if (!formTabela.nome.trim()) return
+                  setSalvandoTab(true)
+                  const res  = await fetch('/api/tabelas-preco',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(formTabela)})
+                  const data = await res.json()
+                  if (data.ok) {
+                    setTabelas((p:any[])=>[...p,data.data])
+                    setFormTabela({nome:'',descricao:'',padrao:false})
+                  }
+                  setSalvandoTab(false)
+                }}>+ Criar</Btn>
+              </div>
+
+              {/* Lista de tabelas */}
+              {tabelas.length === 0
+                ? <div style={{textAlign:'center',padding:24,color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Nenhuma tabela cadastrada.</div>
+                : <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                    {tabelas.map((t:any)=>(
+                      <div key={t.id} style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',padding:'12px 16px',
+                        display:'flex',justifyContent:'space-between',alignItems:'center',
+                        background: t.padrao ? 'var(--c-primary-light,#e8f4f8)' : 'transparent'}}>
+                        <div>
+                          <div style={{fontWeight:700,fontSize:'var(--fs-base)',display:'flex',alignItems:'center',gap:8}}>
+                            {t.nome}
+                            {t.padrao && <span style={{fontSize:'var(--fs-xs)',background:'var(--c-primary)',color:'#fff',padding:'2px 8px',borderRadius:'var(--r-sm)',fontWeight:700}}>PADRÃO</span>}
+                          </div>
+                          {t.descricao && <div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)',marginTop:2}}>{t.descricao}</div>}
+                          <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginTop:4}}>
+                            {(t.tabela_preco_regras ?? []).length} regras de preço configuradas
+                          </div>
+                        </div>
+                        <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                          {!t.padrao && (
+                            <button onClick={async()=>{
+                                await fetch('/api/tabelas-preco',{method:'POST',headers:{'Content-Type':'application/json'},
+                                  body:JSON.stringify({nome:t.nome,descricao:t.descricao,padrao:true})})
+                                fetch('/api/tabelas-preco').then(r=>r.json()).then(d=>{ if(d.ok) setTabelas(d.data) })
+                              }}
+                              style={{background:'none',border:'1px solid var(--border)',borderRadius:'var(--r-sm)',
+                                padding:'4px 10px',cursor:'pointer',fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>
+                              Tornar padrão
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+              }
+            </div>
+          )}
           {/* ═══ FINANCEIRO ═══════════════════════════════════════════ */}
           {aba === 'financeiro' && (
             <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
@@ -483,7 +569,6 @@ export default function ParametrosPage() {
                   <TesteSMTPBtn usar="global" />
                 </div>
               </div>
-
               {/* ── Dica ── */}
               <div style={{ background:'var(--bg-header)', border:'1px solid var(--border)',
                 borderRadius:'var(--r-md)', padding:'12px 16px', fontSize:'var(--fs-md)', color:'var(--t-secondary)' }}>

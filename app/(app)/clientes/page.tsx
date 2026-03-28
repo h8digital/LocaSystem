@@ -315,6 +315,14 @@ export default function ClientesPage() {
                     <div><label className="ds-label">Cidade</label><input value={end.cidade||''} onChange={e=>{const a=[...enderecos];a[i].cidade=e.target.value;setEnderecos(a)}} className={inputCls} /></div>
                     <div><label className="ds-label">UF</label><input value={end.estado||''} onChange={e=>{const a=[...enderecos];a[i].estado=e.target.value.toUpperCase().slice(0,2);setEnderecos(a)}} className={inputCls} maxLength={2} placeholder="SP" /></div>
                     <div style={{gridColumn:'span 2'}}><label className="ds-label">Ponto de Referência <span style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)',fontWeight:400}}>(para auxiliar na entrega)</span></label><input value={end.referencia||''} onChange={e=>{const a=[...enderecos];a[i].referencia=e.target.value;setEnderecos(a)}} className={inputCls} placeholder="Ex: Portão azul, 2º andar, solicitar João, próximo ao mercado..." /></div>
+                    <div>
+                      <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:'var(--fs-base)'}}>
+                        <input type="checkbox" checked={!!end.flag_obra_entrega}
+                          onChange={e=>{const a=[...enderecos];a[i].flag_obra_entrega=e.target.checked;setEnderecos(a)}}
+                          style={{accentColor:'var(--c-primary)',width:14,height:14}} />
+                        <span style={{fontWeight:600}}>Endereço de Entrega / Obra</span>
+                      </label>
+                    </div>
                   </div>
                 </div>
               ))}
@@ -340,6 +348,17 @@ export default function ClientesPage() {
                     <div><label className="ds-label">Celular</label><input value={ct.celular||''} onChange={e=>{const a=[...contatos];a[i].celular=formatarPhone(e.target.value);setContatos(a)}} className={inputCls} placeholder="(00) 00000-0000" /></div>
                     <div><label className="ds-label">Telefone</label><input value={ct.telefone||''} onChange={e=>{const a=[...contatos];a[i].telefone=formatarPhone(e.target.value);setContatos(a)}} className={inputCls} placeholder="(00) 0000-0000" /></div>
                     <div style={{gridColumn:'span 2'}}><label className="ds-label">Email</label><input type="email" value={ct.email||''} onChange={e=>{const a=[...contatos];a[i].email=e.target.value.toLowerCase();setContatos(a)}} className={inputCls} /></div>
+                    <div style={{gridColumn:'span 2'}}>
+                      <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:'var(--fs-base)'}}>
+                        <input type="checkbox" checked={!!ct.tomador_decisao}
+                          onChange={e=>{const a=[...contatos];a[i].tomador_decisao=e.target.checked;setContatos(a)}}
+                          style={{accentColor:'var(--c-primary)',width:14,height:14}} />
+                        <div>
+                          <span style={{fontWeight:600}}>Tomador de Decisão</span>
+                          <span style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)',marginLeft:6}}>Este contato aprova contratos e propostas</span>
+                        </div>
+                      </label>
+                    </div>
                   </div>
                 </div>
               ))}

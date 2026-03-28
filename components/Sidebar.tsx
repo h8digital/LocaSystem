@@ -1,4 +1,5 @@
 'use client'
+import Notificacoes from '@/components/ui/Notificacoes'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 
@@ -58,6 +59,7 @@ export default function Sidebar({ user }: { user: any }) {
           <div style={{color:'rgba(255,255,255,0.85)',fontSize:'var(--fs-md)',fontWeight:500,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.nome}</div>
           <div style={{color:'rgba(255,255,255,0.35)',fontSize:'var(--fs-xs)'}}>{(user.perfil??'').split(',').map((p:string)=>p.trim()).filter(Boolean).join(' · ')}</div>
         </div>
+        <Notificacoes />
         <button onClick={logout} title="Sair" style={{background:'transparent',border:'none',cursor:'pointer',color:'rgba(255,255,255,0.3)',fontSize:'var(--fs-lg)',padding:3,borderRadius:'3px',transition:'color 150ms'}}
           onMouseEnter={e=>(e.currentTarget.style.color='#ff6b6b')}
           onMouseLeave={e=>(e.currentTarget.style.color='rgba(255,255,255,0.3)')}>⇥</button>

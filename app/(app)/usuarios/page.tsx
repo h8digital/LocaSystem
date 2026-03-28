@@ -95,6 +95,7 @@ export default function UsuariosPage() {
     nome:'', email:'', perfis:['operador'], comissao_percentual:0,
     telefone:'', ativo:1, senha:'',
     smtp_ativo:false, smtp_host:'', smtp_porta:587, smtp_usuario:'',
+    ver_financeiro_global:true, ver_apenas_proprios:false,
     smtp_senha:'', smtp_seguro:true, smtp_de_nome:'', smtp_de_email:''
   })
 
@@ -142,6 +143,8 @@ export default function UsuariosPage() {
       smtp_senha:         form.smtp_senha  || null,
       smtp_seguro:        !!form.smtp_seguro,
       smtp_de_nome:       form.smtp_de_nome  || null,
+      ver_financeiro_global: !!form.ver_financeiro_global,
+      ver_apenas_proprios:   !!form.ver_apenas_proprios,
       smtp_de_email:      form.smtp_de_email || null,
     }
     if (form.senha) {
@@ -291,6 +294,31 @@ export default function UsuariosPage() {
               style={{ accentColor:'var(--c-primary)', width:14, height:14 }} />
             <span style={{ fontWeight:500, color:'var(--t-secondary)' }}>Usuário ativo no sistema</span>
           </label>
+
+          {/* ── Permissões Financeiras (RBAC) ── */}
+          <div style={{borderTop:'1px solid var(--border)',paddingTop:14,marginTop:4}}>
+            <div style={{fontWeight:700,fontSize:'var(--fs-base)',marginBottom:10}}>Permissões Financeiras</div>
+            <div style={{display:'flex',flexDirection:'column',gap:8}}>
+              <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:'var(--fs-base)'}}>
+                <input type="checkbox" checked={!!form.ver_financeiro_global}
+                  onChange={e=>setForm({...form,ver_financeiro_global:e.target.checked})}
+                  style={{accentColor:'var(--c-primary)',width:14,height:14}} />
+                <div>
+                  <span style={{fontWeight:500}}>Ver faturamento global da empresa</span>
+                  <div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>Desative para vendedores — eles só veem suas próprias metas</div>
+                </div>
+              </label>
+              <label style={{display:'flex',alignItems:'center',gap:8,cursor:'pointer',fontSize:'var(--fs-base)'}}>
+                <input type="checkbox" checked={!!form.ver_apenas_proprios}
+                  onChange={e=>setForm({...form,ver_apenas_proprios:e.target.checked})}
+                  style={{accentColor:'var(--c-primary)',width:14,height:14}} />
+                <div>
+                  <span style={{fontWeight:500}}>Ver apenas contratos/cotações próprios</span>
+                  <div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>Restringe a lista aos registros onde este usuário é o vendedor</div>
+                </div>
+              </label>
+            </div>
+          </div>
 
           {/* ── Configuração SMTP pessoal ── */}
           <div style={{ borderTop:'1px solid var(--border)', paddingTop:16, marginTop:4 }}>
