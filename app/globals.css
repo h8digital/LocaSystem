@@ -895,9 +895,10 @@ button, input, select, textarea { font-family: var(--font); font-size: var(--fon
 
 /* ════════════════════════════════════════════════════════════
    ALIASES DE COMPATIBILIDADE
-   (mantém páginas antigas funcionando durante migração)
    ════════════════════════════════════════════════════════════ */
-.inputCls { @apply ds-input; }
+
+/* inputCls — alias string usado via className={inputCls} nos componentes */
+/* Não precisa de regra CSS — o valor é 'ds-input' (string), não @apply    */
 
 /* Aliasses de layout */
 .text-secondary-color { color: var(--t-secondary) !important; }
@@ -906,18 +907,17 @@ button, input, select, textarea { font-family: var(--font); font-size: var(--fon
 .bg-subtle            { background: var(--bg-header) !important; }
 
 /* Tabs internas */
-.ds-tabs-bar { background: var(--bg-header); border: 1px solid var(--border); }
+.ds-tabs-bar  { background: var(--bg-header); border: 1px solid var(--border); }
 .ds-tab-active { color: var(--c-primary) !important; }
 .ds-periodo-ativo { background: var(--c-primary) !important; color: #fff !important; }
 .border-primary { border-color: var(--c-primary) !important; }
 
-/* Antigos aliases de botão */
-.btn, .ds-btn, .ap-btn { }
-.btn-primary { @apply ds-btn-primary; }
-.btn-secondary { @apply ds-btn-secondary; }
-.btn-danger { @apply ds-btn-danger; }
-.btn-sm { @apply ds-btn-sm; }
-.btn-save { @apply ds-btn-primary; }
+/* Antigos aliases de botão — sem @apply (Tailwind v4 não aceita classes customizadas) */
+.btn-primary   { background: var(--c-primary); color: #fff; border-color: var(--c-primary); box-shadow: 0 1px 2px rgba(14,165,233,0.3); }
+.btn-secondary { background: var(--bg-card); color: var(--t-secondary); border-color: var(--border-input); }
+.btn-danger    { background: var(--c-danger); color: #fff; border-color: var(--c-danger); }
+.btn-sm        { padding: 0 10px; height: 26px; font-size: var(--fs-md); border-radius: var(--r-sm); }
+.btn-save      { background: var(--c-primary); color: #fff; border-color: var(--c-primary); font-weight: 600; }
 
 /* ════════════════════════════════════════════════════════════
    PADRONIZAÇÃO GLOBAL — sobrepõe inline styles inconsistentes
