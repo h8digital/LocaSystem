@@ -47,7 +47,9 @@ export { IconEye, IconEdit, IconTrash }
 
 export default function ActionButtons({ onView, onEdit, onDelete, deleteConfirm, acoesSec }: ActionButtonsProps) {
   const [dropOpen, setDropOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
+  const [dropPos,  setDropPos]  = useState({ top: 0, right: 0 })
+  const ref    = useRef<HTMLDivElement>(null)
+  const btnRef = useRef<HTMLButtonElement>(null)
 
   useEffect(() => {
     function h(e: MouseEvent) {
@@ -56,6 +58,14 @@ export default function ActionButtons({ onView, onEdit, onDelete, deleteConfirm,
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
   }, [])
+
+  function toggleDrop() {
+    if (!dropOpen && btnRef.current) {
+      const r = btnRef.current.getBoundingClientRect()
+      setDropPos({ top: r.bottom + 4, right: window.innerWidth - r.right })
+    }
+    setDropOpen(o => !o)
+  }
 
   const hasMore = acoesSec && acoesSec.length > 0
 
@@ -86,15 +96,21 @@ export default function ActionButtons({ onView, onEdit, onDelete, deleteConfirm,
       {hasMore && (
         <div ref={ref} style={{ position: 'relative' }}>
           <button
+            ref={btnRef}
             className={`tbl-btn ${dropOpen ? 'tbl-btn-open' : ''}`}
-            onClick={() => setDropOpen(o => !o)}
+            onClick={toggleDrop}
             title="Mais ações"
             style={{ color: dropOpen ? 'var(--c-primary)' : undefined }}
           >
             <IconMore />
           </button>
           {dropOpen && (
-            <div className="tbl-dropdown">
+            <div className="tbl-dropdown" style={{
+              position: 'fixed',
+              top: dropPos.top,
+              right: dropPos.right,
+              zIndex: 9999,
+            }}>
               {acoesSec!.map((a, i) => (
                 <React.Fragment key={i}>
                   {i > 0 && acoesSec![i - 1].grupo !== a.grupo && (

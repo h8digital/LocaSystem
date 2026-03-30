@@ -301,7 +301,7 @@ button, input, select, textarea { font-family: var(--font); font-size: var(--fon
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   box-shadow: var(--shadow-sm);
-  overflow: hidden;
+  /* overflow:hidden removido — cortava dropdowns position:absolute */
 }
 
 /* ════════════════════════════════════════════════════════════
@@ -316,6 +316,13 @@ button, input, select, textarea { font-family: var(--font); font-size: var(--fon
   background: var(--bg-header);
   border-bottom: 1px solid var(--border);
 }
+/* Manter bordas arredondadas do card sem overflow:hidden */
+.ds-card > div:first-child,
+.ds-card > table:first-child { border-radius: var(--r-lg) var(--r-lg) 0 0; }
+.ds-card > div:first-child > table thead tr:first-child th:first-child,
+.ds-card > table thead tr:first-child th:first-child { border-radius: var(--r-lg) 0 0 0; }
+.ds-card > div:first-child > table thead tr:first-child th:last-child,
+.ds-card > table thead tr:first-child th:last-child  { border-radius: 0 var(--r-lg) 0 0; }
 .ds-table th, .ap-table th {
   text-align: left;
   padding: 9px 14px;
