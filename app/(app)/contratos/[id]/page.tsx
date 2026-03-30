@@ -43,6 +43,9 @@ export default function VerContratoPage() {
   const [painelEmail,   setPainelEmail]   = useState(false)
   const [emailLog,      setEmailLog]      = useState<any[]>([])
   const [timeline,      setTimeline]      = useState<any[]>([])
+  const [aprovacoes,    setAprovacoes]    = useState<any[]>([])
+  const [gerandoLink,   setGerandoLink]   = useState(false)
+  const [linkAprov,     setLinkAprov]     = useState('')
   const [envEmail,      setEnvEmail]      = useState({ para:'', cc:'', assunto:'', corpo:'' })
   const [enviandoEmail, setEnviandoEmail] = useState(false)
   const [erroEmail,     setErroEmail]     = useState('')
@@ -97,6 +100,10 @@ export default function VerContratoPage() {
       const tlRes = await fetch('/api/contrato-timeline?contrato_id=' + id)
       const tlData = await tlRes.json()
       setTimeline(tlData.ok ? tlData.data : [])
+      // Carregar aprovações eletrônicas
+      const aprRes = await fetch(`/api/contrato-aprovacao?contrato_id=${id}`)
+      const aprData = await aprRes.json()
+      if (aprData.ok) setAprovacoes(aprData.data)
       setTemplates(t??[]); setDevolucoes(d??[]); setLoading(false)
       const pad = t?.find((x:any)=>x.padrao===1&&x.tipo==='contrato')
       if(pad) setTemplateSel(String(pad.id))
@@ -108,6 +115,28 @@ export default function VerContratoPage() {
     if(!confirm('Cancelar este contrato? Esta ação não pode ser desfeita.'))return
     await supabase.from('contratos').update({status:'cancelado'}).eq('id',id)
     router.push('/contratos')
+  }
+
+  async function gerarLinkAprovacao() {
+    setGerandoLink(true)
+    const r = await fetch('/api/contrato-aprovacao', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contrato_id: id }),
+    })
+    const d = await r.json()
+    if (d.ok) {
+      const appUrl = window.location.origin
+      const link = `${appUrl}/aprovar?token=${d.token}`
+      setLinkAprov(link)
+      // Recarregar aprovações
+      const aprRes = await fetch(`/api/contrato-aprovacao?contrato_id=${id}`)
+      const aprData = await aprRes.json()
+      if (aprData.ok) setAprovacoes(aprData.data)
+    } else {
+      alert('Erro ao gerar link: ' + d.error)
+    }
+    setGerandoLink(false)
   }
 
   async function registrarTimeline(tipo:string, descricao:string, detalhes?:any) {
@@ -491,6 +520,7 @@ Atenciosamente,`,
     {key:'devolucoes', label:'Devoluções', count:devolucoes.length},
     {key:'documentos',   label:'Documentos'},
     {key:'timeline',     label:'Histórico'},
+    {key:'aprovacao',    label:'Aprovação', count: aprovacoes.filter((a:any)=>a.status==='pendente').length || undefined},
   ]
 
   return(
@@ -1054,6 +1084,105 @@ Atenciosamente,`,
                     })}
                   </div>
               }
+            </div>
+          )}
+
+          {aba==='aprovacao'&&(
+            <div style={{display:'flex',flexDirection:'column',gap:20}}>
+
+              {/* Gerar link */}
+              <div className="panel-section">
+                <div className="panel-section-header">🔗 Aprovação Eletrônica</div>
+                <div className="panel-section-body">
+                  <p style={{fontSize:'var(--fs-md)',color:'var(--t-secondary)',marginBottom:14}}>
+                    Gere um link seguro para o cliente aprovar ou reprovar o contrato eletronicamente,
+                    com assinatura digital e registro em log.
+                  </p>
+                  <Btn
+                    variant="primary"
+                    loading={gerandoLink}
+                    onClick={gerarLinkAprovacao}
+                  >
+                    🔗 Gerar Link de Aprovação
+                  </Btn>
+
+                  {linkAprov && (
+                    <div style={{marginTop:14,background:'var(--c-primary-light)',border:'1px solid var(--c-primary)',borderRadius:'var(--r-md)',padding:'12px 14px'}}>
+                      <div style={{fontSize:'var(--fs-sm)',fontWeight:700,color:'var(--c-primary-text)',marginBottom:6}}>
+                        ✅ Link gerado! Copie e envie ao cliente:
+                      </div>
+                      <div style={{display:'flex',gap:8,alignItems:'center'}}>
+                        <input
+                          readOnly
+                          value={linkAprov}
+                          onClick={e=>(e.target as HTMLInputElement).select()}
+                          style={{flex:1,fontFamily:'var(--font-mono)',fontSize:'var(--fs-sm)',
+                            padding:'6px 10px',border:'1px solid var(--border-input)',borderRadius:'var(--r-sm)',
+                            background:'#fff',color:'var(--t-primary)'}}
+                        />
+                        <Btn size="sm" variant="secondary" onClick={()=>{
+                          navigator.clipboard.writeText(linkAprov)
+                          alert('Link copiado!')
+                        }}>Copiar</Btn>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Log de aprovações */}
+              {aprovacoes.length > 0 && (
+                <div className="panel-section">
+                  <div className="panel-section-header">📋 Log de Aprovações</div>
+                  <div style={{overflowX:'auto'}}>
+                    <table className="ds-table">
+                      <thead><tr>
+                        <th>Data/Hora</th>
+                        <th>Status</th>
+                        <th>IP</th>
+                        <th>Expiração</th>
+                        <th>Motivo</th>
+                      </tr></thead>
+                      <tbody>
+                        {aprovacoes.map((a:any)=>(
+                          <tr key={a.id}>
+                            <td className="tbl-mono" style={{fontSize:'var(--fs-sm)'}}>
+                              {a.aprovado_em
+                                ? new Date(a.aprovado_em).toLocaleString('pt-BR')
+                                : <span style={{color:'var(--t-muted)'}}>Pendente</span>}
+                            </td>
+                            <td>
+                              <span className={
+                                a.status==='aprovado' ? 'ds-badge ds-badge-green' :
+                                a.status==='reprovado'? 'ds-badge ds-badge-red' :
+                                'ds-badge ds-badge-yellow'
+                              }>
+                                {a.status==='aprovado'?'✅ Aprovado':a.status==='reprovado'?'❌ Reprovado':'⏳ Pendente'}
+                              </span>
+                            </td>
+                            <td className="tbl-mono" style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>{a.ip_aprovador||'—'}</td>
+                            <td style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>
+                              {a.expires_at ? new Date(a.expires_at).toLocaleDateString('pt-BR') : '—'}
+                            </td>
+                            <td style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>{a.motivo_reprovacao||'—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                  {/* Assinatura */}
+                  {aprovacoes.some((a:any)=>a.assinatura_svg) && (
+                    <div style={{padding:'12px 16px',borderTop:'1px solid var(--border)'}}>
+                      <div style={{fontSize:'var(--fs-sm)',fontWeight:700,color:'var(--t-secondary)',marginBottom:8}}>Assinatura do Cliente</div>
+                      {aprovacoes.filter((a:any)=>a.assinatura_svg).map((a:any)=>(
+                        <div key={a.id} style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',padding:8,display:'inline-block'}}>
+                          <img src={a.assinatura_svg} alt="Assinatura" style={{maxWidth:300,height:'auto'}} />
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
           )}
 
