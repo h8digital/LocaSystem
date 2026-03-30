@@ -228,7 +228,51 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    Object.entries(tags).forEach(([k,v]) => { conteudo = conteudo.replaceAll(k, v) })
+    // ── 1. Blocos condicionais {{#tag}}...{{/tag}} ───────────────────────
+    // Se a tag tem valor → mantém o conteúdo (sem as marcações)
+    // Se a tag é vazia   → remove o bloco inteiro
+    conteudo = conteudo.replace(
+      /\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
+      (_match: string, key: string, inner: string) => {
+        const val = tags[`{{${key}}}`] ?? ''
+        return val.trim() ? inner : ''
+      }
+    )
+
+    // ── 2. Tags simples: substituir pelo valor, ou suprimir o padrão ──────
+    // Padrão "Rótulo: {{tag}}" → se vazio, remove a linha inteira
+    // Padrão "Rótulo: <b>{{tag}}</b>" → idem
+    // Padrão standalone {{tag}} → substitui por '' (sem deixar lixo)
+    Object.entries(tags).forEach(([k, v]) => {
+      // Substituir padrões com rótulo HTML bold + tag na mesma linha/célula
+      // ex: <b>Referência:</b> {{entrega_referencia}}<br>  → remove linha se vazio
+      if (!v || v.trim() === '') {
+        // Remove linhas que contêm apenas rótulo + tag vazia (com ou sem <br>)
+        const safeKey = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+        // Padrão: <b>Qualquer rótulo:</b> TAG<br> ou TAG\n
+        conteudo = conteudo.replace(
+          new RegExp(`<b>[^<]*:<\\/b>\\s*${safeKey}<br>\\n?`, 'g'), ''
+        )
+        conteudo = conteudo.replace(
+          new RegExp(`<strong>[^<]*:<\\/strong>\\s*${safeKey}<br>\\n?`, 'g'), ''
+        )
+        // Padrão: Texto: TAG<br>
+        conteudo = conteudo.replace(
+          new RegExp(`[^<\\n]*:\\s*${safeKey}<br>\\n?`, 'g'), ''
+        )
+        // Padrão: <td>...TAG...</td> → deixa célula vazia
+        conteudo = conteudo.replace(new RegExp(safeKey, 'g'), '')
+      } else {
+        conteudo = conteudo.replaceAll(k, v)
+      }
+    })
+
+    // ── 3. Limpar qualquer tag {{...}} que sobrou sem valor ───────────────
+    // Remove padrões "Rótulo: {{tag_desconhecida}}<br>"
+    conteudo = conteudo.replace(/<b>[^<]*:<\/b>\s*\{\{[^}]+\}\}<br>\n?/g, '')
+    conteudo = conteudo.replace(/[^<\n]*:\s*\{\{[^}]+\}\}<br>\n?/g, '')
+    // Remove tags soltas restantes
+    conteudo = conteudo.replace(/\{\{[^}]+\}\}/g, '')
 
     // Salvar documento gerado
     const token = gerarToken()
