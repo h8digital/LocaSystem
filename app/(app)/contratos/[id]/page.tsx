@@ -81,7 +81,7 @@ export default function VerContratoPage() {
 
   useEffect(() => {
     async function load() {
-      const [{ data:c },{ data:i },{ data:f }, s,{ data:t },{ data:d },{ data:el },{ data:per }] = await Promise.all([
+      const [{ data:c },{ data:i },{ data:f }, s,{ data:t },{ data:per },{ data:d },{ data:el }] = await Promise.all([
         supabase.from('contratos').select('*, clientes(*), usuarios(nome)').eq('id', id).single(),
         supabase.from('contrato_itens').select('*, produtos(nome), patrimonios(numero_patrimonio)').eq('contrato_id', id),
         supabase.from('faturas').select('*').eq('contrato_id', id).order('data_vencimento'),
@@ -1394,135 +1394,242 @@ Atenciosamente,`,
         onClose={() => setPainelEditar(false)}
         title="Alterar Contrato"
         subtitle={`Contrato ${contrato?.numero}`}
-        width="md"
+        width="lg"
         footer={
-          <div className="panel-footer-2btn">
-            <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPainelEditar(false)}>Cancelar</Btn>
-            <Btn style={{ flex:2 }} loading={salvandoEdicao} onClick={salvarEdicao}>Salvar Alterações</Btn>
+          <div style={{display:'flex',gap:10,width:'100%'}}>
+            <Btn variant="secondary" style={{flex:1}} onClick={() => setPainelEditar(false)}>Cancelar</Btn>
+            <Btn style={{flex:2}} loading={salvandoEdicao} onClick={salvarEdicao}>Salvar Alterações</Btn>
           </div>
         }
       >
-        {erroEdicao && <div className="ds-alert-error" style={{ marginBottom:14 }}>{erroEdicao}</div>}
-        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        {erroEdicao && <div className="ds-alert-error" style={{marginBottom:14}}>{erroEdicao}</div>}
 
-          {/* Período */}
-          <FormField label="Período de Locação">
-            <select value={formEdicao.periodo_id ?? ''}
-              onChange={e => {
-                const pid = e.target.value
-                const per = periodos.find((p:any) => String(p.id) === pid)
-                if (per && formEdicao.data_inicio) {
-                  const fim = new Date(formEdicao.data_inicio)
-                  fim.setDate(fim.getDate() + per.dias)
-                  setFormEdicao((f:any) => ({ ...f, periodo_id: pid, data_fim: fim.toISOString().split('T')[0] }))
-                } else {
-                  setFormEdicao((f:any) => ({ ...f, periodo_id: pid }))
-                }
-              }}
-              className={selectCls}>
-              <option value="">-- Selecione um período --</option>
-              {periodos.map((p:any) => (
-                <option key={p.id} value={p.id}>{p.nome} ({p.dias} dias)</option>
-              ))}
-            </select>
-            {formEdicao.periodo_id && formEdicao.periodo_id !== contrato?.periodo_id && (
-              <div style={{ marginTop:4, fontSize:'var(--fs-sm)', color:'var(--c-warning,#f59e0b)', fontWeight:600 }}>
-                Período alterado — os preços dos itens serão recalculados automaticamente ao salvar.
-              </div>
-            )}
-          </FormField>
+        <div style={{display:'flex',flexDirection:'column',gap:20}}>
 
-          <div className="form-grid-2">
-            <FormField label="Data de Início" required>
-              <input type="date" value={formEdicao.data_inicio ?? ''}
-                onChange={e => setFormEdicao((f: any) => ({ ...f, data_inicio: e.target.value }))}
-                className={inputCls} />
-            </FormField>
-            <FormField label="Data de Fim" required>
-              <input type="date" value={formEdicao.data_fim ?? ''}
-                onChange={e => setFormEdicao((f: any) => ({ ...f, data_fim: e.target.value }))}
-                className={inputCls} min={formEdicao.data_inicio} />
-            </FormField>
-          </div>
+          {/* ── SEÇÃO 1: Período e Datas ── */}
+          <div className="panel-section">
+            <div className="panel-section-header">📅 Período de Locação</div>
+            <div className="panel-section-body">
 
-          <div className="form-grid-2">
-            <FormField label="Forma de Pagamento">
-              <select value={formEdicao.forma_pagamento ?? ''}
-                onChange={e => setFormEdicao((f: any) => ({ ...f, forma_pagamento: e.target.value }))}
-                className={selectCls}>
-                {['pix','dinheiro','cartao_credito','cartao_debito','boleto','transferencia'].map(v => (
-                  <option key={v} value={v}>{v.replace(/_/g,' ').replace(/\w/g,(c: string) => c.toUpperCase())}</option>
-                ))}
-              </select>
-            </FormField>
-            <FormField label="Condição de Pagamento">
-              <input value={formEdicao.condicao_pagamento ?? ''}
-                onChange={e => setFormEdicao((f: any) => ({ ...f, condicao_pagamento: e.target.value }))}
-                className={inputCls} placeholder="Ex: 0+2x, 30+60+90" />
-            </FormField>
-          </div>
+              {/* Seletor de período */}
+              <FormField label="Modalidade do Contrato">
+                <select
+                  value={formEdicao.periodo_id ?? ''}
+                  onChange={e => {
+                    const pid = e.target.value
+                    const per = periodos.find((p:any) => String(p.id) === pid)
+                    if (per && formEdicao.data_inicio) {
+                      const fim = new Date(formEdicao.data_inicio)
+                      fim.setDate(fim.getDate() + per.dias)
+                      setFormEdicao((f:any) => ({ ...f, periodo_id: pid, data_fim: fim.toISOString().split('T')[0] }))
+                    } else {
+                      setFormEdicao((f:any) => ({ ...f, periodo_id: pid }))
+                    }
+                  }}
+                  className={selectCls}
+                >
+                  <option value="">-- Selecione a modalidade --</option>
+                  {periodos.map((p:any) => (
+                    <option key={p.id} value={p.id}>{p.nome} ({p.dias} dias)</option>
+                  ))}
+                </select>
+                <div style={{marginTop:5,fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>
+                  {periodos.length === 0
+                    ? '⚠️ Nenhum período cadastrado — verifique os parâmetros'
+                    : 'Alterar a modalidade recalcula automaticamente os preços de todos os itens'}
+                </div>
+              </FormField>
 
-          <div className="form-grid-3">
-            <FormField label="Desconto (R$)">
-              <input type="number" step="0.01" min="0" value={formEdicao.desconto ?? 0}
-                onChange={e => setFormEdicao((f: any) => ({ ...f, desconto: e.target.value }))}
-                className={inputCls} />
-            </FormField>
-            <FormField label="Acréscimo (R$)">
-              <input type="number" step="0.01" min="0" value={formEdicao.acrescimo ?? 0}
-                onChange={e => setFormEdicao((f: any) => ({ ...f, acrescimo: e.target.value }))}
-                className={inputCls} />
-            </FormField>
-            <FormField label="Frete (R$)">
-              <input type="number" step="0.01" min="0" value={formEdicao.frete ?? 0}
-                onChange={e => setFormEdicao((f: any) => ({ ...f, frete: e.target.value }))}
-                className={inputCls} />
-            </FormField>
-          </div>
-
-          <div className="form-grid-2">
-            <FormField label="Caução (R$)">
-              <input type="number" step="0.01" min="0" value={formEdicao.caucao ?? 0}
-                onChange={e => setFormEdicao((f: any) => ({ ...f, caucao: e.target.value }))}
-                className={inputCls} />
-            </FormField>
-            <FormField label="Comissão (%)">
-              <input type="number" step="0.01" min="0" max="100" value={formEdicao.comissao_percentual ?? 0}
-                onChange={e => setFormEdicao((f: any) => ({ ...f, comissao_percentual: e.target.value }))}
-                className={inputCls} />
-            </FormField>
-          </div>
-
-          <FormField label="Observações">
-            <textarea value={formEdicao.observacoes ?? ''}
-              onChange={e => setFormEdicao((f: any) => ({ ...f, observacoes: e.target.value }))}
-              className={textareaCls} rows={2} />
-          </FormField>
-          <FormField label="Observações Internas">
-            <textarea value={formEdicao.observacoes_internas ?? ''}
-              onChange={e => setFormEdicao((f: any) => ({ ...f, observacoes_internas: e.target.value }))}
-              className={textareaCls} rows={2} />
-          </FormField>
-
-          {/* Preview do total recalculado */}
-          <div style={{ background:'var(--bg-header)', border:'1px solid var(--border)', borderRadius:'var(--r-md)', padding:'12px 16px' }}>
-            {(() => {
-              const sub = itens.reduce((s: number, i: any) => s + Number(i.preco_unitario ?? 0) * Number(i.quantidade ?? 1), 0)
-              const tot = sub - Number(formEdicao.desconto ?? 0) + Number(formEdicao.acrescimo ?? 0) + Number(formEdicao.frete ?? 0)
-              return (
-                <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                  <div style={{ fontSize:'var(--fs-md)', color:'var(--t-secondary)' }}>
-                    Subtotal {fmt.money(sub)}
-                    {Number(formEdicao.desconto) > 0 && ` − ${fmt.money(formEdicao.desconto)}`}
-                    {Number(formEdicao.acrescimo) > 0 && ` + ${fmt.money(formEdicao.acrescimo)}`}
-                    {Number(formEdicao.frete) > 0 && ` + frete ${fmt.money(formEdicao.frete)}`}
-                  </div>
-                  <div style={{ fontWeight:800, fontSize:'var(--fs-lg)', color:'var(--c-primary)' }}>
-                    {fmt.money(tot)}
+              {/* Alerta de recálculo */}
+              {formEdicao.periodo_id && String(formEdicao.periodo_id) !== String(contrato?.periodo_id) && (
+                <div style={{display:'flex',alignItems:'flex-start',gap:10,padding:'10px 14px',
+                  background:'#FEF3C7',border:'1px solid #F59E0B',borderRadius:'var(--r-md)'}}>
+                  <span style={{fontSize:18,flexShrink:0}}>⚡</span>
+                  <div>
+                    <div style={{fontWeight:700,fontSize:'var(--fs-base)',color:'#78350F'}}>Recálculo automático de preços</div>
+                    <div style={{fontSize:'var(--fs-sm)',color:'#92400E',marginTop:2}}>
+                      Ao salvar, os preços de todos os {itens.length} item(ns) serão recalculados com base na nova modalidade selecionada.
+                    </div>
                   </div>
                 </div>
-              )
-            })()}
+              )}
+
+              {/* Datas */}
+              <div className="form-grid-2">
+                <FormField label="Data de Início" required>
+                  <input type="date" value={formEdicao.data_inicio ?? ''}
+                    onChange={e => setFormEdicao((f:any) => ({ ...f, data_inicio: e.target.value }))}
+                    className={inputCls} />
+                </FormField>
+                <FormField label="Data de Fim" required>
+                  <input type="date" value={formEdicao.data_fim ?? ''}
+                    onChange={e => setFormEdicao((f:any) => ({ ...f, data_fim: e.target.value }))}
+                    className={inputCls} min={formEdicao.data_inicio} />
+                </FormField>
+              </div>
+
+              {/* Duração calculada */}
+              {formEdicao.data_inicio && formEdicao.data_fim && (() => {
+                const dias = Math.max(0, Math.ceil(
+                  (new Date(formEdicao.data_fim).getTime() - new Date(formEdicao.data_inicio).getTime()) / 86400000
+                ))
+                return (
+                  <div style={{display:'flex',alignItems:'center',gap:8,fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>
+                    <span style={{fontWeight:600,color:'var(--c-primary)',fontSize:'var(--fs-base)'}}>{dias}</span>
+                    {dias === 1 ? 'dia de locação' : 'dias de locação'}
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+
+          {/* ── SEÇÃO 2: Itens com preços atuais ── */}
+          {itens.length > 0 && (
+            <div className="panel-section">
+              <div className="panel-section-header">
+                📦 Equipamentos ({itens.length} {itens.length === 1 ? 'item' : 'itens'})
+                {formEdicao.periodo_id && String(formEdicao.periodo_id) !== String(contrato?.periodo_id) && (
+                  <span style={{marginLeft:'auto',fontSize:'var(--fs-xs)',fontWeight:700,
+                    background:'#F59E0B',color:'#fff',padding:'2px 8px',borderRadius:99}}>
+                    PREÇOS SERÃO ATUALIZADOS
+                  </span>
+                )}
+              </div>
+              <div style={{overflowX:'auto'}}>
+                <table className="ds-table" style={{fontSize:'var(--fs-sm)'}}>
+                  <thead>
+                    <tr>
+                      <th>Equipamento</th>
+                      <th style={{textAlign:'right'}}>Qtd</th>
+                      <th style={{textAlign:'right'}}>Preço Unit.</th>
+                      <th style={{textAlign:'right'}}>Total</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {itens.map((it:any) => (
+                      <tr key={it.id}>
+                        <td>
+                          <div style={{fontWeight:600,fontSize:'var(--fs-base)'}}>{it.produtos?.nome ?? it.nome}</div>
+                          {it.patrimonios?.numero_patrimonio && (
+                            <div className="tbl-cell-sub">Patrimônio: {it.patrimonios.numero_patrimonio}</div>
+                          )}
+                        </td>
+                        <td style={{textAlign:'right',fontFamily:'var(--font-mono)'}}>{it.quantidade}</td>
+                        <td style={{textAlign:'right',fontFamily:'var(--font-mono)',fontWeight:600}}>
+                          {fmt.money(it.preco_unitario)}
+                        </td>
+                        <td style={{textAlign:'right',fontFamily:'var(--font-mono)',fontWeight:700,color:'var(--c-primary)'}}>
+                          {fmt.money(Number(it.preco_unitario) * Number(it.quantidade))}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {/* ── SEÇÃO 3: Pagamento ── */}
+          <div className="panel-section">
+            <div className="panel-section-header">💳 Pagamento</div>
+            <div className="panel-section-body">
+              <div className="form-grid-2">
+                <FormField label="Forma de Pagamento">
+                  <select value={formEdicao.forma_pagamento ?? ''}
+                    onChange={e => setFormEdicao((f:any) => ({ ...f, forma_pagamento: e.target.value }))}
+                    className={selectCls}>
+                    {[
+                      ['pix','PIX'],['dinheiro','Dinheiro'],['cartao_credito','Cartão de Crédito'],
+                      ['cartao_debito','Cartão de Débito'],['boleto','Boleto'],['transferencia','Transferência'],
+                    ].map(([v,l]) => <option key={v} value={v}>{l}</option>)}
+                  </select>
+                </FormField>
+                <FormField label="Condição de Pagamento">
+                  <input value={formEdicao.condicao_pagamento ?? ''}
+                    onChange={e => setFormEdicao((f:any) => ({ ...f, condicao_pagamento: e.target.value }))}
+                    className={inputCls} placeholder="Ex: 0+2x, 30+60+90" />
+                </FormField>
+              </div>
+            </div>
+          </div>
+
+          {/* ── SEÇÃO 4: Ajustes de Valor ── */}
+          <div className="panel-section">
+            <div className="panel-section-header">💰 Ajustes de Valor</div>
+            <div className="panel-section-body">
+              <div className="form-grid-3">
+                <FormField label="Desconto (R$)">
+                  <input type="number" step="0.01" min="0"
+                    value={formEdicao.desconto ?? 0}
+                    onChange={e => setFormEdicao((f:any) => ({ ...f, desconto: e.target.value }))}
+                    className={inputCls} />
+                </FormField>
+                <FormField label="Acréscimo (R$)">
+                  <input type="number" step="0.01" min="0"
+                    value={formEdicao.acrescimo ?? 0}
+                    onChange={e => setFormEdicao((f:any) => ({ ...f, acrescimo: e.target.value }))}
+                    className={inputCls} />
+                </FormField>
+                <FormField label="Frete (R$)">
+                  <input type="number" step="0.01" min="0"
+                    value={formEdicao.frete ?? 0}
+                    onChange={e => setFormEdicao((f:any) => ({ ...f, frete: e.target.value }))}
+                    className={inputCls} />
+                </FormField>
+              </div>
+              <div className="form-grid-2">
+                <FormField label="Caução (R$)">
+                  <input type="number" step="0.01" min="0"
+                    value={formEdicao.caucao ?? 0}
+                    onChange={e => setFormEdicao((f:any) => ({ ...f, caucao: e.target.value }))}
+                    className={inputCls} />
+                </FormField>
+                <FormField label="Comissão (%)">
+                  <input type="number" step="0.01" min="0" max="100"
+                    value={formEdicao.comissao_percentual ?? 0}
+                    onChange={e => setFormEdicao((f:any) => ({ ...f, comissao_percentual: e.target.value }))}
+                    className={inputCls} />
+                </FormField>
+              </div>
+
+              {/* Preview do total */}
+              {(() => {
+                const sub = itens.reduce((s:number, i:any) => s + Number(i.preco_unitario ?? 0) * Number(i.quantidade ?? 1), 0)
+                const tot = sub - Number(formEdicao.desconto ?? 0) + Number(formEdicao.acrescimo ?? 0) + Number(formEdicao.frete ?? 0)
+                return (
+                  <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',
+                    padding:'12px 14px',background:'var(--bg-header)',borderRadius:'var(--r-md)',
+                    border:'1px solid var(--border)',marginTop:4}}>
+                    <div style={{fontSize:'var(--fs-md)',color:'var(--t-secondary)'}}>
+                      Subtotal {fmt.money(sub)}
+                      {Number(formEdicao.desconto) > 0 && <span style={{color:'var(--c-success)',marginLeft:8}}>− {fmt.money(Number(formEdicao.desconto))}</span>}
+                      {Number(formEdicao.acrescimo) > 0 && <span style={{color:'var(--c-danger)',marginLeft:8}}>+ {fmt.money(Number(formEdicao.acrescimo))}</span>}
+                      {Number(formEdicao.frete) > 0 && <span style={{marginLeft:8}}>+ frete {fmt.money(Number(formEdicao.frete))}</span>}
+                    </div>
+                    <div style={{fontWeight:700,fontSize:'var(--fs-lg)',color:'var(--c-primary)',fontFamily:'var(--font-mono)'}}>
+                      {fmt.money(tot)}
+                    </div>
+                  </div>
+                )
+              })()}
+            </div>
+          </div>
+
+          {/* ── SEÇÃO 5: Observações ── */}
+          <div className="panel-section">
+            <div className="panel-section-header">📝 Observações</div>
+            <div className="panel-section-body">
+              <FormField label="Observações (visível no documento)">
+                <textarea value={formEdicao.observacoes ?? ''}
+                  onChange={e => setFormEdicao((f:any) => ({ ...f, observacoes: e.target.value }))}
+                  className={textareaCls} rows={2} />
+              </FormField>
+              <FormField label="Observações Internas (apenas para a equipe)">
+                <textarea value={formEdicao.observacoes_internas ?? ''}
+                  onChange={e => setFormEdicao((f:any) => ({ ...f, observacoes_internas: e.target.value }))}
+                  className={textareaCls} rows={2} />
+              </FormField>
+            </div>
           </div>
 
         </div>
