@@ -282,7 +282,7 @@ export default function EquipamentosPage() {
 
   async function load() {
     setLoading(true)
-    let q = supabase.from('produtos').select('*, categorias(nome), contrato_itens(quantidade, contratos(status)), patrimonios(numero_patrimonio,numero_serie,status)').eq('ativo',1).order('nome')
+    let q = supabase.from('produtos').select('*, categorias(nome), contrato_itens(quantidade, contratos(status)), patrimonios(numero_patrimonio,numero_serie,status,deleted_at)').eq('ativo',1).order('nome')
     if (filters.busca)       q = q.ilike('nome',   `%${filters.busca}%`)
     if (filters.categoria_id) q = q.eq('categoria_id', filters.categoria_id)
     if (filters.codigo)       q = q.ilike('codigo', `%${filters.codigo}%`)
@@ -316,7 +316,7 @@ export default function EquipamentosPage() {
     if (filters.patrimonio) {
       const term = filters.patrimonio.toLowerCase()
       enriched = enriched.filter((p:any) =>
-        (p.patrimonios ?? []).some((pat:any) =>
+        (p.patrimonios ?? []).filter((pat:any) => !pat.deleted_at).some((pat:any) =>
           (pat.numero_patrimonio ?? '').toLowerCase().includes(term) ||
           (pat.numero_serie ?? '').toLowerCase().includes(term)
         )
@@ -538,8 +538,9 @@ export default function EquipamentosPage() {
           )},
           { key:'disponivel', label:'Disponível', render: r => {
             if (r.controla_patrimonio) {
-              const total = (r.patrimonios ?? []).length
-              const disp  = (r.patrimonios ?? []).filter((p:any) => p.status === 'disponivel').length
+              const pats  = (r.patrimonios ?? []).filter((p:any) => !p.deleted_at)
+              const total = pats.length
+              const disp  = pats.filter((p:any) => p.status === 'disponivel').length
               return (
                 <span style={{ fontWeight:600, color: disp > 0 ? 'var(--c-primary)' : 'var(--t-muted)' }}>
                   {disp} / {total} un
@@ -556,7 +557,7 @@ export default function EquipamentosPage() {
           }},
           { key:'locado', label:'Locado', render: r => {
             if (r.controla_patrimonio) {
-              const qtd = (r.patrimonios ?? []).filter((p:any) => p.status === 'locado').length
+              const qtd = (r.patrimonios ?? []).filter((p:any) => !p.deleted_at && p.status === 'locado').length
               return <span style={{ fontWeight:600, color: qtd > 0 ? 'var(--c-warning,#f59e0b)' : 'var(--t-muted)' }}>{qtd} un</span>
             }
             const qtd = r.qtd_locada ?? 0
