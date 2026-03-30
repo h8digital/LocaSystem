@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { calcularPrecoItem, calcularDias, type PrecosProduto } from '@/lib/calcularCobranca'
 import { supabase, fmt } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import { Badge, Btn, Tabs, SlidePanel, FormField, inputCls, selectCls, textareaCls, LookupField, ActionButtons } from '@/components/ui'
@@ -162,20 +163,20 @@ export default function VerContratoPage() {
       const prodMap: Record<number,any> = {}
       prods?.forEach((p:any) => { prodMap[p.id] = p })
 
+      const periodoObj = periodos.find((p:any) => String(p.id) === String(formEdicao.periodo_id))
+      const diasCalc   = calcularDias(formEdicao.data_inicio, formEdicao.data_fim)
+
       itensAtualizados = itens.map((it:any) => {
         const p = prodMap[it.produto_id]
         if (!p) return it
-        let preco = 0
-        const d = periodoDias
-        if      (isFDS && p.preco_fds > 0)                    preco = Number(p.preco_fds)
-        else if (d >= 180 && p.preco_semestral > 0)           preco = Number(p.preco_semestral)
-        else if (d >= 90  && p.preco_trimestral > 0)          preco = Number(p.preco_trimestral)
-        else if (d >= 30  && p.preco_locacao_mensal > 0)      preco = Number(p.preco_locacao_mensal)
-        else if (d >= 15  && p.preco_quinzenal > 0)           preco = Number(p.preco_quinzenal)
-        else if (d >= 7   && p.preco_locacao_semanal > 0)     preco = Number(p.preco_locacao_semanal)
-        else                                                   preco = Number(p.preco_locacao_diario ?? 0)
-        const novoTotal = preco * Number(it.quantidade ?? 1)
-        return { ...it, preco_unitario: preco, total: novoTotal }
+        const res = calcularPrecoItem(
+          p as PrecosProduto,
+          diasCalc,
+          periodoObj?.nome ?? '',
+          periodoObj?.dias ?? diasCalc
+        )
+        const qtd = Number(it.quantidade ?? 1)
+        return { ...it, preco_unitario: res.totalItem, total: res.totalItem * qtd }
       })
 
       // Salvar novos preços nos itens
@@ -1500,13 +1501,24 @@ Atenciosamente,`,
                   <thead>
                     <tr>
                       <th>Equipamento</th>
-                      <th style={{textAlign:'right'}}>Qtd</th>
-                      <th style={{textAlign:'right'}}>Preço Unit.</th>
+                      <th style={{textAlign:'center'}}>Qtd</th>
+                      <th>Composição da Cobrança</th>
                       <th style={{textAlign:'right'}}>Total</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {itens.map((it:any) => (
+                    {itens.map((it:any) => {
+                      const periodo = periodos.find((p:any) => String(p.id) === String(formEdicao.periodo_id ?? contrato?.periodo_id))
+                      const diasLoc = calcularDias(
+                        formEdicao.data_inicio ?? contrato?.data_inicio ?? '',
+                        formEdicao.data_fim    ?? contrato?.data_fim    ?? ''
+                      )
+                      const qtd = Number(it.quantidade ?? 1)
+                      const res = (periodo && it.produtos)
+                        ? calcularPrecoItem(it.produtos as PrecosProduto, diasLoc, periodo.nome ?? '', periodo.dias ?? diasLoc)
+                        : null
+                      const totalLinha = res ? res.totalItem * qtd : Number(it.preco_unitario ?? 0) * qtd
+                      return (
                       <tr key={it.id}>
                         <td>
                           <div style={{fontWeight:600,fontSize:'var(--fs-base)'}}>{it.produtos?.nome ?? it.nome}</div>
@@ -1514,15 +1526,29 @@ Atenciosamente,`,
                             <div className="tbl-cell-sub">Patrimônio: {it.patrimonios.numero_patrimonio}</div>
                           )}
                         </td>
-                        <td style={{textAlign:'right',fontFamily:'var(--font-mono)'}}>{it.quantidade}</td>
-                        <td style={{textAlign:'right',fontFamily:'var(--font-mono)',fontWeight:600}}>
-                          {fmt.money(it.preco_unitario)}
+                        <td style={{textAlign:'center',fontFamily:'var(--font-mono)'}}>{qtd}</td>
+                        <td>
+                          {res ? (
+                            <div>
+                              <div style={{fontSize:'var(--fs-sm)',fontWeight:600,color:'var(--t-secondary)'}}>
+                                {res.descricao}
+                              </div>
+                              {res.periodos > 0 && res.diasRestantes > 0 && (
+                                <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginTop:1}}>
+                                  {fmt.money(res.valorPeriodos)} + {fmt.money(res.valorDiarias)}
+                                </div>
+                              )}
+                            </div>
+                          ) : (
+                            <span style={{color:'var(--t-muted)'}}>—</span>
+                          )}
                         </td>
                         <td style={{textAlign:'right',fontFamily:'var(--font-mono)',fontWeight:700,color:'var(--c-primary)'}}>
-                          {fmt.money(Number(it.preco_unitario) * Number(it.quantidade))}
+                          {fmt.money(totalLinha)}
                         </td>
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                 </table>
               </div>

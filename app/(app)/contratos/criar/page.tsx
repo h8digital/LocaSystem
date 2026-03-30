@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState } from 'react'
+import { calcularPrecoItem, calcularDias, type PrecosProduto } from '@/lib/calcularCobranca'
 import { supabase, fmt } from '@/lib/supabase'
 import { useRouter } from 'next/navigation'
 import { FormField, inputCls, selectCls, textareaCls, Btn, LookupField } from '@/components/ui'
@@ -103,23 +104,15 @@ export default function CriarContratoPage() {
 
   useEffect(()=>{ supabase.from('periodos_locacao').select('*').eq('ativo',1).order('dias').then(({data})=>setPeriodos(data??[])) },[])
 
-  // Recalcular preços dos itens já adicionados quando período muda
-  useEffect(()=>{
-    if(itens.length===0||periodos.length===0) return
-    setItens(prev=>prev.map(it=>{
-      if(!it._produto) return it
-      const p=periodos.find((x:any)=>String(x.id)===String(form.periodo_id))
-      const d=p?.dias??dias??1
-      let preco=0
-      if(d>=180&&it._produto.preco_semestral>0)       preco=Number(it._produto.preco_semestral)
-      else if(d>=90&&it._produto.preco_trimestral>0)   preco=Number(it._produto.preco_trimestral)
-      else if(d>=30&&it._produto.preco_locacao_mensal>0)preco=Number(it._produto.preco_locacao_mensal)
-      else if(d>=15&&it._produto.preco_quinzenal>0)    preco=Number(it._produto.preco_quinzenal)
-      else if((()=>{const nm=(periodos.find((x:any)=>String(x.id)===String(form.periodo_id))?.nome??'').toLowerCase();return nm.includes('final')||nm.includes('fds')})()&&it._produto.preco_fds>0)preco=Number(it._produto.preco_fds)
-      else if(d>=7&&it._produto.preco_locacao_semanal>0)preco=Number(it._produto.preco_locacao_semanal)
-      else preco=Number(it._produto.preco_locacao_diario??0)
-      if(preco===0) return it
-      return {...it,preco_unitario:preco,total:preco*dias*(it._produto.controla_patrimonio?1:it.quantidade)}
+  // Recalcular preços dos itens quando período ou datas mudam
+  useEffect(() => {
+    if (itens.length === 0 || periodos.length === 0) return
+    setItens(prev => prev.map(it => {
+      if (!it._produto) return it
+      const p = periodos.find((x:any) => String(x.id) === String(form.periodo_id))
+      const res = calcularPrecoItem(it._produto as PrecosProduto, dias, p?.nome ?? '', p?.dias ?? dias ?? 1)
+      const qtd = it._produto.controla_patrimonio ? 1 : it.quantidade
+      return { ...it, preco_unitario: res.totalItem, total: res.totalItem * qtd, _descricaoCobranca: res.descricao }
     }))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[form.periodo_id,dias])
@@ -150,22 +143,21 @@ export default function CriarContratoPage() {
     setEnderecoUsoLabel(partes.join(', '))
   }
 
-  function getPrecoParaPeriodo(prod:any) {
-    if(!prod) return 0
-    const p=periodos.find((p:any)=>String(p.id)===String(form.periodo_id))
-    const d=p?.dias??dias??1
-    const nomePeriodo=(p?.nome??'').toLowerCase()
-    // FDS (Final de Semana) usa campo próprio preco_fds — NÃO herda do semanal
-    const isFDS = nomePeriodo.includes('final') || nomePeriodo.includes('fds') || nomePeriodo.includes('weekend')
-    if(isFDS && prod.preco_fds>0)             return Number(prod.preco_fds)
-    if(d>=180 && prod.preco_semestral>0)      return Number(prod.preco_semestral)
-    if(d>=90  && prod.preco_trimestral>0)     return Number(prod.preco_trimestral)
-    if(d>=30  && prod.preco_locacao_mensal>0) return Number(prod.preco_locacao_mensal)
-    if(d>=15  && prod.preco_quinzenal>0)      return Number(prod.preco_quinzenal)
-    if(d>=7   && prod.preco_locacao_semanal>0)return Number(prod.preco_locacao_semanal)
-    return Number(prod.preco_locacao_diario??0)
+  function getPrecoParaPeriodo(prod:any): number {
+    if (!prod) return 0
+    const p = periodos.find((x:any) => String(x.id) === String(form.periodo_id))
+    const res = calcularPrecoItem(prod as PrecosProduto, dias, p?.nome ?? '', p?.dias ?? dias ?? 1)
+    return res.totalItem
   }
 
+  function getDescricaoCobranca(prod:any): string {
+    if (!prod) return ''
+    const p = periodos.find((x:any) => String(x.id) === String(form.periodo_id))
+    const res = calcularPrecoItem(prod as PrecosProduto, dias, p?.nome ?? '', p?.dias ?? dias ?? 1)
+    return res.descricao
+  }
+
+  
   async function loadPatrimonios(produtoId:number) {
     setLoadingPats(true)
     const {data}=await supabase.from('patrimonios').select('id,numero_patrimonio,numero_serie,status').eq('produto_id',produtoId).eq('status','disponivel').order('numero_patrimonio')
@@ -187,10 +179,11 @@ export default function CriarContratoPage() {
       produto_id:itemProdutoId, produto_nome:itemProduto.nome,
       patrimonio_id:itemPatrimonioId, patrimonio_num:itemPatrimonioNome||null,
       quantidade:itemQtd, preco_unitario:itemPreco,
+      _descricaoCobranca: getDescricaoCobranca(itemProduto),
       preco_diario: Number(itemProduto.preco_locacao_diario??0),
       custo_reposicao: Number(itemProduto.custo_reposicao??0),
       prazo_entrega_dias: Number(itemProduto.prazo_entrega_dias??0),
-      total:itemPreco*dias*(itemProduto.controla_patrimonio?1:itemQtd),
+      total:itemPreco*(itemProduto.controla_patrimonio?1:itemQtd),
       _produto: itemProduto,
     }])
     setItemProdutoId(null); setItemProdutoNome(''); setItemProduto(null)
@@ -518,8 +511,10 @@ export default function CriarContratoPage() {
                       <td style={{ padding:'10px 12px', color:'var(--t-muted)', fontFamily:'monospace', fontSize:'var(--fs-md)', borderBottom:'1px solid var(--border)' }}>{item.patrimonio_num??'—'}</td>
                       <td style={{ padding:'10px 12px', textAlign:'right', borderBottom:'1px solid var(--border)' }}>{item.quantidade}</td>
                       <td style={{ padding:'10px 12px', textAlign:'right', borderBottom:'1px solid var(--border)' }}>
-                        <div>{fmt.money(item.preco_unitario)}</div>
-                        {item.preco_diario>0&&item.preco_diario!==item.preco_unitario&&<div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>Diária: {fmt.money(item.preco_diario)}</div>}
+                        <div style={{fontWeight:700,fontFamily:'var(--font-mono)'}}>{fmt.money(item.total)}</div>
+                        <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginTop:1}}>
+                          {item._descricaoCobranca ?? getDescricaoCobranca(item._produto)}
+                        </div>
                       </td>
                       <td style={{ padding:'10px 12px', textAlign:'right', borderBottom:'1px solid var(--border)', fontSize:'var(--fs-md)', color:'var(--t-muted)' }}>
                         {item.prazo_entrega_dias>0?`${item.prazo_entrega_dias}d`:'—'}
