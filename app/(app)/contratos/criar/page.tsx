@@ -446,7 +446,10 @@ export default function CriarContratoPage() {
                         </select>
                   }
                 </FormField>
-                <FormField label={`Preço/Dia (R$) — ${dias}d`}>
+                <FormField
+                  label={getDescricaoCobranca(itemProduto) ? `Preço do período (R$)` : `Preço/Dia (R$)`}
+                  hint={getDescricaoCobranca(itemProduto) || undefined}
+                >
                   <div style={{ position:'relative' }}>
                     <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
                     <input type="number" step="0.01" min="0" value={itemPreco}
@@ -458,7 +461,7 @@ export default function CriarContratoPage() {
             )}
             {itemProduto && !itemProduto.controla_patrimonio && (
               <div style={{ marginTop:12 }}>
-                <FormField label={`Preço/Dia (R$) — ${dias}d`} style={{ maxWidth:200 }}>
+                <FormField label={getDescricaoCobranca(itemProduto) ? `Preço do período (R$)` : `Preço/Dia (R$)`} hint={getDescricaoCobranca(itemProduto) || undefined} style={{ maxWidth:200 }}>
                   <div style={{ position:'relative' }}>
                     <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
                     <input type="number" step="0.01" min="0" value={itemPreco}
@@ -474,10 +477,11 @@ export default function CriarContratoPage() {
               <div style={{ marginTop:12, background:'var(--c-primary-light)', border:'1px solid var(--c-primary)', borderRadius:'var(--r-sm)',
                 padding:'8px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'var(--fs-md)' }}>
                 <span style={{ color:'var(--c-primary-text)' }}>
-                  {dias}d × {fmt.money(itemPreco)}/dia × {itemProduto.controla_patrimonio?'1 un':`${itemQtd} un`}
+                  {getDescricaoCobranca(itemProduto) || `${dias}d`}
+                  {' × '}{itemProduto.controla_patrimonio ? '1 un' : `${itemQtd} un`}
                 </span>
                 <span style={{ fontWeight:800, color:'var(--c-primary)' }}>
-                  {fmt.money(itemPreco*dias*(itemProduto.controla_patrimonio?1:itemQtd))}
+                  {fmt.money(itemPreco*(itemProduto.controla_patrimonio?1:itemQtd))}
                 </span>
               </div>
             )}
