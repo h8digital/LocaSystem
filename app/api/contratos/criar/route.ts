@@ -15,23 +15,16 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { itens, subtotal, total, comissao_valor, ...contrato } = body
 
-    // Gerar número do contrato — busca o último número do ano atual (race-condition safe)
+    // ── Gerar número do contrato via sequence do banco (atômico, sem race condition)
     const { data: param } = await sb.from('parametros').select('valor').eq('chave','prefixo_contrato').single()
     const prefixo = param?.valor ?? 'LOC'
-    const ano = new Date().getFullYear()
-    const prefAno = `${prefixo}${ano}`
-    const { data: ultimos } = await sb
-      .from('contratos')
-      .select('numero')
-      .ilike('numero', `${prefAno}%`)
-      .order('numero', { ascending: false })
-      .limit(1)
-    const proximoSeq = ultimos?.length
-      ? parseInt(ultimos[0].numero.replace(prefAno, '')) + 1
-      : 1
-    const numero = `${prefAno}${String(proximoSeq).padStart(6, '0')}`
 
-    // Criar contrato
+    const { data: numData, error: numError } = await sb
+      .rpc('gerar_numero_contrato', { prefixo })
+    if (numError) return NextResponse.json({ ok:false, error:'Erro ao gerar número: ' + numError.message })
+    const numero = numData as string
+
+    // ── Criar contrato
     const { data: c, error } = await sb.from('contratos').insert({
       numero,
       cliente_id:           contrato.cliente_id,
@@ -52,7 +45,6 @@ export async function POST(req: NextRequest) {
       comissao_percentual:  Number(contrato.comissao_percentual) || 0,
       comissao_valor:       Number(comissao_valor) || 0,
       observacoes:          contrato.observacoes || null,
-      // Local de uso
       local_uso_cep:        contrato.local_uso_cep        || null,
       local_uso_endereco:   contrato.local_uso_endereco   || null,
       local_uso_numero:     contrato.local_uso_numero     || null,
@@ -66,40 +58,33 @@ export async function POST(req: NextRequest) {
 
     if (error) return NextResponse.json({ ok:false, error:error.message })
 
-    // Criar itens
+    // ── Criar itens
     for (const item of itens) {
       await sb.from('contrato_itens').insert({
-        contrato_id:    c.id,
-        produto_id:     item.produto_id,
-        patrimonio_id:  item.patrimonio_id || null,
-        quantidade:     item.quantidade || 1,
-        preco_unitario: Number(item.preco_unitario) || 0,
-        total_item:     Number(item.total) || 0,
+        contrato_id:       c.id,
+        produto_id:        item.produto_id,
+        patrimonio_id:     item.patrimonio_id || null,
+        quantidade:        item.quantidade || 1,
+        preco_unitario:    Number(item.preco_unitario) || 0,
+        total_item:        Number(item.total) || 0,
         preco_diario:      Number(item.preco_diario)      || 0,
         custo_reposicao:   Number(item.custo_reposicao)   || 0,
         prazo_entrega_dias: Number(item.prazo_entrega_dias) || 0,
       })
-      // Marcar patrimônio como locado
       if (item.patrimonio_id) {
         await sb.from('patrimonios').update({ status:'locado' }).eq('id', item.patrimonio_id)
       }
     }
 
-    // Gerar número da fatura — busca o último número do ano atual
+    // ── Gerar número da fatura via sequence do banco (atômico)
     const { data: paramFat } = await sb.from('parametros').select('valor').eq('chave','prefixo_fatura').single()
     const prefFat = paramFat?.valor ?? 'FAT'
-    const anoFat = new Date().getFullYear()
-    const prefAnoFat = `${prefFat}${anoFat}`
-    const { data: ultimasFat } = await sb
-      .from('faturas')
-      .select('numero')
-      .ilike('numero', `${prefAnoFat}%`)
-      .order('numero', { ascending: false })
-      .limit(1)
-    const proximoFat = ultimasFat?.length
-      ? parseInt(ultimasFat[0].numero.replace(prefAnoFat, '')) + 1
-      : 1
-    const numFatura = `${prefAnoFat}${String(proximoFat).padStart(6, '0')}`
+
+    const { data: numFatData, error: numFatError } = await sb
+      .rpc('gerar_numero_fatura', { prefixo: prefFat })
+    if (numFatError) return NextResponse.json({ ok:false, error:'Erro ao gerar número da fatura: ' + numFatError.message })
+    const numFatura = numFatData as string
+
     const dataVenc = contrato.data_venc_fatura || contrato.data_fim
     const hoje = new Date().toISOString().split('T')[0]
     await sb.from('faturas').insert({
