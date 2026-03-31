@@ -490,14 +490,25 @@ export default function FinanceiroPage() {
             <div style={{position:'relative',display:'inline-block'}} className="fat-menu-wrap">
               <button
                 title="Mais ações"
-                onClick={e=>{const m=e.currentTarget.nextElementSibling as HTMLElement;m.style.display=m.style.display==='block'?'none':'block';e.stopPropagation()}}
+                onClick={e=>{
+                  e.stopPropagation()
+                  const m=e.currentTarget.nextElementSibling as HTMLElement
+                  if(m.style.display==='block'){m.style.display='none';return}
+                  const r=e.currentTarget.getBoundingClientRect()
+                  m.style.top=(r.bottom+4)+'px'
+                  m.style.right=(window.innerWidth-r.right)+'px'
+                  m.style.display='block'
+                  // fechar ao clicar fora
+                  const close=()=>{m.style.display='none';document.removeEventListener('click',close)}
+                  setTimeout(()=>document.addEventListener('click',close),0)
+                }}
                 style={{background:'var(--bg-header)',border:'1px solid var(--border)',borderRadius:'var(--r-sm)',
                   padding:'4px 8px',cursor:'pointer',fontWeight:700,fontSize:13,color:'var(--t-secondary)',lineHeight:1}}>
                 ⋮
               </button>
-              <div style={{display:'none',position:'absolute',right:0,top:'100%',zIndex:200,
+              <div style={{display:'none',position:'fixed',right:0,top:0,zIndex:9999,
                 background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:'var(--r-md)',
-                boxShadow:'var(--shadow-md)',minWidth:170,padding:'4px 0'}}
+                boxShadow:'var(--shadow-lg)',minWidth:180,padding:'4px 0'}}
                 onClick={e=>e.stopPropagation()}>
                 {[
                   {l:'✏️ Editar',          fn:()=>{ abrirEdicao(row); (document.querySelectorAll('.fat-menu-wrap div')[0] as any).style.display='none' }},
