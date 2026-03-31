@@ -15,11 +15,21 @@ export async function POST(req: NextRequest) {
     const body = await req.json()
     const { itens, subtotal, total, comissao_valor, ...contrato } = body
 
-    // Gerar número do contrato
+    // Gerar número do contrato — busca o último número do ano atual (race-condition safe)
     const { data: param } = await sb.from('parametros').select('valor').eq('chave','prefixo_contrato').single()
     const prefixo = param?.valor ?? 'LOC'
-    const { count } = await sb.from('contratos').select('*', { count:'exact', head:true })
-    const numero = `${prefixo}${new Date().getFullYear()}${String((count??0)+1).padStart(6,'0')}`
+    const ano = new Date().getFullYear()
+    const prefAno = `${prefixo}${ano}`
+    const { data: ultimos } = await sb
+      .from('contratos')
+      .select('numero')
+      .ilike('numero', `${prefAno}%`)
+      .order('numero', { ascending: false })
+      .limit(1)
+    const proximoSeq = ultimos?.length
+      ? parseInt(ultimos[0].numero.replace(prefAno, '')) + 1
+      : 1
+    const numero = `${prefAno}${String(proximoSeq).padStart(6, '0')}`
 
     // Criar contrato
     const { data: c, error } = await sb.from('contratos').insert({
@@ -75,12 +85,22 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // Criar fatura automaticamente ao ativar contrato
-    const dataVenc = contrato.data_venc_fatura || contrato.data_fim
+    // Gerar número da fatura — busca o último número do ano atual
     const { data: paramFat } = await sb.from('parametros').select('valor').eq('chave','prefixo_fatura').single()
     const prefFat = paramFat?.valor ?? 'FAT'
-    const { count: countFat } = await sb.from('faturas').select('*', { count:'exact', head:true })
-    const numFatura = `${prefFat}${new Date().getFullYear()}${String((countFat??0)+1).padStart(6,'0')}`
+    const anoFat = new Date().getFullYear()
+    const prefAnoFat = `${prefFat}${anoFat}`
+    const { data: ultimasFat } = await sb
+      .from('faturas')
+      .select('numero')
+      .ilike('numero', `${prefAnoFat}%`)
+      .order('numero', { ascending: false })
+      .limit(1)
+    const proximoFat = ultimasFat?.length
+      ? parseInt(ultimasFat[0].numero.replace(prefAnoFat, '')) + 1
+      : 1
+    const numFatura = `${prefAnoFat}${String(proximoFat).padStart(6, '0')}`
+    const dataVenc = contrato.data_venc_fatura || contrato.data_fim
     const hoje = new Date().toISOString().split('T')[0]
     await sb.from('faturas').insert({
       contrato_id:     c.id,

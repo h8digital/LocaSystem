@@ -127,9 +127,12 @@ export default function EquipamentosPage() {
   const [conflitos,     setConflitos]     = useState<Record<number,string>>({})
 
   async function abrirMovimentacao(prod: any) {
+    // Limpar TODO o estado da movimentação anterior antes de abrir
     setMovProduto(prod)
     setMovTab('historico')
     setFormMov(emptyMov())
+    setLinhasEntrada([emptyPatLine()])
+    setConflitos({})
     setMovErro('')
     setModalMov(true)
     setMovLoading(true)
@@ -343,9 +346,26 @@ export default function EquipamentosPage() {
     setViewRow(row)
     setAbaView(aba)
     setPanelView(true)
-    // Carregar dados de estoque em paralelo
     setViewLoadingEx(true)
     setViewContratos([]); setViewOS([]); setViewMovs([]); setViewPats([])
+    // Buscar dados frescos do produto (estoque, locado, disponível)
+    const { data: prodFresh } = await supabase
+      .from('produtos')
+      .select('*, contrato_itens(quantidade, contratos(status)), patrimonios(id,status,deleted_at)')
+      .eq('id', row.id)
+      .single()
+    if (prodFresh) {
+      const patsAtivos = (prodFresh.patrimonios ?? []).filter((p:any) => !p.deleted_at)
+      const qtdLocada = prodFresh.controla_patrimonio
+        ? patsAtivos.filter((p:any) => p.status === 'locado').length
+        : (prodFresh.contrato_itens ?? [])
+            .filter((ci:any) => ci.contratos?.status === 'ativo')
+            .reduce((s:number, ci:any) => s + Number(ci.quantidade), 0)
+      const estDisp = prodFresh.controla_patrimonio
+        ? patsAtivos.filter((p:any) => p.status === 'disponivel').length
+        : Math.max(0, (prodFresh.estoque_total ?? 0) - qtdLocada)
+      setViewRow({ ...prodFresh, qtd_locada: qtdLocada, estoque_disponivel: estDisp })
+    }
     const [contratosRes, osRes, movsRes, patsRes] = await Promise.all([
       supabase.from('contrato_itens')
         .select('quantidade, preco_unitario, contratos(numero, status, data_inicio, data_fim, clientes(nome))')
@@ -1117,7 +1137,13 @@ export default function EquipamentosPage() {
                 <div style={{fontWeight:700,fontSize:'var(--fs-lg)'}}>Movimentação de Ativos</div>
                 <div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)'}}>{movProduto?.nome}</div>
               </div>
-              <button onClick={()=>setModalMov(false)}
+              <button onClick={()=>{
+                  setModalMov(false)
+                  setFormMov(emptyMov())
+                  setLinhasEntrada([emptyPatLine()])
+                  setConflitos({})
+                  setMovErro('')
+                }}
                 style={{background:'none',border:'none',cursor:'pointer',fontSize:20,color:'var(--t-muted)',padding:'4px 8px'}}>✕</button>
             </div>
 
