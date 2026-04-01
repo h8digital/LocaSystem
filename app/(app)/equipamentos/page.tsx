@@ -1017,275 +1017,335 @@ export default function EquipamentosPage() {
       {/* ══ PAINEL: Editar / Novo Produto ════════════════════════════════ */}
       <SlidePanel
         open={panel}
-        onClose={() => setPanel(false)}
-        title={editId ? 'Editar Produto' : 'Novo Produto'}
-        subtitle={editId ? form.nome : 'Preencha os dados do produto'}
-        width="lg"
+        onClose={() => { setPanel(false); setAbaForm('dados') }}
+        title=""
+        width="xl"
         footer={
-          <div className="panel-footer-2btn">
-            <Btn variant="secondary" style={{ flex:1 }} onClick={() => setPanel(false)}>Cancelar</Btn>
-            <Btn style={{ flex:2 }} loading={saving} onClick={salvar}>
-              {editId ? 'Atualizar Produto' : 'Salvar Produto'}
+          <div style={{display:'flex',gap:12,width:'100%'}}>
+            <Btn variant="secondary" style={{flex:1}} onClick={() => { setPanel(false); setAbaForm('dados') }}>
+              Descartar
+            </Btn>
+            <Btn style={{flex:2,fontWeight:700}} loading={saving} onClick={salvar}>
+              {editId ? 'Salvar Alterações' : 'Criar Produto'}
             </Btn>
           </div>
         }
       >
-        {erro && <div className="ds-alert-error" style={{ marginBottom:14 }}>{erro}</div>}
-
-        <div style={{display:"flex",flexDirection:"column",gap:16}}>
-
-          {/* ── Tabs: Dados / Fotos (só aparece em modo edição) ── */}
-          {form.id && (
-            <div style={{display:'flex',borderBottom:'1px solid var(--border)',marginBottom:4,gap:0,marginTop:-8}}>
-              {([['dados','📋 Dados'],['fotos',`🖼️ Fotos${fotos.length>0?' ('+fotos.length+')':''}`]] as const).map(([k,l])=>(
-                <button key={k} onClick={()=>setAbaForm(k)}
-                  style={{padding:'8px 18px',border:'none',background:'none',cursor:'pointer',
-                    fontWeight:abaForm===k?700:400,fontSize:'var(--fs-md)',
-                    color:abaForm===k?'var(--c-primary)':'var(--t-muted)',
-                    borderBottom:abaForm===k?'2px solid var(--c-primary)':'2px solid transparent',
-                    marginBottom:-1}}>
-                  {l}
-                </button>
-              ))}
+        {/* ── HERO ───────────────────────────────────────────────────── */}
+        <div style={{display:'flex',alignItems:'flex-start',gap:20,paddingBottom:20,borderBottom:'1px solid var(--border)',marginBottom:4}}>
+          <div style={{flex:1}}>
+            <div style={{fontSize:'var(--fs-xs)',fontWeight:700,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.08em',marginBottom:10}}>
+              {editId ? 'Editar Produto' : 'Novo Produto'}
+              {form.codigo ? ` · ${form.codigo}` : ''}
             </div>
-          )}
-
-          {/* ══ ABA FOTOS ═══════════════════════════════════════════════════ */}
-          {abaForm==='fotos' && form.id && (
-            <div style={{display:"flex",flexDirection:"column",gap:16}}>
-              {erroFoto && (
-                <div style={{background:'var(--c-danger-light)',border:'1px solid var(--c-danger)',
-                  borderRadius:'var(--r-md)',padding:'10px 14px',color:'var(--c-danger-text)',fontSize:'var(--fs-md)'}}>
-                  {erroFoto}
-                </div>
+            <input
+              {...F('nome')}
+              placeholder="Nome do produto..."
+              autoFocus={!editId}
+              style={{
+                fontSize:22,fontWeight:700,width:'100%',padding:'0 0 8px 0',
+                border:'none',borderBottom:'2px solid var(--border)',
+                background:'transparent',outline:'none',color:'var(--t-primary)',
+                transition:'border-color .15s',lineHeight:1.2,
+              }}
+              onFocus={e=>(e.currentTarget.style.borderBottomColor='var(--c-primary)')}
+              onBlur={e=>(e.currentTarget.style.borderBottomColor='var(--border)')}
+            />
+            <div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)',marginTop:10,minHeight:18}}>
+              {[form.marca,form.modelo].filter(Boolean).join(' · ') || <span style={{fontStyle:'italic',opacity:.5}}>Marca e modelo — preencha abaixo</span>}
+            </div>
+          </div>
+          {/* Thumbnail da foto principal */}
+          {form.id && (
+            <button
+              onClick={()=>setAbaForm('fotos')}
+              title="Gerenciar fotos"
+              style={{
+                width:90,height:90,flexShrink:0,borderRadius:'var(--r-md)',overflow:'hidden',
+                border:'2px dashed var(--border)',background:'var(--bg-header)',
+                cursor:'pointer',display:'flex',flexDirection:'column',
+                alignItems:'center',justifyContent:'center',gap:3,
+                padding:0,position:'relative',transition:'border-color .15s',
+              }}
+              onMouseEnter={e=>(e.currentTarget.style.borderColor='var(--c-primary)')}
+              onMouseLeave={e=>(e.currentTarget.style.borderColor='var(--border)')}
+            >
+              {fotos.find((f:any)=>f.principal)
+                ? <img src={fotos.find((f:any)=>f.principal).url} alt=""
+                    style={{width:'100%',height:'100%',objectFit:'cover',position:'absolute',inset:0}} />
+                : <>
+                    <span style={{fontSize:22,opacity:.45}}>📷</span>
+                    <span style={{fontSize:10,color:'var(--t-muted)',textAlign:'center',lineHeight:1.3}}>Adicionar foto</span>
+                  </>
+              }
+              {fotos.length>0 && (
+                <span style={{position:'absolute',top:4,right:4,background:'var(--c-primary)',color:'#fff',
+                  fontSize:10,fontWeight:700,padding:'1px 5px',borderRadius:99,zIndex:1}}>
+                  {fotos.length}
+                </span>
               )}
-              <label style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
-                gap:8,border:'2px dashed var(--border)',borderRadius:'var(--r-md)',padding:'28px 16px',
-                cursor:uploadando?'not-allowed':'pointer',
-                background:uploadando?'var(--bg-header)':'transparent',transition:'border-color 150ms'}}
-                onMouseEnter={e=>{ if(!uploadando) e.currentTarget.style.borderColor='var(--c-primary)' }}
-                onMouseLeave={e=>{ e.currentTarget.style.borderColor='var(--border)' }}>
-                <input type="file" accept="image/jpeg,image/png,image/webp" multiple style={{display:'none'}}
-                  disabled={uploadando}
-                  onChange={async e=>{
-                    const files=Array.from(e.target.files??[])
-                    if(!files.length) return
-                    setUploadando(true); setErroFoto('')
-                    for(const file of files){
-                      if(file.size>5*1024*1024){setErroFoto(`"${file.name}" excede 5MB`);continue}
-                      const fd=new FormData()
-                      fd.append('produto_id',String(form.id))
-                      fd.append('file',file)
-                      fd.append('principal',fotos.length===0?'true':'false')
-                      const res=await fetch('/api/produto-fotos',{method:'POST',body:fd})
-                      const data=await res.json()
-                      if(data.ok) setFotos((p:any[])=>[...p,data.data])
-                      else setErroFoto(data.error)
-                    }
-                    setUploadando(false); e.target.value=''
-                  }}
-                />
-                {uploadando
-                  ? <><span style={{fontSize:32}}>⏳</span><span style={{color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Enviando…</span></>
-                  : <><span style={{fontSize:32}}>📷</span>
-                    <span style={{color:'var(--t-muted)',fontSize:'var(--fs-md)',textAlign:'center'}}>
-                      Clique para adicionar fotos<br/>
-                      <span style={{fontSize:'var(--fs-sm)'}}>JPG, PNG, WEBP · até 5MB cada</span>
-                    </span></>
-                }
-              </label>
-              {fotos.length>0 ? (
-                <div className="kpi-grid">
-                  {fotos.map((foto:any)=>(
-                    <div key={foto.id} style={{position:'relative',borderRadius:'var(--r-md)',overflow:'hidden',
-                      border:`2px solid ${foto.principal?'var(--c-primary)':'var(--border)'}`,
-                      aspectRatio:'1',background:'var(--bg-header)'}}>
-                      <img src={foto.url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
-                      {foto.principal && (
-                        <div style={{position:'absolute',top:4,left:4,background:'var(--c-primary)',color:'#fff',
-                          fontSize:'var(--fs-xs)',fontWeight:700,padding:'2px 6px',borderRadius:'var(--r-sm)'}}>
-                          ★ Principal
-                        </div>
-                      )}
-                      <div style={{position:'absolute',bottom:0,left:0,right:0,display:'flex',gap:4,
-                        padding:5,background:'linear-gradient(transparent,rgba(0,0,0,0.65))'}}>
-                        {!foto.principal && (
-                          <button onClick={async()=>{
-                              const res=await fetch(`/api/produto-fotos?id=${foto.id}`,{method:'PATCH',
-                                headers:{'Content-Type':'application/json'},body:JSON.stringify({produto_id:form.id})})
-                              if((await res.json()).ok) setFotos((p:any[])=>p.map((f:any)=>({...f,principal:f.id===foto.id})))
-                            }}
-                            style={{flex:1,background:'rgba(255,255,255,0.88)',border:'none',borderRadius:'var(--r-sm)',
-                              padding:'3px 0',cursor:'pointer',fontSize:'var(--fs-xs)',fontWeight:700}}>
-                            ★ Tornar Principal
-                          </button>
-                        )}
+            </button>
+          )}
+        </div>
+
+        {/* ── TABS ───────────────────────────────────────────────────── */}
+        {form.id && (
+          <div style={{display:'flex',borderBottom:'2px solid var(--border)',marginBottom:20,gap:0}}>
+            {([
+              ['dados',  'Dados'],
+              ['fotos',  `Fotos${fotos.length>0?' ('+fotos.length+')':''}`],
+            ] as const).map(([k,l])=>(
+              <button key={k} onClick={()=>setAbaForm(k)}
+                style={{
+                  padding:'9px 22px',border:'none',background:'none',cursor:'pointer',
+                  fontWeight:abaForm===k?700:500,fontSize:'var(--fs-base)',
+                  color:abaForm===k?'var(--c-primary)':'var(--t-muted)',
+                  borderBottom:abaForm===k?'2px solid var(--c-primary)':'2px solid transparent',
+                  marginBottom:-2,transition:'all .15s',
+                }}>
+                {l}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {erro && <div className="ds-alert-error" style={{marginBottom:14}}>{erro}</div>}
+
+        {/* ══ ABA FOTOS ═══════════════════════════════════════════════ */}
+        {abaForm==='fotos' && form.id && (
+          <div style={{display:"flex",flexDirection:"column",gap:16}}>
+            {erroFoto && (
+              <div style={{background:'var(--c-danger-light)',border:'1px solid var(--c-danger)',
+                borderRadius:'var(--r-md)',padding:'10px 14px',color:'var(--c-danger-text)',fontSize:'var(--fs-md)'}}>
+                {erroFoto}
+              </div>
+            )}
+            <label style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+              gap:8,border:'2px dashed var(--border)',borderRadius:'var(--r-md)',padding:'28px 16px',
+              cursor:uploadando?'not-allowed':'pointer',
+              background:uploadando?'var(--bg-header)':'transparent',transition:'border-color 150ms'}}
+              onMouseEnter={e=>{ if(!uploadando) e.currentTarget.style.borderColor='var(--c-primary)' }}
+              onMouseLeave={e=>{ e.currentTarget.style.borderColor='var(--border)' }}>
+              <input type="file" accept="image/jpeg,image/png,image/webp" multiple style={{display:'none'}}
+                disabled={uploadando}
+                onChange={async e=>{
+                  const files=Array.from(e.target.files??[])
+                  if(!files.length) return
+                  setUploadando(true); setErroFoto('')
+                  for(const file of files){
+                    if(file.size>5*1024*1024){setErroFoto(`"${file.name}" excede 5MB`);continue}
+                    const fd=new FormData()
+                    fd.append('produto_id',String(form.id))
+                    fd.append('file',file)
+                    fd.append('principal',fotos.length===0?'true':'false')
+                    const res=await fetch('/api/produto-fotos',{method:'POST',body:fd})
+                    const data=await res.json()
+                    if(data.ok) setFotos((p:any[])=>[...p,data.data])
+                    else setErroFoto(data.error)
+                  }
+                  setUploadando(false); e.target.value=''
+                }}
+              />
+              {uploadando
+                ? <><span style={{fontSize:32}}>⏳</span><span style={{color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Enviando…</span></>
+                : <><span style={{fontSize:32}}>📷</span>
+                  <span style={{color:'var(--t-muted)',fontSize:'var(--fs-md)',textAlign:'center'}}>
+                    Clique para adicionar fotos<br/>
+                    <span style={{fontSize:'var(--fs-sm)'}}>JPG, PNG, WEBP · até 5MB cada</span>
+                  </span></>
+              }
+            </label>
+            {fotos.length>0 ? (
+              <div className="kpi-grid">
+                {fotos.map((foto:any)=>(
+                  <div key={foto.id} style={{position:'relative',borderRadius:'var(--r-md)',overflow:'hidden',
+                    border:`2px solid ${foto.principal?'var(--c-primary)':'var(--border)'}`,
+                    aspectRatio:'1',background:'var(--bg-header)'}}>
+                    <img src={foto.url} alt="" style={{width:'100%',height:'100%',objectFit:'cover'}} />
+                    {foto.principal && (
+                      <div style={{position:'absolute',top:4,left:4,background:'var(--c-primary)',color:'#fff',
+                        fontSize:'var(--fs-xs)',fontWeight:700,padding:'2px 6px',borderRadius:'var(--r-sm)'}}>
+                        ★ Principal
+                      </div>
+                    )}
+                    <div style={{position:'absolute',bottom:0,left:0,right:0,display:'flex',gap:4,
+                      padding:5,background:'linear-gradient(transparent,rgba(0,0,0,0.65))'}}>
+                      {!foto.principal && (
                         <button onClick={async()=>{
-                            if(!confirm('Excluir esta foto?')) return
-                            const res=await fetch(`/api/produto-fotos?id=${foto.id}`,{method:'DELETE'})
-                            if((await res.json()).ok) setFotos((p:any[])=>p.filter((f:any)=>f.id!==foto.id))
+                            const res=await fetch(`/api/produto-fotos?id=${foto.id}`,{method:'PATCH',
+                              headers:{'Content-Type':'application/json'},body:JSON.stringify({produto_id:form.id})})
+                            if((await res.json()).ok) setFotos((p:any[])=>p.map((f:any)=>({...f,principal:f.id===foto.id})))
                           }}
-                          style={{background:'rgba(220,38,38,0.85)',border:'none',borderRadius:'var(--r-sm)',
-                            padding:'3px 8px',cursor:'pointer',color:'#fff',fontSize:'var(--fs-xs)',fontWeight:700}}>
-                          ✕
+                          style={{flex:1,background:'rgba(255,255,255,0.88)',border:'none',borderRadius:'var(--r-sm)',
+                            padding:'3px 0',cursor:'pointer',fontSize:'var(--fs-xs)',fontWeight:700}}>
+                          ★ Tornar Principal
                         </button>
+                      )}
+                      <button onClick={async()=>{
+                          if(!confirm('Excluir esta foto?')) return
+                          const res=await fetch(`/api/produto-fotos?id=${foto.id}`,{method:'DELETE'})
+                          if((await res.json()).ok) setFotos((p:any[])=>p.filter((f:any)=>f.id!==foto.id))
+                        }}
+                        style={{background:'rgba(220,38,38,0.85)',border:'none',borderRadius:'var(--r-sm)',
+                          padding:'3px 8px',cursor:'pointer',color:'#fff',fontSize:'var(--fs-xs)',fontWeight:700}}>
+                        ✕
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div style={{textAlign:'center',padding:'12px 0',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>
+                Nenhuma foto ainda. Adicione a primeira acima.
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* ══ ABA DADOS ═══════════════════════════════════════════════ */}
+        {(abaForm==='dados'||!form.id) && (
+          <div style={{display:'flex',flexDirection:'column',gap:16}}>
+
+            {/* ── PAINEL 1: Identificação ─────────────────────── */}
+            <div className="panel-section">
+              <div className="panel-section-header">📋 Identificação</div>
+              <div className="panel-section-body">
+                <FormField label="Nome do Produto" required>
+                  <input {...F('nome')} className={inputCls} placeholder="Ex: Andaime Tubular 1,5m" autoFocus />
+                </FormField>
+                <div className="form-grid-2">
+                  <FormField label="Código / SKU">
+                    <input {...F('codigo')} className={inputCls} placeholder="Ex: AND-001" />
+                  </FormField>
+                  <FormField label="Categoria">
+                    <LookupField
+                      value={form.categoria_id || null}
+                      displayValue={catNome}
+                      onChange={(id, row) => { setForm((f:any) => ({ ...f, categoria_id: id })); setCatNome(row?.nome ?? '') }}
+                      table="categorias" searchColumn="nome" filter={{ ativo: 1 }} orderBy="nome"
+                      placeholder="Buscar ou criar categoria..."
+                      createPanelTitle="Nova Categoria" createPanelWidth="sm"
+                      createPanel={({ onClose, onCreated }: { onClose:()=>void; onCreated:(r:any)=>void }) => (
+                        <CriarCategoriaPanel onClose={onClose} onCreated={onCreated} />
+                      )}
+                    />
+                  </FormField>
+                  <FormField label="Marca">
+                    <input {...F('marca')} className={inputCls} placeholder="Ex: Tramontina" />
+                  </FormField>
+                  <FormField label="Modelo">
+                    <input {...F('modelo')} className={inputCls} placeholder="Ex: Pro 1.5m" />
+                  </FormField>
+                </div>
+                <FormField label="Descrição / Observações">
+                  <textarea {...F('observacoes')} rows={2} className={textareaCls} placeholder="Especificações técnicas, observações..." />
+                </FormField>
+              </div>
+            </div>
+
+            {/* ── PAINEL 2: Controle de Estoque ───────────────── */}
+            <div className="panel-section">
+              <div className="panel-section-header">📦 Controle de Estoque</div>
+              <div className="panel-section-body">
+                {/* Tipo de controle */}
+                <div className="form-grid-2" style={{marginBottom:0}}>
+                  {[
+                    { v:1, l:'Por Patrimônio',  icon:'🏷️', d:'Cada unidade tem número único' },
+                    { v:0, l:'Por Quantidade',   icon:'📊', d:'Itens sem identificação individual' },
+                  ].map(o => (
+                    <div key={o.v} onClick={()=>setForm({...form,controla_patrimonio:o.v})}
+                      style={{
+                        border:`2px solid ${Number(form.controla_patrimonio)===o.v?'var(--c-primary)':'var(--border)'}`,
+                        borderRadius:'var(--r-md)', padding:'12px 14px', cursor:'pointer',
+                        background:Number(form.controla_patrimonio)===o.v?'var(--c-primary-light,#e0f2fe)':'transparent',
+                        transition:'all 150ms', display:'flex', alignItems:'center', gap:12,
+                      }}>
+                      <span style={{fontSize:22}}>{o.icon}</span>
+                      <div>
+                        <div style={{fontWeight:700,fontSize:'var(--fs-base)',color:Number(form.controla_patrimonio)===o.v?'var(--c-primary)':'var(--t-primary)'}}>{o.l}</div>
+                        <div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)',marginTop:1}}>{o.d}</div>
                       </div>
                     </div>
                   ))}
                 </div>
-              ) : (
-                <div style={{textAlign:'center',padding:'12px 0',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>
-                  Nenhuma foto ainda. Adicione a primeira acima.
-                </div>
-              )}
-            </div>
-          )}
 
-          {/* ══ ABA DADOS ═══════════════════════════════════════════════════ */}
-          {(abaForm==='dados'||!form.id) && (
-            <div style={{display:'flex',flexDirection:'column',gap:16}}>
-
-              {/* ── PAINEL 1: Identificação ─────────────────────── */}
-              <div className="panel-section">
-                <div className="panel-section-header">📋 Identificação</div>
-                <div className="panel-section-body">
-                  <FormField label="Nome do Produto" required>
-                    <input {...F('nome')} className={inputCls} placeholder="Ex: Andaime Tubular 1,5m" autoFocus />
-                  </FormField>
-                  <div className="form-grid-2">
-                    <FormField label="Código / SKU">
-                      <input {...F('codigo')} className={inputCls} placeholder="Ex: AND-001" />
+                {/* Campos de quantidade (só para controle por quantidade) */}
+                {Number(form.controla_patrimonio)===0 && (
+                  <div className="form-grid-3" style={{marginTop:14}}>
+                    <FormField label="Unidade">
+                      <input {...F('unidade')} className={inputCls} placeholder="un, kg, m, pç..." />
                     </FormField>
-                    <FormField label="Categoria">
-                      <LookupField
-                        value={form.categoria_id || null}
-                        displayValue={catNome}
-                        onChange={(id, row) => { setForm((f:any) => ({ ...f, categoria_id: id })); setCatNome(row?.nome ?? '') }}
-                        table="categorias" searchColumn="nome" filter={{ ativo: 1 }} orderBy="nome"
-                        placeholder="Buscar ou criar categoria..."
-                        createPanelTitle="Nova Categoria" createPanelWidth="sm"
-                        createPanel={({ onClose, onCreated }: { onClose:()=>void; onCreated:(r:any)=>void }) => (
-                          <CriarCategoriaPanel onClose={onClose} onCreated={onCreated} />
-                        )}
-                      />
+                    <FormField label="Estoque Atual">
+                      <input type="number" step="1" min="0" {...F('estoque_total')} className={inputCls} />
                     </FormField>
-                    <FormField label="Marca">
-                      <input {...F('marca')} className={inputCls} placeholder="Ex: Tramontina" />
-                    </FormField>
-                    <FormField label="Modelo">
-                      <input {...F('modelo')} className={inputCls} placeholder="Ex: Pro 1.5m" />
+                    <FormField label="Prazo Entrega (dias)">
+                      <input type="number" step="1" min="0" {...F('prazo_entrega_dias')} className={inputCls} placeholder="0" />
                     </FormField>
                   </div>
-                  <FormField label="Descrição / Observações">
-                    <textarea {...F('observacoes')} rows={2} className={textareaCls} placeholder="Especificações técnicas, observações..." />
-                  </FormField>
-                </div>
-              </div>
-
-              {/* ── PAINEL 2: Controle de Estoque ───────────────── */}
-              <div className="panel-section">
-                <div className="panel-section-header">📦 Controle de Estoque</div>
-                <div className="panel-section-body">
-                  {/* Tipo de controle */}
-                  <div className="form-grid-2" style={{marginBottom:0}}>
-                    {[
-                      { v:1, l:'Por Patrimônio',  icon:'🏷️', d:'Cada unidade tem número único' },
-                      { v:0, l:'Por Quantidade',   icon:'📊', d:'Itens sem identificação individual' },
-                    ].map(o => (
-                      <div key={o.v} onClick={()=>setForm({...form,controla_patrimonio:o.v})}
-                        style={{
-                          border:`2px solid ${Number(form.controla_patrimonio)===o.v?'var(--c-primary)':'var(--border)'}`,
-                          borderRadius:'var(--r-md)', padding:'12px 14px', cursor:'pointer',
-                          background:Number(form.controla_patrimonio)===o.v?'var(--c-primary-light,#e0f2fe)':'transparent',
-                          transition:'all 150ms', display:'flex', alignItems:'center', gap:12,
-                        }}>
-                        <span style={{fontSize:22}}>{o.icon}</span>
-                        <div>
-                          <div style={{fontWeight:700,fontSize:'var(--fs-base)',color:Number(form.controla_patrimonio)===o.v?'var(--c-primary)':'var(--t-primary)'}}>{o.l}</div>
-                          <div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)',marginTop:1}}>{o.d}</div>
-                        </div>
+                )}
+                {Number(form.controla_patrimonio)===1 && (
+                  <div className="form-grid-2" style={{marginTop:14}}>
+                    <FormField label="Prazo Entrega (dias)">
+                      <input type="number" step="1" min="0" {...F('prazo_entrega_dias')} className={inputCls} placeholder="0" />
+                    </FormField>
+                    <FormField label="Custo de Reposição (R$)">
+                      <div style={{position:'relative'}}>
+                        <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'var(--t-muted)',fontSize:'var(--fs-md)',pointerEvents:'none'}}>R$</span>
+                        <input type="number" step="0.01" min="0" {...F('custo_reposicao')} className={inputCls} style={{paddingLeft:30}} />
                       </div>
-                    ))}
+                    </FormField>
                   </div>
-
-                  {/* Campos de quantidade (só para controle por quantidade) */}
-                  {Number(form.controla_patrimonio)===0 && (
-                    <div className="form-grid-3" style={{marginTop:14}}>
-                      <FormField label="Unidade">
-                        <input {...F('unidade')} className={inputCls} placeholder="un, kg, m, pç..." />
-                      </FormField>
-                      <FormField label="Estoque Atual">
-                        <input type="number" step="1" min="0" {...F('estoque_total')} className={inputCls} />
-                      </FormField>
-                      <FormField label="Prazo Entrega (dias)">
-                        <input type="number" step="1" min="0" {...F('prazo_entrega_dias')} className={inputCls} placeholder="0" />
-                      </FormField>
-                    </div>
-                  )}
-                  {Number(form.controla_patrimonio)===1 && (
-                    <div className="form-grid-2" style={{marginTop:14}}>
-                      <FormField label="Prazo Entrega (dias)">
-                        <input type="number" step="1" min="0" {...F('prazo_entrega_dias')} className={inputCls} placeholder="0" />
-                      </FormField>
-                      <FormField label="Custo de Reposição (R$)">
-                        <div style={{position:'relative'}}>
-                          <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'var(--t-muted)',fontSize:'var(--fs-md)',pointerEvents:'none'}}>R$</span>
-                          <input type="number" step="0.01" min="0" {...F('custo_reposicao')} className={inputCls} style={{paddingLeft:30}} />
-                        </div>
-                      </FormField>
-                    </div>
-                  )}
-                </div>
+                )}
               </div>
-
-              {/* ── PAINEL 3: Preços de Locação ─────────────────── */}
-              <div className="panel-section">
-                <div className="panel-section-header">💰 Preços de Locação por Período</div>
-                <div className="panel-section-body">
-                  {periodos.length === 0 ? (
-                    <div style={{textAlign:'center',padding:'16px 0',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>
-                      Nenhum período cadastrado. Configure os períodos nos Parâmetros.
-                    </div>
-                  ) : (
-                    <div className="form-grid-3">
-                      {periodos.map((p:any) => {
-                        const campo = campoPreco(p.nome)
-                        const val = Number(form[campo]??0)
-                        return (
-                          <FormField key={p.id} label={`${p.nome}${Number(p.desconto_percentual)>0?` (${p.desconto_percentual}% desc)`:''}`}>
-                            <div style={{position:'relative'}}>
-                              <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'var(--t-muted)',fontSize:'var(--fs-md)',pointerEvents:'none'}}>R$</span>
-                              <input type="number" step="0.01" min="0"
-                                value={form[campo]??0}
-                                onChange={e=>setForm({...form,[campo]:e.target.value})}
-                                className={inputCls}
-                                style={{paddingLeft:30,borderColor:val>0?'var(--c-primary)':'undefined'}}
-                              />
-                            </div>
-                            {val>0 && <div style={{fontSize:'var(--fs-xs)',color:'var(--c-primary)',marginTop:3,fontWeight:600}}>{p.dias}d → {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(val/p.dias)}/dia</div>}
-                          </FormField>
-                        )
-                      })}
-                    </div>
-                  )}
-                  {/* Custo reposição (só para por quantidade — para por patrimônio já está acima) */}
-                  {Number(form.controla_patrimonio)===0 && (
-                    <div style={{marginTop:14}}>
-                      <FormField label="Custo de Reposição (R$)" hint="Valor cobrado em caso de perda ou dano">
-                        <div style={{position:'relative',maxWidth:200}}>
-                          <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'var(--t-muted)',fontSize:'var(--fs-md)',pointerEvents:'none'}}>R$</span>
-                          <input type="number" step="0.01" min="0" {...F('custo_reposicao')} className={inputCls} style={{paddingLeft:30}} />
-                        </div>
-                      </FormField>
-                    </div>
-                  )}
-                </div>
-              </div>
-
             </div>
-          )}
 
-        </div>
+            {/* ── PAINEL 3: Preços de Locação ─────────────────── */}
+            <div className="panel-section">
+              <div className="panel-section-header">💰 Preços de Locação por Período</div>
+              <div className="panel-section-body">
+                {periodos.length === 0 ? (
+                  <div style={{textAlign:'center',padding:'16px 0',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>
+                    Nenhum período cadastrado. Configure os períodos nos Parâmetros.
+                  </div>
+                ) : (
+                  <div className="form-grid-3">
+                    {periodos.map((p:any) => {
+                      const campo = campoPreco(p.nome)
+                      const val = Number(form[campo]??0)
+                      return (
+                        <FormField key={p.id} label={`${p.nome}${Number(p.desconto_percentual)>0?` (${p.desconto_percentual}% desc)`:''}`}>
+                          <div style={{position:'relative'}}>
+                            <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'var(--t-muted)',fontSize:'var(--fs-md)',pointerEvents:'none'}}>R$</span>
+                            <input type="number" step="0.01" min="0"
+                              value={form[campo]??0}
+                              onChange={e=>setForm({...form,[campo]:e.target.value})}
+                              className={inputCls}
+                              style={{paddingLeft:30,borderColor:val>0?'var(--c-primary)':'undefined'}}
+                            />
+                          </div>
+                          {val>0 && <div style={{fontSize:'var(--fs-xs)',color:'var(--c-primary)',marginTop:3,fontWeight:600}}>{p.dias}d → {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(val/p.dias)}/dia</div>}
+                        </FormField>
+                      )
+                    })}
+                  </div>
+                )}
+                {/* Custo reposição (só para por quantidade — para por patrimônio já está acima) */}
+                {Number(form.controla_patrimonio)===0 && (
+                  <div style={{marginTop:14}}>
+                    <FormField label="Custo de Reposição (R$)" hint="Valor cobrado em caso de perda ou dano">
+                      <div style={{position:'relative',maxWidth:200}}>
+                        <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'var(--t-muted)',fontSize:'var(--fs-md)',pointerEvents:'none'}}>R$</span>
+                        <input type="number" step="0.01" min="0" {...F('custo_reposicao')} className={inputCls} style={{paddingLeft:30}} />
+                      </div>
+                    </FormField>
+                  </div>
+                )}
+              </div>
+            </div>
+
+          </div>
+        )}
+
       </SlidePanel>
 
       {/* ── Modal de Movimentação de Ativos ───────────────────────────────── */}
