@@ -383,7 +383,7 @@ export default function EquipamentosPage() {
         .order('created_at', { ascending: false })
         .limit(8),
       supabase.from('patrimonios')
-        .select('id, numero_patrimonio, numero_serie, status, data_aquisicao, valor_aquisicao, contrato_itens(contratos(numero,status))')
+        .select('id, numero_patrimonio, numero_serie, status, data_aquisicao, valor_aquisicao, contrato_itens!contrato_itens_patrimonio_id_fkey(contratos(numero,status))')
         .eq('produto_id', row.id)
         .is('deleted_at', null)
         .order('numero_patrimonio'),
@@ -745,8 +745,14 @@ export default function EquipamentosPage() {
                         </thead>
                         <tbody>
                           {viewPats.map((pat:any,i:number)=>{
+                            // Tenta link direto (patrimonio_id em contrato_itens)
                             const contratoAtivo = (pat.contrato_itens ?? [])
                               .find((ci:any) => ['ativo','em_devolucao','pendente_manutencao'].includes(ci.contratos?.status))
+                            // Fallback: se está locado mas sem link direto, busca pelo produto
+                            const contratoFallback = !contratoAtivo && pat.status === 'locado'
+                              ? viewContratos.find((ci:any) => ['ativo','em_devolucao','pendente_manutencao'].includes(ci.contratos?.status))
+                              : null
+                            const contratoExibir = contratoAtivo ?? contratoFallback
                             const statusColor = pat.status==='disponivel'?'var(--c-success,#16a34a)':
                               pat.status==='locado'?'var(--c-primary)':
                               pat.status==='manutencao'?'var(--c-warning,#f59e0b)':'var(--t-muted)'
@@ -770,9 +776,10 @@ export default function EquipamentosPage() {
                                   {pat.data_aquisicao ? new Date(pat.data_aquisicao).toLocaleDateString('pt-BR') : '—'}
                                 </td>
                                 <td style={{padding:'7px 10px',fontSize:'var(--fs-sm)'}}>
-                                  {contratoAtivo
+                                  {contratoExibir
                                     ? <span style={{fontFamily:'var(--font-mono)',fontWeight:600,color:'var(--c-primary)'}}>
-                                        {contratoAtivo.contratos?.numero}
+                                        {contratoExibir.contratos?.numero}
+                                        {!contratoAtivo && <span style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginLeft:4}}>(via produto)</span>}
                                       </span>
                                     : <span style={{color:'var(--t-muted)'}}>—</span>
                                   }
