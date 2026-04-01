@@ -550,6 +550,18 @@ export default function EquipamentosPage() {
     setErro('')
     setForm(p ? { ...emptyForm(), ...p } : emptyForm())
     setEditId(p?.id ?? null)
+    // Popular o displayValue da categoria ao abrir em modo edição
+    if (p?.categoria_id) {
+      const cat = p.categorias?.nome ?? p.categoria_nome ?? ''
+      setCatNome(cat)
+      // Se não tem o nome no row, buscar no banco
+      if (!cat) {
+        supabase.from('categorias').select('nome').eq('id', p.categoria_id).single()
+          .then(({ data }) => { if (data) setCatNome(data.nome) })
+      }
+    } else {
+      setCatNome('')
+    }
     setPanel(true)
   }
 
