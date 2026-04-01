@@ -67,6 +67,213 @@ function CriarCategoriaPanel({ onClose, onCreated }: { onClose:()=>void; onCreat
   )
 }
 
+// ── Inventário de Patrimônios — componente dedicado com paginação e filtros ──
+function PatrimonioInventario({ viewPats, viewContratos, patBusca, setPatBusca, patFiltro, setPatFiltro, patPagina, setPatPagina, inputCls }: any) {
+  const PAT_PAGE = 10
+
+  const patsFiltrados = viewPats.filter((p: any) => {
+    const matchBusca = !patBusca ||
+      p.numero_patrimonio?.toLowerCase().includes(patBusca.toLowerCase()) ||
+      p.numero_serie?.toLowerCase().includes(patBusca.toLowerCase())
+    const matchStatus = patFiltro === 'todos' || p.status === patFiltro
+    return matchBusca && matchStatus
+  })
+  const totalPags  = Math.max(1, Math.ceil(patsFiltrados.length / PAT_PAGE))
+  const patsPagina = patsFiltrados.slice((patPagina - 1) * PAT_PAGE, patPagina * PAT_PAGE)
+
+  const dispCount   = viewPats.filter((p: any) => p.status === 'disponivel').length
+  const locadoCount = viewPats.filter((p: any) => p.status === 'locado').length
+  const manutCount  = viewPats.filter((p: any) => p.status === 'manutencao').length
+
+  const STATUS_COLORS: Record<string, string> = {
+    disponivel: 'var(--c-success,#16a34a)',
+    locado:     'var(--c-primary)',
+    manutencao: 'var(--c-warning,#f59e0b)',
+  }
+  const STATUS_LABELS: Record<string, string> = {
+    disponivel: 'Disponível',
+    locado:     'Locado',
+    manutencao: 'Manutenção',
+  }
+
+  return (
+    <div className="panel-section">
+      {/* Header com chips de status e busca */}
+      <div style={{ padding: '10px 14px', background: 'var(--bg-header)', borderBottom: '1px solid var(--border)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10, flexWrap: 'wrap', gap: 8 }}>
+          <span style={{ fontWeight: 700, fontSize: 'var(--fs-base)' }}>
+            Inventário de Patrimônios
+          </span>
+          <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+            {[
+              { label: `✅ ${dispCount} disp.`,   val: 'disponivel', color: STATUS_COLORS.disponivel },
+              { label: `🔵 ${locadoCount} loc.`,  val: 'locado',     color: STATUS_COLORS.locado },
+              ...(manutCount > 0 ? [{ label: `🔧 ${manutCount} man.`, val: 'manutencao', color: STATUS_COLORS.manutencao }] : []),
+              { label: `Todos (${viewPats.length})`, val: 'todos', color: 'var(--t-secondary)' },
+            ].map(btn => (
+              <button
+                key={btn.val}
+                onClick={() => { setPatFiltro(btn.val); setPatPagina(1) }}
+                style={{
+                  fontSize: 'var(--fs-xs)', fontWeight: 600, padding: '3px 10px', borderRadius: 99,
+                  cursor: 'pointer', border: '1px solid', transition: 'all .15s',
+                  borderColor: btn.color,
+                  background: patFiltro === btn.val ? btn.color : 'transparent',
+                  color:      patFiltro === btn.val ? '#fff'    : btn.color,
+                }}
+              >
+                {btn.label}
+              </button>
+            ))}
+          </div>
+        </div>
+        {/* Campo de busca */}
+        <div style={{ position: 'relative' }}>
+          <span style={{ position: 'absolute', left: 9, top: '50%', transform: 'translateY(-50%)', color: 'var(--t-muted)', fontSize: 13, pointerEvents: 'none' }}>🔍</span>
+          <input
+            value={patBusca}
+            onChange={e => { setPatBusca(e.target.value); setPatPagina(1) }}
+            placeholder="Buscar por Nº Patrimônio ou Nº Série..."
+            className={inputCls}
+            style={{ paddingLeft: 30, fontSize: 'var(--fs-sm)' }}
+          />
+        </div>
+      </div>
+
+      {/* Tabela ou vazio */}
+      {patsFiltrados.length === 0 ? (
+        <div style={{ padding: '24px', textAlign: 'center', color: 'var(--t-muted)', fontSize: 'var(--fs-md)' }}>
+          {patBusca ? `Nenhum patrimônio encontrado para "${patBusca}"` : 'Nenhum patrimônio neste filtro.'}
+        </div>
+      ) : (
+        <>
+          <table className="ds-table" style={{ fontSize: 'var(--fs-sm)' }}>
+            <thead>
+              <tr>
+                <th style={{ width: 110 }}>Nº Patrimônio</th>
+                <th style={{ width: 100 }}>Nº Série</th>
+                <th style={{ width: 120 }}>Status</th>
+                <th style={{ width: 100 }}>Aquisição</th>
+                <th>Contrato Atual</th>
+              </tr>
+            </thead>
+            <tbody>
+              {patsPagina.map((pat: any) => {
+                const contratoAtivo = (pat.contrato_itens ?? [])
+                  .find((ci: any) => ['ativo', 'em_devolucao', 'pendente_manutencao'].includes(ci.contratos?.status))
+                const contratoFallback = !contratoAtivo && pat.status === 'locado'
+                  ? viewContratos.find((ci: any) => ['ativo', 'em_devolucao', 'pendente_manutencao'].includes(ci.contratos?.status))
+                  : null
+                const contratoExibir = contratoAtivo ?? contratoFallback
+                const color = STATUS_COLORS[pat.status] ?? 'var(--t-muted)'
+                return (
+                  <tr key={pat.id}>
+                    <td className="tbl-mono" style={{ fontWeight: 700 }}>{pat.numero_patrimonio}</td>
+                    <td className="tbl-mono" style={{ color: 'var(--t-muted)' }}>{pat.numero_serie || '—'}</td>
+                    <td>
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 5,
+                        fontWeight: 600, fontSize: 'var(--fs-xs)',
+                        padding: '3px 9px', borderRadius: 99,
+                        background: color + '18', color,
+                      }}>
+                        <span style={{ width: 6, height: 6, borderRadius: '50%', background: color, flexShrink: 0 }} />
+                        {STATUS_LABELS[pat.status] ?? pat.status}
+                      </span>
+                    </td>
+                    <td style={{ color: 'var(--t-muted)' }}>
+                      {pat.data_aquisicao ? new Date(pat.data_aquisicao).toLocaleDateString('pt-BR') : '—'}
+                    </td>
+                    <td>
+                      {contratoExibir ? (
+                        <a
+                          href={`/contratos/${contratoExibir.contratos?.id ?? contratoExibir.contrato_id}`}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{
+                            fontFamily: 'var(--font-mono)', fontWeight: 700,
+                            color: 'var(--c-primary)', textDecoration: 'none',
+                            display: 'inline-flex', alignItems: 'center', gap: 5,
+                          }}
+                          title="Abrir contrato em nova aba"
+                        >
+                          {contratoExibir.contratos?.numero}
+                          <span style={{ fontSize: 10, opacity: .7 }}>↗</span>
+                          {!contratoAtivo && (
+                            <span style={{ fontSize: 'var(--fs-xs)', color: 'var(--t-muted)', fontWeight: 400, fontFamily: 'inherit' }}>
+                              (via produto)
+                            </span>
+                          )}
+                        </a>
+                      ) : (
+                        <span style={{ color: 'var(--t-muted)' }}>—</span>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+
+          {/* Paginação */}
+          {totalPags > 1 && (
+            <div style={{
+              display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+              padding: '10px 16px', borderTop: '1px solid var(--border)', background: 'var(--bg-header)',
+            }}>
+              <span style={{ fontSize: 'var(--fs-sm)', color: 'var(--t-muted)' }}>
+                {patsFiltrados.length} patrimônio(s) · página {patPagina} de {totalPags}
+              </span>
+              <div style={{ display: 'flex', gap: 6 }}>
+                <button
+                  disabled={patPagina <= 1}
+                  onClick={() => setPatPagina((p: number) => Math.max(1, p - 1))}
+                  style={{
+                    padding: '4px 12px', borderRadius: 'var(--r-sm)',
+                    border: '1px solid var(--border)', background: 'var(--bg-card)',
+                    cursor: patPagina <= 1 ? 'not-allowed' : 'pointer',
+                    color: patPagina <= 1 ? 'var(--t-muted)' : 'var(--t-primary)',
+                    fontSize: 'var(--fs-sm)',
+                  }}
+                >← Ant.</button>
+
+                {Array.from({ length: Math.min(5, totalPags) }, (_, i) => {
+                  const p = totalPags <= 5 ? i + 1 : Math.max(1, Math.min(totalPags - 4, patPagina - 2)) + i
+                  return (
+                    <button key={p}
+                      onClick={() => setPatPagina(p)}
+                      style={{
+                        padding: '4px 10px', borderRadius: 'var(--r-sm)', fontSize: 'var(--fs-sm)', cursor: 'pointer',
+                        border: '1px solid',
+                        borderColor: p === patPagina ? 'var(--c-primary)' : 'var(--border)',
+                        background:  p === patPagina ? 'var(--c-primary)' : 'var(--bg-card)',
+                        color:       p === patPagina ? '#fff'             : 'var(--t-primary)',
+                        fontWeight:  p === patPagina ? 700 : 400,
+                      }}
+                    >{p}</button>
+                  )
+                })}
+
+                <button
+                  disabled={patPagina >= totalPags}
+                  onClick={() => setPatPagina((p: number) => Math.min(totalPags, p + 1))}
+                  style={{
+                    padding: '4px 12px', borderRadius: 'var(--r-sm)',
+                    border: '1px solid var(--border)', background: 'var(--bg-card)',
+                    cursor: patPagina >= totalPags ? 'not-allowed' : 'pointer',
+                    color: patPagina >= totalPags ? 'var(--t-muted)' : 'var(--t-primary)',
+                    fontSize: 'var(--fs-sm)',
+                  }}
+                >Próx. →</button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 export default function EquipamentosPage() {
   const router = useRouter()
   const [lista, setLista]       = useState<any[]>([])
@@ -90,6 +297,10 @@ export default function EquipamentosPage() {
   const [viewOS,        setViewOS]        = useState<any[]>([])
   const [viewMovs,      setViewMovs]      = useState<any[]>([])
   const [viewLoadingEx, setViewLoadingEx] = useState(false)
+  // ── Inventário de patrimônios: filtros e paginação ──────────────
+  const [patBusca,  setPatBusca]  = useState('')
+  const [patFiltro, setPatFiltro] = useState('todos')
+  const [patPagina, setPatPagina] = useState(1)
   const [viewPats,      setViewPats]      = useState<any[]>([])
 
   // Painel: preços (acesso rápido pelas ações)
@@ -346,6 +557,8 @@ export default function EquipamentosPage() {
     setViewRow(row)
     setAbaView(aba)
     setPanelView(true)
+    // Resetar filtros do inventário ao abrir novo produto
+    setPatBusca(''); setPatFiltro('todos'); setPatPagina(1)
     setViewLoadingEx(true)
     setViewContratos([]); setViewOS([]); setViewMovs([]); setViewPats([])
     // Buscar dados frescos do produto (estoque, locado, disponível)
@@ -383,7 +596,7 @@ export default function EquipamentosPage() {
         .order('created_at', { ascending: false })
         .limit(8),
       supabase.from('patrimonios')
-        .select('id, numero_patrimonio, numero_serie, status, data_aquisicao, valor_aquisicao, contrato_itens!contrato_itens_patrimonio_id_fkey(contratos(numero,status))')
+        .select('id, numero_patrimonio, numero_serie, status, data_aquisicao, valor_aquisicao, contrato_itens!contrato_itens_patrimonio_id_fkey(contrato_id, contratos(id, numero, status))')
         .eq('produto_id', row.id)
         .is('deleted_at', null)
         .order('numero_patrimonio'),
@@ -715,81 +928,17 @@ export default function EquipamentosPage() {
 
                 {/* Patrimônios / Inventário */}
                 {viewRow?.controla_patrimonio===1 && (
-                  <div className="panel-section">
-                    <div style={{padding:'8px 12px',background:'var(--bg-header)',fontWeight:700,
-                      fontSize:'var(--fs-md)',borderBottom:'1px solid var(--border)',
-                      display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                      <span>Inventário de Patrimônios</span>
-                      <span style={{fontWeight:400,fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>
-                        {viewPats.filter((p:any)=>p.status==='disponivel').length} disponível /
-                        {' '}{viewPats.filter((p:any)=>p.status==='locado').length} locado /
-                        {' '}{viewPats.length} total
-                      </span>
-                    </div>
-                    {viewLoadingEx ? (
-                      <div style={{padding:'16px',textAlign:'center',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Carregando…</div>
-                    ) : viewPats.length === 0 ? (
-                      <div style={{padding:'16px',textAlign:'center',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>
-                        Nenhum patrimônio cadastrado. Use o botão <strong>+ Movimentação</strong> para registrar entradas.
-                      </div>
-                    ) : (
-                      <table className="ds-table">
-                        <thead>
-                          <tr style={{background:'var(--bg-header)'}}>
-                            {['Nº Patrimônio','Nº Série','Status','Aquisição','Contrato Atual'].map(h=>(
-                              <th key={h} style={{padding:'6px 10px',textAlign:'left',fontWeight:600,
-                                color:'var(--t-muted)',fontSize:'var(--fs-sm)',borderBottom:'1px solid var(--border)'}}>{h}</th>
-                            ))}
-                          </tr>
-                        </thead>
-                        <tbody>
-                          {viewPats.map((pat:any,i:number)=>{
-                            // Tenta link direto (patrimonio_id em contrato_itens)
-                            const contratoAtivo = (pat.contrato_itens ?? [])
-                              .find((ci:any) => ['ativo','em_devolucao','pendente_manutencao'].includes(ci.contratos?.status))
-                            // Fallback: se está locado mas sem link direto, busca pelo produto
-                            const contratoFallback = !contratoAtivo && pat.status === 'locado'
-                              ? viewContratos.find((ci:any) => ['ativo','em_devolucao','pendente_manutencao'].includes(ci.contratos?.status))
-                              : null
-                            const contratoExibir = contratoAtivo ?? contratoFallback
-                            const statusColor = pat.status==='disponivel'?'var(--c-success,#16a34a)':
-                              pat.status==='locado'?'var(--c-primary)':
-                              pat.status==='manutencao'?'var(--c-warning,#f59e0b)':'var(--t-muted)'
-                            return (
-                              <tr key={pat.id} style={{borderBottom:'1px solid var(--border)',
-                                background:i%2===0?'transparent':'var(--bg-header)'}}>
-                                <td style={{padding:'7px 10px',fontFamily:'var(--font-mono)',fontWeight:700,fontSize:'var(--fs-sm)'}}>
-                                  {pat.numero_patrimonio}
-                                </td>
-                                <td style={{padding:'7px 10px',color:'var(--t-muted)',fontFamily:'var(--font-mono)',fontSize:'var(--fs-sm)'}}>
-                                  {pat.numero_serie || '—'}
-                                </td>
-                                <td style={{padding:'7px 10px'}}>
-                                  <span style={{fontWeight:600,fontSize:'var(--fs-xs)',
-                                    padding:'2px 8px',borderRadius:'var(--r-sm)',
-                                    background:statusColor+'22',color:statusColor,textTransform:'capitalize'}}>
-                                    {pat.status}
-                                  </span>
-                                </td>
-                                <td style={{padding:'7px 10px',color:'var(--t-muted)',fontSize:'var(--fs-sm)'}}>
-                                  {pat.data_aquisicao ? new Date(pat.data_aquisicao).toLocaleDateString('pt-BR') : '—'}
-                                </td>
-                                <td style={{padding:'7px 10px',fontSize:'var(--fs-sm)'}}>
-                                  {contratoExibir
-                                    ? <span style={{fontFamily:'var(--font-mono)',fontWeight:600,color:'var(--c-primary)'}}>
-                                        {contratoExibir.contratos?.numero}
-                                        {!contratoAtivo && <span style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginLeft:4}}>(via produto)</span>}
-                                      </span>
-                                    : <span style={{color:'var(--t-muted)'}}>—</span>
-                                  }
-                                </td>
-                              </tr>
-                            )
-                          })}
-                        </tbody>
-                      </table>
-                    )}
-                  </div>
+                  <PatrimonioInventario
+                    viewPats={viewPats}
+                    viewContratos={viewContratos}
+                    patBusca={patBusca}
+                    setPatBusca={setPatBusca}
+                    patFiltro={patFiltro}
+                    setPatFiltro={setPatFiltro}
+                    patPagina={patPagina}
+                    setPatPagina={setPatPagina}
+                    inputCls={inputCls}
+                  />
                 )}
 
                 {/* OS abertas */}
