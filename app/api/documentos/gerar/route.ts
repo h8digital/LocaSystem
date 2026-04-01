@@ -263,15 +263,21 @@ export async function POST(req: NextRequest) {
   // 4. Limpar tags não substituídas
   html = html.replace(/\{\{[^}]+\}\}/g, '')
 
+  // ── Gerar token único para acesso público ─────────────────────────────────
+  const token = Math.random().toString(36).slice(2) + Date.now().toString(36)
+
   // ── Salvar no banco ────────────────────────────────────────────────────────
   const { data: doc, error: docErr } = await sb.from('doc_gerados').insert({
     contrato_id,
-    template_id: tmplId,
-    conteudo_html: html,
-    gerado_por: null,
-  }).select('id').single()
+    template_id:    tmplId,
+    conteudo_final: html,
+    token,
+    titulo:         `Contrato ${contrato.numero ?? contrato_id}`,
+    expirado:       0,
+    visualizacoes:  0,
+  }).select('id, token').single()
 
   if (docErr) return NextResponse.json({ ok:false, error:docErr.message })
 
-  return NextResponse.json({ ok:true, doc_id: doc.id, html })
+  return NextResponse.json({ ok:true, doc_id: doc.id, token: doc.token, html })
 }
