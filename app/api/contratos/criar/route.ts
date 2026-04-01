@@ -74,7 +74,8 @@ export async function POST(req: NextRequest) {
         descricao_livre:   item.descricao_livre || null,
       })
       if (item.patrimonio_id) {
-        await sb.from('patrimonios').update({ status:'locado' }).eq('id', item.patrimonio_id)
+        // NÃO marcar como locado aqui — só na ativação do contrato
+        // A marcação prematura impede a ativação (verifica status='locado')
       }
     }
 
