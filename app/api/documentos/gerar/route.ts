@@ -1,292 +1,275 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
-import { cookies } from 'next/headers'
-export const runtime = 'nodejs'
 
-const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
+const sb = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_KEY!
+)
 
-function fmt_money(v: number) { return 'R$ ' + Number(v).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.') }
-function fmt_date(d: string)  { if (!d) return ''; return new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') }
-
-function gerarToken() {
-  return Array.from(crypto.getRandomValues(new Uint8Array(32))).map(b => b.toString(16).padStart(2,'0')).join('')
+function fmt_money(v: number | string | null | undefined): string {
+  const n = Number(v ?? 0)
+  return 'R$ ' + n.toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+}
+function fmt_date(d: string | null | undefined): string {
+  if (!d) return '—'
+  return new Date(d + 'T12:00:00').toLocaleDateString('pt-BR')
+}
+function valor_extenso(valor: number): string {
+  // Extenso simplificado para nota promissória (até 999.999,99)
+  const partes: Record<number,string> = {
+    1:'um',2:'dois',3:'três',4:'quatro',5:'cinco',6:'seis',7:'sete',8:'oito',9:'nove',
+    10:'dez',11:'onze',12:'doze',13:'treze',14:'quatorze',15:'quinze',16:'dezesseis',
+    17:'dezessete',18:'dezoito',19:'dezenove',20:'vinte',30:'trinta',40:'quarenta',
+    50:'cinquenta',60:'sessenta',70:'setenta',80:'oitenta',90:'noventa'
+  }
+  const centenas: Record<number,string> = {
+    100:'cem',200:'duzentos',300:'trezentos',400:'quatrocentos',500:'quinhentos',
+    600:'seiscentos',700:'setecentos',800:'oitocentos',900:'novecentos'
+  }
+  if (valor === 0) return 'zero reais'
+  const reais = Math.floor(valor)
+  const centavos = Math.round((valor - reais) * 100)
+  function porExtenso(n: number): string {
+    if (n === 0) return ''
+    if (n <= 20) return partes[n] ?? ''
+    if (n < 100) {
+      const dez = Math.floor(n / 10) * 10
+      const uni = n % 10
+      return uni === 0 ? partes[dez] : `${partes[dez]} e ${partes[uni]}`
+    }
+    if (n === 100) return 'cem'
+    const cent = Math.floor(n / 100) * 100
+    const resto = n % 100
+    return resto === 0 ? centenas[cent] : `${centenas[cent]} e ${porExtenso(resto)}`
+  }
+  function milhar(n: number): string {
+    if (n >= 1000) {
+      const mil = Math.floor(n / 1000)
+      const resto = n % 1000
+      const milStr = mil === 1 ? 'mil' : `${porExtenso(mil)} mil`
+      return resto === 0 ? milStr : `${milStr} e ${porExtenso(resto)}`
+    }
+    return porExtenso(n)
+  }
+  const reaisStr = reais === 1 ? `${milhar(reais)} real` : `${milhar(reais)} reais`
+  if (centavos === 0) return reaisStr
+  const centStr = centavos === 1 ? `${partes[centavos]} centavo` : `${porExtenso(centavos)} centavos`
+  return `${reaisStr} e ${centStr}`
 }
 
+// Substituição de blocos condicionais {{#tag}}...{{/tag}}
+function processarBlocos(html: string, dados: Record<string,boolean>): string {
+  return html.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_, tag, conteudo) => {
+    return dados[tag] ? conteudo : ''
+  })
+}
 
-// ── Valor por extenso (pt-BR) ─────────────────────────────────────────────
-function valorPorExtenso(v: number): string {
-  const valor = Math.round(v * 100) / 100
-  const reais  = Math.floor(valor)
-  const cents  = Math.round((valor - reais) * 100)
-  const u = ['','um','dois','três','quatro','cinco','seis','sete','oito','nove']
-  const t = ['','dez','vinte','trinta','quarenta','cinquenta','sessenta','setenta','oitenta','noventa']
-  const d11_19 = ['dez','onze','doze','treze','quatorze','quinze','dezesseis','dezessete','dezoito','dezenove']
-  const c2 = ['','cento','duzentos','trezentos','quatrocentos','quinhentos','seiscentos','setecentos','oitocentos','novecentos']
-  function grupo(n: number): string {
-    if(n===0) return ''
-    if(n===100) return 'cem'
-    const c=Math.floor(n/100), resto=n%100
-    const dz=Math.floor(resto/10), un=resto%10
-    const partes=[]
-    if(c) partes.push(c2[c])
-    if(resto>=10&&resto<=19) partes.push(d11_19[resto-10])
-    else { if(dz) partes.push(t[dz]); if(un) partes.push(u[un]) }
-    return partes.join(' e ')
-  }
-  function por_extenso_int(n: number): string {
-    if(n===0) return 'zero'
-    if(n>=1000000) return `${por_extenso_int(Math.floor(n/1000000))} ${Math.floor(n/1000000)===1?'milhão':'milhões'}${n%1000000?' e '+por_extenso_int(n%1000000):''}`
-    if(n>=1000) return `${por_extenso_int(Math.floor(n/1000))} mil${n%1000?' e '+por_extenso_int(n%1000):''}`
-    return grupo(n)
-  }
-  const partes=[]
-  if(reais>0) partes.push(`${por_extenso_int(reais)} ${reais===1?'real':'reais'}`)
-  if(cents>0) partes.push(`${por_extenso_int(cents)} ${cents===1?'centavo':'centavos'}`)
-  return partes.join(' e ') || 'zero reais'
+// Substituição de loops {{#lista}}...{{/lista}} com array de objetos
+function processarLoops(html: string, loops: Record<string, Record<string,string>[]>): string {
+  return html.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (match, tag, template) => {
+    const arr = loops[tag]
+    if (!arr) return match
+    return arr.map(item => {
+      let row = template
+      for (const [k, v] of Object.entries(item)) {
+        row = row.split(`{{${k}}}`).join(v)
+      }
+      return row
+    }).join('')
+  })
 }
 
 export async function POST(req: NextRequest) {
-  try {
-    const cookieStore = await cookies()
-    const userCookie = cookieStore.get('locasystem_user')
-    if (!userCookie) return NextResponse.json({ ok:false, error:'Não autenticado' }, { status:401 })
+  const { contrato_id, template_id } = await req.json()
+  if (!contrato_id) return NextResponse.json({ ok:false, error:'contrato_id obrigatório' })
 
-    const { template_id, contrato_id } = await req.json()
-
-    // Buscar template
-    const { data: template } = await sb.from('doc_templates').select('*').eq('id', template_id).single()
-    if (!template) return NextResponse.json({ ok:false, error:'Template não encontrado' })
-
-    // Buscar contrato com todos os dados
-    const { data: contrato } = await sb.from('contratos')
+  // ── Carregar dados ────────────────────────────────────────────────────────
+  const [
+    { data: contrato },
+    { data: itens },
+    { data: params },
+    { data: periodos },
+  ] = await Promise.all([
+    sb.from('contratos')
       .select('*, clientes(*), usuarios(nome)')
-      .eq('id', contrato_id).single()
-    if (!contrato) return NextResponse.json({ ok:false, error:'Contrato não encontrado' })
-
-    // Buscar itens do contrato
-    const { data: itens } = await sb.from('contrato_itens')
-      .select('*, produtos(nome, preco_locacao_diario, custo_reposicao, prazo_entrega_dias), patrimonios(numero_patrimonio)')
+      .eq('id', contrato_id).single(),
+    sb.from('contrato_itens')
+      .select(`*, produtos(nome,preco_locacao_diario,custo_reposicao,prazo_entrega_dias),
+               patrimonios(numero_patrimonio,numero_serie)`)
       .eq('contrato_id', contrato_id)
+      .order('tipo_item')
+      .order('id'),
+    sb.from('parametros').select('chave,valor'),
+    sb.from('periodos_locacao').select('*').eq('ativo',1).order('dias'),
+  ])
 
-    // Buscar parâmetros da empresa
-    const { data: params } = await sb.from('parametros').select('chave, valor')
-    const p: Record<string,string> = {}
-    params?.forEach(x => { p[x.chave] = x.valor ?? '' })
+  if (!contrato) return NextResponse.json({ ok:false, error:'Contrato não encontrado' })
 
-    const cliente  = contrato.clientes as any
-    const vendedor = (contrato.usuarios as any)?.nome ?? ''
+  // ── Template ──────────────────────────────────────────────────────────────
+  const tmplId = template_id ?? 1
+  const { data: tmpl } = await sb.from('doc_templates').select('conteudo').eq('id', tmplId).single()
+  if (!tmpl) return NextResponse.json({ ok:false, error:'Template não encontrado' })
 
-    // Endereço principal do cliente (completo)
-    const endCliente   = [cliente.endereco, cliente.numero, cliente.complemento, cliente.bairro, cliente.cidade, cliente.estado].filter(Boolean).join(', ')
-    const cidadeCliente = [cliente.cidade, cliente.estado].filter(Boolean).join('/')
+  // ── Parâmetros da empresa ─────────────────────────────────────────────────
+  const p: Record<string,string> = {}
+  ;(params ?? []).forEach((x: any) => { p[x.chave] = x.valor })
 
-    // Endereço de entrega: usa local_uso se preenchido, senão endereço do cliente
-    const endEntrega = contrato.local_uso_endereco
-      ? [contrato.local_uso_endereco, contrato.local_uso_numero, contrato.local_uso_complemento, contrato.local_uso_bairro, contrato.local_uso_cidade, contrato.local_uso_estado].filter(Boolean).join(', ')
-      : endCliente
-    const cepEntrega       = contrato.local_uso_cep || cliente.cep || ''
-    const referenciaEntrega = contrato.local_uso_referencia || ''
+  // ── Dados do cliente ──────────────────────────────────────────────────────
+  const cliente = contrato.clientes ?? {}
+  const endCliente = [
+    cliente.logradouro, cliente.numero, cliente.complemento,
+    cliente.bairro, cliente.cidade, cliente.estado
+  ].filter(Boolean).join(', ')
 
-    // Período de cobrança
-    const { data: periodoData } = await sb.from('periodos_locacao').select('nome').eq('id', contrato.periodo_id).maybeSingle()
-    const periodoNome = (periodoData as any)?.nome ?? ''
+  // ── Período ───────────────────────────────────────────────────────────────
+  const di   = contrato.data_inicio ? new Date(contrato.data_inicio + 'T12:00:00') : null
+  const df   = contrato.data_fim    ? new Date(contrato.data_fim    + 'T12:00:00') : null
+  const dias = di && df ? Math.max(1, Math.ceil((df.getTime() - di.getTime()) / 86400000)) : 0
 
-    const dias  = Math.max(1, Math.ceil((new Date(contrato.data_fim).getTime() - new Date(contrato.data_inicio).getTime()) / 86400000))
-    const agora = new Date()
+  // Descobrir período pelo numero de dias
+  const periodoDetected = (periodos ?? []).reduce((best: any, p2: any) => {
+    if (p2.dias <= dias && (!best || p2.dias > best.dias)) return p2
+    return best
+  }, null)
+  const periodoNome = periodoDetected?.nome ?? `${dias} dia(s)`
 
-    // Endereço completo da empresa (usa campos desmembrados se disponíveis)
-    const empresaCidade = p['empresa_cidade'] || (() => {
-      const end = p['empresa_endereco'] ?? ''
-      const partes = end.split(',').map((s: string) => s.trim())
-      return partes.length >= 2 ? partes[partes.length - 2] : ''
-    })()
+  // ── Local de uso ──────────────────────────────────────────────────────────
+  const localUso = [
+    contrato.local_uso_endereco,
+    contrato.local_uso_numero,
+    contrato.local_uso_complemento,
+    contrato.local_uso_bairro,
+    contrato.local_uso_cidade,
+    contrato.local_uso_estado,
+  ].filter(Boolean).join(', ') || contrato.local_uso_referencia || '—'
 
-    const empresaEnderecoCompleto = p['empresa_logradouro']
-      ? [p['empresa_logradouro'], p['empresa_numero'], p['empresa_complemento'],
-         p['empresa_bairro'], `${p['empresa_cidade']}/${p['empresa_estado']}`,
-         `CEP: ${p['empresa_cep']}`].filter(Boolean).join(', ')
-      : p['empresa_endereco'] ?? ''
+  // ── Separar itens por tipo ────────────────────────────────────────────────
+  const itensLocacao   = (itens ?? []).filter((i: any) => i.tipo_item !== 'acessorio')
+  const itensAcessorios = (itens ?? []).filter((i: any) => i.tipo_item === 'acessorio')
+  const temAcessorios  = itensAcessorios.length > 0
 
-    const empresaLogoUrl = p['empresa_logo_url'] ?? ''
+  // ── Calcular totais ────────────────────────────────────────────────────────
+  const subtotal        = itensLocacao.reduce((s: number, i: any) => s + Number(i.total_item), 0)
+  const totalAcessorios = itensAcessorios.reduce((s: number, i: any) => s + Number(i.total_item), 0)
+  const totalGeral      = Number(contrato.total ?? 0)
+  const totalReposicao  = itensLocacao.reduce((s: number, i: any) => s + Number(i.custo_reposicao ?? 0) * Number(i.quantidade), 0)
+  const multaDiaria     = itensLocacao.reduce((s: number, i: any) => s + Number(i.preco_diario ?? i.produtos?.preco_locacao_diario ?? 0), 0)
 
-    // Gerar tabela de itens — formato Kanoff: Qtd | Patrimônio | Descrição | Aditivo | Val.Equip Unit | Val.Equip Total | Val.Loc Unit | Val.Loc Total
-    const itensHtml = (itens ?? []).map((item: any) => {
-      const prod       = item.produtos as any
-      const patNum     = (item.patrimonios as any)?.numero_patrimonio ?? ''
-      const qtd        = Number(item.quantidade ?? 1)
-      const custoUnit  = Number(item.custo_reposicao ?? prod?.custo_reposicao ?? 0)
-      const custoTotal = custoUnit * qtd
-      const locUnit    = Number(item.preco_unitario ?? 0)
-      const locTotal   = Number(item.total_item ?? locUnit * qtd)
-      return `<tr>
-        <td style="text-align:center">${qtd}</td>
-        <td style="text-align:center">${patNum}</td>
-        <td class="desc">${prod?.nome ?? ''}</td>
-        <td style="text-align:center">-</td>
-        <td style="text-align:right">${fmt_money(custoUnit)}</td>
-        <td style="text-align:right">${fmt_money(custoTotal)}</td>
-        <td style="text-align:right">${fmt_money(locUnit)}</td>
-        <td style="text-align:right">${fmt_money(locTotal)}</td>
-      </tr>`
-    }).join('')
-    // Completar com linhas vazias até mínimo 8 linhas
-    const minRows = 8
-    const emptyRows = Math.max(0, minRows - (itens ?? []).length)
-    const itensHtmlFull = itensHtml + Array(emptyRows).fill('<tr class="empty-row"><td></td><td></td><td></td><td></td><td></td><td></td><td></td><td></td></tr>').join('')
+  // ── Nota promissória: valor = maior entre total do contrato e custo reposição
+  const valorNP = Math.max(totalGeral, totalReposicao)
 
-    // Mapa de substituição
-    const tags: Record<string,string> = {
-      '{{empresa_nome}}':             p['empresa_nome'] ?? '',
-      '{{empresa_cnpj}}':             p['empresa_cnpj'] ?? '',
-      '{{empresa_telefone}}':         p['empresa_telefone'] ?? '',
-      '{{empresa_email}}':            p['empresa_email'] ?? '',
-      '{{empresa_endereco}}':         empresaEnderecoCompleto,
-      '{{empresa_ie}}':               p['empresa_ie'] ?? '',
-      '{{empresa_logo_url}}':         empresaLogoUrl,
-
-      '{{cliente_nome}}':             cliente.nome ?? '',
-      '{{cliente_cpf_cnpj}}':         cliente.cpf_cnpj ?? '',
-      '{{cliente_tipo_doc}}':         cliente.tipo === 'PJ' ? 'CNPJ' : 'CPF',
-      '{{cliente_email}}':            cliente.email ?? '',
-      '{{cliente_telefone}}':         cliente.celular || cliente.telefone || '',
-      '{{cliente_endereco_completo}}':endCliente,
-      '{{contrato_numero}}':          contrato.numero,
-      '{{contrato_data_inicio}}':     fmt_date(contrato.data_inicio),
-      '{{contrato_data_fim}}':        fmt_date(contrato.data_fim),
-      '{{contrato_dias}}':            String(dias),
-      '{{contrato_subtotal}}':        fmt_money(contrato.subtotal),
-      '{{contrato_desconto}}':        fmt_money(contrato.desconto),
-      '{{contrato_acrescimo}}':       fmt_money(contrato.acrescimo),
-      '{{contrato_total}}':           fmt_money(contrato.total),
-      '{{contrato_caucao}}':          fmt_money(contrato.caucao),
-      '{{contrato_forma_pagamento}}': (contrato.forma_pagamento ?? '').replace(/_/g,' ').replace(/\b\w/g,(c:string)=>c.toUpperCase()),
-      '{{contrato_observacoes}}':     contrato.observacoes ?? '',
-      '{{contrato_frete}}':            fmt_money(contrato.frete ?? 0),
-      '{{contrato_periodo}}':          periodoNome,
-      '{{contrato_forma_pagamento_desc}}': (contrato.forma_pagamento ?? '').replace(/_/g,' ').replace(/\b\w/g,(cc:string)=>cc.toUpperCase()),
-      '{{vendedor_nome}}':             vendedor,
-      '{{cliente_rg_ie}}':             cliente.rg_ie ?? '',
-      '{{cliente_cep}}':               cliente.cep ?? '',
-      '{{cliente_cidade}}':            cidadeCliente,
-      '{{cliente_bairro}}':            cliente.bairro ?? '',
-      '{{cliente_estado}}':            cliente.estado ?? '',
-      '{{entrega_endereco}}':          endEntrega,
-      '{{entrega_cep}}':               cepEntrega,
-      '{{entrega_referencia}}':        referenciaEntrega,
-      '{{empresa_cidade}}':            empresaCidade,
-      '{{multa_por_dia}}':             fmt_money((itens??[]).reduce((s:number,i:any)=>s+Number(i.preco_diario??i.produtos?.preco_locacao_diario??0),0)),
-      '{{data_geracao}}':             agora.toLocaleDateString('pt-BR'),
-      '{{hora_geracao}}':             agora.toLocaleTimeString('pt-BR'),
-      '{{itens_tabela}}':             itensHtmlFull,
-      '{{devolucao_dias_atraso}}':    '0',
-      '{{devolucao_multa}}':          'R$ 0,00',
-      '{{devolucao_avarias}}':        'R$ 0,00',
-      '{{devolucao_caucao}}':         fmt_money(contrato.caucao),
-    }
-
-    // ── Nota promissória ──────────────────────────────────────────────────
-    const totalReposicao = (itens ?? []).reduce((s: number, item: any) => {
-      const prod  = item.produtos as any
-      const custo = Number(item.custo_reposicao ?? prod?.custo_reposicao ?? 0)
-      const qtd   = Number(item.quantidade ?? 1)
-      return s + custo * qtd
-    }, 0)
-
-    const promissoriaItensHtml = (itens ?? []).map((item: any, idx: number) => {
-      const prod   = item.produtos as any
-      const custo  = Number(item.custo_reposicao ?? prod?.custo_reposicao ?? 0)
-      const qtd    = Number(item.quantidade ?? 1)
-      const patNum = (item.patrimonios as any)?.numero_patrimonio ?? '—'
-      return `<tr>
-        <td>${idx + 1}</td>
-        <td>${prod?.nome ?? ''} ${patNum !== '—' ? `<small>(${patNum})</small>` : ''}</td>
-        <td style="text-align:center">${qtd}</td>
-        <td style="text-align:right">${fmt_money(custo)}</td>
-        <td style="text-align:right">${fmt_money(custo * qtd)}</td>
-      </tr>`
-    }).join('')
-
-    const multaPorDia = (itens ?? []).reduce((s: number, item: any) => {
-      const prod = item.produtos as any
-      return s + Number(item.preco_diario ?? prod?.preco_locacao_diario ?? 0)
-    }, 0)
-
-    // Adicionar tags da promissória ao mapa
-    tags['{{promissoria_itens}}'] = `<table class="doc-table"><thead><tr><th>#</th><th>Item</th><th style="text-align:center">Qtd</th><th style="text-align:right">Custo Unit.</th><th style="text-align:right">Total Reposição</th></tr></thead><tbody>${promissoriaItensHtml}</tbody><tfoot><tr><td colspan="4" style="text-align:right;font-weight:bold">TOTAL:</td><td style="text-align:right;font-weight:bold">${fmt_money(totalReposicao)}</td></tr></tfoot></table>`
-    tags['{{promissoria_total}}']          = fmt_money(totalReposicao)
-    tags['{{promissoria_valor_extenso}}']  = valorPorExtenso(totalReposicao)
-    tags['{{multa_por_dia}}']              = fmt_money(multaPorDia)
-
-    // Substituir tags
-    let conteudo = template.conteudo
-
-    // Logo: se há URL, substitui placeholder de texto pelo <img>
-    if (empresaLogoUrl) {
-      conteudo = conteudo.replace(
-        '<div class="hdr-logo-txt">{{empresa_nome}}</div>',
-        `<img src="${empresaLogoUrl}" alt="Logo" style="max-width:100px;max-height:60px;object-fit:contain"/>`
-      )
-    }
-
-    // ── 1. Blocos condicionais {{#tag}}...{{/tag}} ───────────────────────
-    // Se a tag tem valor → mantém o conteúdo (sem as marcações)
-    // Se a tag é vazia   → remove o bloco inteiro
-    conteudo = conteudo.replace(
-      /\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g,
-      (_match: string, key: string, inner: string) => {
-        const val = tags[`{{${key}}}`] ?? ''
-        return val.trim() ? inner : ''
-      }
-    )
-
-    // ── 2. Tags simples: substituir pelo valor, ou suprimir o padrão ──────
-    // Padrão "Rótulo: {{tag}}" → se vazio, remove a linha inteira
-    // Padrão "Rótulo: <b>{{tag}}</b>" → idem
-    // Padrão standalone {{tag}} → substitui por '' (sem deixar lixo)
-    Object.entries(tags).forEach(([k, v]) => {
-      // Substituir padrões com rótulo HTML bold + tag na mesma linha/célula
-      // ex: <b>Referência:</b> {{entrega_referencia}}<br>  → remove linha se vazio
-      if (!v || v.trim() === '') {
-        // Remove linhas que contêm apenas rótulo + tag vazia (com ou sem <br>)
-        const safeKey = k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
-        // Padrão: <b>Qualquer rótulo:</b> TAG<br> ou TAG\n
-        conteudo = conteudo.replace(
-          new RegExp(`<b>[^<]*:<\\/b>\\s*${safeKey}<br>\\n?`, 'g'), ''
-        )
-        conteudo = conteudo.replace(
-          new RegExp(`<strong>[^<]*:<\\/strong>\\s*${safeKey}<br>\\n?`, 'g'), ''
-        )
-        // Padrão: Texto: TAG<br>
-        conteudo = conteudo.replace(
-          new RegExp(`[^<\\n]*:\\s*${safeKey}<br>\\n?`, 'g'), ''
-        )
-        // Padrão: <td>...TAG...</td> → deixa célula vazia
-        conteudo = conteudo.replace(new RegExp(safeKey, 'g'), '')
-      } else {
-        conteudo = conteudo.replaceAll(k, v)
-      }
+  // ── Lista resumida de equipamentos para nota promissória ──────────────────
+  const listaResumida = itensLocacao
+    .map((i: any) => {
+      const nome = i.descricao_livre ?? i.produtos?.nome ?? '—'
+      const pat  = i.patrimonios?.numero_patrimonio ? ` (Pat. ${i.patrimonios.numero_patrimonio})` : ''
+      return `${nome}${pat}`
     })
+    .join('; ')
 
-    // ── 3. Limpar qualquer tag {{...}} que sobrou sem valor ───────────────
-    // Remove padrões "Rótulo: {{tag_desconhecida}}<br>"
-    conteudo = conteudo.replace(/<b>[^<]*:<\/b>\s*\{\{[^}]+\}\}<br>\n?/g, '')
-    conteudo = conteudo.replace(/[^<\n]*:\s*\{\{[^}]+\}\}<br>\n?/g, '')
-    // Remove tags soltas restantes
-    conteudo = conteudo.replace(/\{\{[^}]+\}\}/g, '')
+  // ── Vencimento NP: data de término do contrato ────────────────────────────
+  const vencimentoNP = fmt_date(contrato.data_fim)
 
-    // Salvar documento gerado
-    const token = gerarToken()
-    const { data: doc, error } = await sb.from('doc_gerados').insert({
-      template_id, contrato_id,
-      titulo: `${template.nome} — ${contrato.numero}`,
-      conteudo_final: conteudo,
-      token,
-    }).select('id, token').single()
+  // ── Empresa ───────────────────────────────────────────────────────────────
+  const empresaEndereco = p['empresa_endereco'] ?? ''
+  const empresaCidade   = p['empresa_cidade']   ?? ''
+  const empresaEstado   = p['empresa_estado']   ?? ''
 
-    if (error) return NextResponse.json({ ok:false, error:error.message })
+  // ── Loops de itens ────────────────────────────────────────────────────────
+  const rowsLocacao: Record<string,string>[] = itensLocacao.map((i: any) => ({
+    nome:             i.descricao_livre ?? i.produtos?.nome ?? '—',
+    patrimonio_num:   i.patrimonios?.numero_patrimonio ?? '—',
+    numero_serie:     i.patrimonios?.numero_serie ?? '—',
+    quantidade:       String(i.quantidade),
+    preco_unitario:   fmt_money(i.preco_unitario),
+    periodo_descricao: periodoNome,
+    total_item:       fmt_money(i.total_item),
+  }))
 
-    return NextResponse.json({ ok:true, token: doc.token, doc_id: doc.id })
-  } catch(e:any) {
-    return NextResponse.json({ ok:false, error:e.message })
+  const rowsAcessorios: Record<string,string>[] = itensAcessorios.map((i: any) => ({
+    nome:           i.descricao_livre ?? i.produtos?.nome ?? '—',
+    quantidade:     String(i.quantidade),
+    preco_unitario: fmt_money(i.preco_unitario),
+    total_item:     fmt_money(i.total_item),
+  }))
+
+  // ── Tags simples ──────────────────────────────────────────────────────────
+  const tags: Record<string,string> = {
+    '{{empresa_nome}}':                    p['empresa_nome'] ?? '',
+    '{{empresa_cnpj}}':                    p['empresa_cnpj'] ?? '',
+    '{{empresa_telefone}}':                p['empresa_telefone'] ?? '',
+    '{{empresa_email}}':                   p['empresa_email'] ?? '',
+    '{{empresa_endereco}}':                empresaEndereco,
+    '{{empresa_cidade}}':                  empresaCidade,
+    '{{empresa_estado}}':                  empresaEstado,
+    '{{cliente_nome}}':                    cliente.nome ?? '',
+    '{{cliente_cpf_cnpj}}':               cliente.cpf_cnpj ?? '',
+    '{{cliente_email}}':                   cliente.email ?? '',
+    '{{cliente_telefone}}':               cliente.celular || cliente.telefone || '',
+    '{{cliente_contato}}':                 cliente.contato ?? '',
+    '{{cliente_endereco_completo}}':       endCliente,
+    '{{contrato_numero}}':                 String(contrato.numero ?? ''),
+    '{{data_emissao}}':                    new Date().toLocaleDateString('pt-BR'),
+    '{{data_inicio}}':                     fmt_date(contrato.data_inicio),
+    '{{data_fim}}':                        fmt_date(contrato.data_fim),
+    '{{dias_totais}}':                     String(dias),
+    '{{local_uso}}':                       localUso,
+    '{{subtotal}}':                        fmt_money(subtotal + totalAcessorios),
+    '{{desconto}}':                        fmt_money(contrato.desconto),
+    '{{frete}}':                           fmt_money(contrato.frete ?? 0),
+    '{{total_geral}}':                     fmt_money(totalGeral),
+    '{{multa_diaria}}':                    fmt_money(multaDiaria),
+    '{{total_nota_promissoria}}':          fmt_money(valorNP),
+    '{{total_nota_promissoria_extenso}}':  valor_extenso(valorNP),
+    '{{vencimento_nota}}':                 vencimentoNP,
+    '{{lista_equipamentos_resumida}}':     listaResumida,
+    // compatibilidade com tags antigas
+    '{{contrato_data_inicio}}':            fmt_date(contrato.data_inicio),
+    '{{contrato_data_fim}}':               fmt_date(contrato.data_fim),
+    '{{contrato_total}}':                  fmt_money(totalGeral),
+    '{{contrato_subtotal}}':               fmt_money(subtotal + totalAcessorios),
+    '{{contrato_desconto}}':               fmt_money(contrato.desconto),
+    '{{contrato_frete}}':                  fmt_money(contrato.frete ?? 0),
+    '{{contrato_forma_pagamento}}':        (contrato.forma_pagamento ?? '').replace(/_/g,' ').replace(/\b\w/g,(cc:string)=>cc.toUpperCase()),
+    '{{contrato_observacoes}}':            contrato.observacoes ?? '',
+    '{{contrato_dias}}':                   String(dias),
+    '{{contrato_periodo}}':                periodoNome,
+    '{{vendedor_nome}}':                   (contrato.usuarios as any)?.nome ?? '',
   }
+
+  // ── Processar HTML ────────────────────────────────────────────────────────
+  let html = tmpl.conteudo as string
+
+  // 1. Processar loops de linhas primeiro
+  html = processarLoops(html, {
+    itens_locacao:   rowsLocacao,
+    itens_acessorios: rowsAcessorios,
+  })
+
+  // 2. Processar blocos condicionais
+  html = processarBlocos(html, {
+    tem_acessorios: temAcessorios,
+    tem_desconto:   Number(contrato.desconto) > 0,
+    tem_frete:      Number(contrato.frete ?? 0) > 0,
+  })
+
+  // 3. Substituir tags simples
+  for (const [tag, val] of Object.entries(tags)) {
+    html = html.split(tag).join(val)
+  }
+
+  // 4. Limpar tags não substituídas
+  html = html.replace(/\{\{[^}]+\}\}/g, '')
+
+  // ── Salvar no banco ────────────────────────────────────────────────────────
+  const { data: doc, error: docErr } = await sb.from('doc_gerados').insert({
+    contrato_id,
+    template_id: tmplId,
+    conteudo_html: html,
+    gerado_por: null,
+  }).select('id').single()
+
+  if (docErr) return NextResponse.json({ ok:false, error:docErr.message })
+
+  return NextResponse.json({ ok:true, doc_id: doc.id, html })
 }

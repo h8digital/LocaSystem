@@ -62,7 +62,7 @@ export async function POST(req: NextRequest) {
     for (const item of itens) {
       await sb.from('contrato_itens').insert({
         contrato_id:       c.id,
-        produto_id:        item.produto_id,
+        produto_id:        item.produto_id || null,
         patrimonio_id:     item.patrimonio_id || null,
         quantidade:        item.quantidade || 1,
         preco_unitario:    Number(item.preco_unitario) || 0,
@@ -70,6 +70,8 @@ export async function POST(req: NextRequest) {
         preco_diario:      Number(item.preco_diario)      || 0,
         custo_reposicao:   Number(item.custo_reposicao)   || 0,
         prazo_entrega_dias: Number(item.prazo_entrega_dias) || 0,
+        tipo_item:         item.tipo_item || 'locacao',
+        descricao_livre:   item.descricao_livre || null,
       })
       if (item.patrimonio_id) {
         await sb.from('patrimonios').update({ status:'locado' }).eq('id', item.patrimonio_id)

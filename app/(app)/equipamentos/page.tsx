@@ -8,8 +8,10 @@ import LookupField from '@/components/ui/LookupField'
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const emptyForm = () => ({
   nome:'', codigo:'', categoria_id:'', marca:'', modelo:'', descricao:'',
-  controla_patrimonio: 1, unidade:'un', estoque_total: 0,
-  custo_reposicao: 0, prazo_entrega_dias: 0,
+  controla_patrimonio: 1, unidade:'un',
+  estoque_total: 0, estoque_locacao: 0, estoque_venda: 0,
+  custo_reposicao: 0, preco_venda: 0, permite_venda: 0,
+  prazo_entrega_dias: 0,
   preco_locacao_diario: 0, preco_fds: 0, preco_locacao_semanal: 0,
   preco_quinzenal: 0, preco_locacao_mensal: 0, preco_trimestral: 0, preco_semestral: 0,
   observacoes:'',
@@ -179,7 +181,11 @@ export default function EquipamentosPage() {
       descricao:             form.observacoes || null,
       controla_patrimonio:   Number(form.controla_patrimonio),
       unidade:               form.unidade || 'un',
-      estoque_total:         Number(form.estoque_total) || 0,
+      estoque_total:         Number(form.estoque_locacao) || Number(form.estoque_total) || 0,
+      estoque_locacao:       Number(form.estoque_locacao) || 0,
+      estoque_venda:         Number(form.estoque_venda) || 0,
+      permite_venda:         Number(form.permite_venda) || 0,
+      preco_venda:           Number(form.preco_venda) || 0,
       custo_reposicao:       Number(form.custo_reposicao) || 0,
       prazo_entrega_dias:    Number(form.prazo_entrega_dias) || 0,
       preco_locacao_diario:  Number(form.preco_locacao_diario) || 0,
@@ -696,21 +702,44 @@ export default function EquipamentosPage() {
                   ))}
                 </div>
                 {Number(form.controla_patrimonio)===0 && (
-                  <div className="form-grid-3">
-                    <FormField label="Unidade">
-                      <input value={form.unidade??'un'} onChange={e=>setForm((f:any)=>({...f,unidade:e.target.value}))}
-                        className={inputCls} placeholder="un, kg, m..." />
-                    </FormField>
-                    <FormField label="Estoque Atual">
-                      <input type="number" min="0" value={form.estoque_total??0}
-                        onChange={e=>setForm((f:any)=>({...f,estoque_total:e.target.value}))}
-                        className={inputCls} />
-                    </FormField>
-                    <FormField label="Prazo Entrega (dias)">
-                      <input type="number" min="0" value={form.prazo_entrega_dias??0}
-                        onChange={e=>setForm((f:any)=>({...f,prazo_entrega_dias:e.target.value}))}
-                        className={inputCls} />
-                    </FormField>
+                  <div style={{display:'flex',flexDirection:'column',gap:10}}>
+                    <div className="form-grid-3">
+                      <FormField label="Unidade">
+                        <input value={form.unidade??'un'} onChange={e=>setForm((f:any)=>({...f,unidade:e.target.value}))}
+                          className={inputCls} placeholder="un, kg, m..." />
+                      </FormField>
+                      <FormField label="Estoque p/ Locação" hint="Itens que retornam">
+                        <input type="number" min="0" value={form.estoque_locacao??0}
+                          onChange={e=>setForm((f:any)=>({...f,estoque_locacao:e.target.value}))}
+                          className={inputCls} />
+                      </FormField>
+                      <FormField label="Estoque p/ Venda" hint="Itens consumíveis / acessórios">
+                        <input type="number" min="0" value={form.estoque_venda??0}
+                          onChange={e=>setForm((f:any)=>({...f,estoque_venda:e.target.value}))}
+                          className={inputCls} />
+                      </FormField>
+                    </div>
+                    <div className="form-grid-2">
+                      <FormField label="Prazo Entrega (dias)">
+                        <input type="number" min="0" value={form.prazo_entrega_dias??0}
+                          onChange={e=>setForm((f:any)=>({...f,prazo_entrega_dias:e.target.value}))}
+                          className={inputCls} />
+                      </FormField>
+                      <FormField label="Pode ser vendido/cobrado avulso?">
+                        <div style={{display:'flex',gap:8,marginTop:4}}>
+                          {[{v:1,l:'Sim'},{v:0,l:'Não'}].map(o=>(
+                            <button key={o.v} onClick={()=>setForm((f:any)=>({...f,permite_venda:o.v}))}
+                              style={{flex:1,padding:'6px 0',borderRadius:'var(--r-sm)',border:'1px solid',
+                                borderColor:Number(form.permite_venda)===o.v?'var(--c-primary)':'var(--border)',
+                                background:Number(form.permite_venda)===o.v?'var(--c-primary)':'transparent',
+                                color:Number(form.permite_venda)===o.v?'#fff':'var(--t-muted)',
+                                fontWeight:600,cursor:'pointer',fontSize:'var(--fs-sm)'}}>
+                              {o.l}
+                            </button>
+                          ))}
+                        </div>
+                      </FormField>
+                    </div>
                   </div>
                 )}
                 {Number(form.controla_patrimonio)===1 && (
@@ -773,11 +802,11 @@ export default function EquipamentosPage() {
                 </div>
               )}
             </div>
-            {/* Custo de reposição por quantidade aqui */}
-            {Number(form.controla_patrimonio)===0 && (
-              <div style={{ borderTop:'1px solid var(--border)', paddingTop:14 }}>
-                <FormField label="Custo de Reposição (R$)" hint="Valor cobrado em caso de perda ou dano">
-                  <div style={{ position:'relative', maxWidth:200 }}>
+            {/* Custo reposição + Preço de venda */}
+            <div style={{ borderTop:'1px solid var(--border)', paddingTop:14 }}>
+              <div className="form-grid-2">
+                <FormField label="Custo de Reposição (R$)" hint="Cobrado em caso de perda ou dano">
+                  <div style={{ position:'relative' }}>
                     <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)',
                       color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
                     <input type="number" step="0.01" min="0" value={form.custo_reposicao??0}
@@ -785,8 +814,20 @@ export default function EquipamentosPage() {
                       className={inputCls} style={{ paddingLeft:30 }} />
                   </div>
                 </FormField>
+                {Number(form.permite_venda)===1 && (
+                  <FormField label="Preço de Venda / Avulso (R$)" hint="Quando cobrado como acessório no contrato">
+                    <div style={{ position:'relative' }}>
+                      <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)',
+                        color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
+                      <input type="number" step="0.01" min="0" value={form.preco_venda??0}
+                        onChange={e=>setForm((f:any)=>({...f,preco_venda:e.target.value}))}
+                        className={inputCls} style={{ paddingLeft:30,
+                          borderColor:Number(form.preco_venda)>0?'var(--c-primary)':undefined }} />
+                    </div>
+                  </FormField>
+                )}
               </div>
-            )}
+            </div>
           </div>
         )}
 

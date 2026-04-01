@@ -89,6 +89,13 @@ export default function CriarContratoPage() {
   const [itemPatrimonioNome,setItemPatrimonioNome]=useState('')
   const [itemQtd,          setItemQtd]          = useState(1)
   const [itemPreco,        setItemPreco]        = useState(0)
+  // ── Acessórios ──────────────────────────────────────────────────────────────
+  const [modoAcess,      setModoAcess]      = useState(false)
+  const [acessDescricao, setAcessDescricao] = useState('')
+  const [acessQtd,       setAcessQtd]       = useState(1)
+  const [acessPreco,     setAcessPreco]     = useState(0)
+  const [acessProdId,    setAcessProdId]    = useState<number|null>(null)
+  const [acessProdNome,  setAcessProdNome]  = useState('')
   const [patrimonios,      setPatrimonios]      = useState<any[]>([])
   const [loadingPats,      setLoadingPats]      = useState(false)
 
@@ -179,6 +186,7 @@ export default function CriarContratoPage() {
       produto_id:itemProdutoId, produto_nome:itemProduto.nome,
       patrimonio_id:itemPatrimonioId, patrimonio_num:itemPatrimonioNome||null,
       quantidade:itemQtd, preco_unitario:itemPreco,
+      tipo_item:'locacao', descricao_livre:null,
       _descricaoCobranca: getDescricaoCobranca(itemProduto),
       preco_diario: Number(itemProduto.preco_locacao_diario??0),
       custo_reposicao: Number(itemProduto.custo_reposicao??0),
@@ -189,6 +197,31 @@ export default function CriarContratoPage() {
     setItemProdutoId(null); setItemProdutoNome(''); setItemProduto(null)
     setItemPatrimonioId(null); setItemPatrimonioNome('')
     setItemQtd(1); setItemPreco(0); setPatrimonios([])
+  }
+
+  function adicionarAcessorio() {
+    if (!acessDescricao.trim() && !acessProdId) { setErro('Informe a descrição do acessório.'); return }
+    if (acessPreco <= 0) { setErro('Informe o valor do acessório.'); return }
+    setErro('')
+    const desc = acessDescricao.trim() || acessProdNome
+    setItens(prev => [...prev, {
+      produto_id:        acessProdId,
+      produto_nome:      desc,
+      patrimonio_id:     null,
+      patrimonio_num:    null,
+      quantidade:        acessQtd,
+      preco_unitario:    acessPreco,
+      total:             acessPreco * acessQtd,
+      tipo_item:         'acessorio',
+      descricao_livre:   acessDescricao.trim() || null,
+      _descricaoCobranca: `${acessQtd}x ${fmt.money(acessPreco)}`,
+      preco_diario:      0,
+      custo_reposicao:   0,
+      prazo_entrega_dias: 0,
+      _produto:          null,
+    }])
+    setAcessDescricao(''); setAcessQtd(1); setAcessPreco(0)
+    setAcessProdId(null); setAcessProdNome(''); setModoAcess(false)
   }
 
   // ── Validação por passo ───────────────────────────────────────────────────
@@ -390,156 +423,259 @@ export default function CriarContratoPage() {
       ══════════════════════════════════════════════════════════ */}
       {passo===3 && (
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-          {/* Adicionar item */}
-          <div className="ds-card" style={{ padding:'14px 16px' }}>
-            <div className="ds-section-title">Adicionar Equipamento</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:10, alignItems:'flex-end' }}>
-              <LookupField
-                label="Produto / Equipamento" required placeholder="Pesquisar equipamento..."
-                value={itemProdutoId} displayValue={itemProdutoNome}
-                onChange={(id,row)=>selecionarProduto(id as number,row)}
-                table="produtos" searchColumn="nome"
-                extraColumns="controla_patrimonio,preco_locacao_diario,preco_fds,preco_locacao_semanal,preco_quinzenal,preco_locacao_mensal,preco_trimestral,preco_semestral,marca,custo_reposicao,prazo_entrega_dias"
-                filter={{ativo:1}}
-                renderOption={row=>(
-                  <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
-                    <div>
-                      <div style={{ fontWeight:500 }}>{row.nome}</div>
-                      {row.marca && <div style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)' }}>{row.marca}</div>}
-                    </div>
-                    <div style={{ fontWeight:700, color:'var(--c-primary)', whiteSpace:'nowrap', fontSize:'var(--fs-md)' }}>
-                      {fmt.money(getPrecoParaPeriodo(row))}
-                    </div>
-                  </div>
-                )}
-                createPanelTitle="Novo Produto"
-                createPanel={({onClose,onCreated}:any)=><QuickCreateProduto onClose={onClose} onCreated={r=>{selecionarProduto(r.id,r);onCreated(r)}}/>}
-              />
-              <div style={{ minWidth:80 }}>
-                <div className="ds-label" style={{ marginBottom:4 }}>Qtd</div>
-                <input type="number" min="1" value={itemQtd}
-                  onChange={e=>setItemQtd(Number(e.target.value))}
-                  className={inputCls} style={{ width:80 }}
-                  disabled={!!itemProduto?.controla_patrimonio}/>
-              </div>
-              <div style={{ paddingBottom:1 }}>
-                <div className="ds-label" style={{ marginBottom:4 }}>&nbsp;</div>
-                <Btn onClick={adicionarItem} disabled={!itemProdutoId} size="sm">+ Adicionar</Btn>
-              </div>
-            </div>
 
-            {/* Patrimônio e preço */}
-            {itemProduto?.controla_patrimonio===1 && (
-              <div style={{ marginTop:12, display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
-                <FormField label="Patrimônio disponível" required>
-                  {loadingPats
-                    ? <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:'var(--fs-md)', color:'var(--t-muted)', height:30 }}><div className="ds-spinner" style={{ width:13, height:13 }}/>Carregando...</div>
-                    : patrimonios.length===0
-                      ? <div style={{ fontSize:'var(--fs-md)', color:'var(--c-warning-text)', background:'var(--c-warning-light)', padding:'6px 10px', borderRadius:'var(--r-sm)', border:'1px solid var(--c-warning)' }}>Nenhum patrimônio disponível.</div>
-                      : <select value={itemPatrimonioId??''} onChange={e=>{
-                          const pid=Number(e.target.value)
-                          const pat=patrimonios.find(p=>p.id===pid)
-                          setItemPatrimonioId(pid||null); setItemPatrimonioNome(pat?.numero_patrimonio??'')
-                        }} className={selectCls}>
-                          <option value="">Selecione o patrimônio...</option>
-                          {patrimonios.map(p=><option key={p.id} value={p.id}>{p.numero_patrimonio}{p.numero_serie?` — ${p.numero_serie}`:''}</option>)}
-                        </select>
-                  }
-                </FormField>
-                <FormField
-                  label={getDescricaoCobranca(itemProduto) ? `Preço do período (R$)` : `Preço/Dia (R$)`}
-                  hint={getDescricaoCobranca(itemProduto) || undefined}
-                >
-                  <div style={{ position:'relative' }}>
-                    <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
-                    <input type="number" step="0.01" min="0" value={itemPreco}
-                      onChange={e=>setItemPreco(Number(e.target.value))}
-                      className={inputCls} style={{ paddingLeft:30 }}/>
-                  </div>
-                </FormField>
-              </div>
-            )}
-            {itemProduto && !itemProduto.controla_patrimonio && (
-              <div style={{ marginTop:12 }}>
-                <FormField label={getDescricaoCobranca(itemProduto) ? `Preço do período (R$)` : `Preço/Dia (R$)`} hint={getDescricaoCobranca(itemProduto) || undefined} style={{ maxWidth:200 }}>
-                  <div style={{ position:'relative' }}>
-                    <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
-                    <input type="number" step="0.01" min="0" value={itemPreco}
-                      onChange={e=>setItemPreco(Number(e.target.value))}
-                      className={inputCls} style={{ paddingLeft:30 }}/>
-                  </div>
-                </FormField>
-              </div>
-            )}
-
-            {/* Preview do item */}
-            {itemPreco>0 && itemProduto && (
-              <div style={{ marginTop:12, background:'var(--c-primary-light)', border:'1px solid var(--c-primary)', borderRadius:'var(--r-sm)',
-                padding:'8px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'var(--fs-md)' }}>
-                <span style={{ color:'var(--c-primary-text)' }}>
-                  {getDescricaoCobranca(itemProduto) || `${dias}d`}
-                  {' × '}{itemProduto.controla_patrimonio ? '1 un' : `${itemQtd} un`}
-                </span>
-                <span style={{ fontWeight:800, color:'var(--c-primary)' }}>
-                  {fmt.money(itemPreco*(itemProduto.controla_patrimonio?1:itemQtd))}
-                </span>
-              </div>
-            )}
+          {/* ── TOGGLE MODO ──────────────────────────────────────────────── */}
+          <div style={{ display:'flex', gap:0, border:'1px solid var(--border)',
+            borderRadius:'var(--r-md)', overflow:'hidden', alignSelf:'flex-start' }}>
+            {[
+              { v:false, l:'📦 Equipamento de Locação' },
+              { v:true,  l:'🔧 Acessório / Produto Avulso' },
+            ].map(opt => (
+              <button key={String(opt.v)} onClick={() => { setModoAcess(opt.v); setErro('') }}
+                style={{ padding:'8px 18px', border:'none', cursor:'pointer',
+                  fontWeight: modoAcess===opt.v ? 700 : 400,
+                  fontSize:'var(--fs-md)',
+                  background: modoAcess===opt.v ? 'var(--c-primary)' : 'var(--bg-card)',
+                  color: modoAcess===opt.v ? '#fff' : 'var(--t-muted)',
+                  transition:'all .15s' }}>
+                {opt.l}
+              </button>
+            ))}
           </div>
 
-          {/* Tabela de itens adicionados */}
+          {/* ── FORMULÁRIO: EQUIPAMENTO ──────────────────────────────────── */}
+          {!modoAcess && (
+            <div className="ds-card" style={{ padding:'14px 16px' }}>
+              <div className="ds-section-title">Adicionar Equipamento de Locação</div>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:10, alignItems:'flex-end' }}>
+                <LookupField
+                  label="Produto / Equipamento" required placeholder="Pesquisar equipamento..."
+                  value={itemProdutoId} displayValue={itemProdutoNome}
+                  onChange={(id,row)=>selecionarProduto(id as number,row)}
+                  table="produtos" searchColumn="nome"
+                  extraColumns="controla_patrimonio,preco_locacao_diario,preco_fds,preco_locacao_semanal,preco_quinzenal,preco_locacao_mensal,preco_trimestral,preco_semestral,marca,custo_reposicao,prazo_entrega_dias"
+                  filter={{ativo:1}}
+                  renderOption={row=>(
+                    <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
+                      <div>
+                        <div style={{ fontWeight:500 }}>{row.nome}</div>
+                        {row.marca && <div style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)' }}>{row.marca}</div>}
+                      </div>
+                      <div style={{ fontWeight:700, color:'var(--c-primary)', whiteSpace:'nowrap', fontSize:'var(--fs-md)' }}>
+                        {fmt.money(getPrecoParaPeriodo(row))}
+                      </div>
+                    </div>
+                  )}
+                  createPanelTitle="Novo Produto"
+                  createPanel={({onClose,onCreated}:any)=><QuickCreateProduto onClose={onClose} onCreated={r=>{selecionarProduto(r.id,r);onCreated(r)}}/>}
+                />
+                <div style={{ minWidth:80 }}>
+                  <div className="ds-label" style={{ marginBottom:4 }}>Qtd</div>
+                  <input type="number" min="1" value={itemQtd}
+                    onChange={e=>setItemQtd(Number(e.target.value))}
+                    className={inputCls} style={{ width:80 }}
+                    disabled={!!itemProduto?.controla_patrimonio}/>
+                </div>
+                <div style={{ paddingBottom:1 }}>
+                  <div className="ds-label" style={{ marginBottom:4 }}>&nbsp;</div>
+                  <Btn onClick={adicionarItem} disabled={!itemProdutoId} size="sm">+ Adicionar</Btn>
+                </div>
+              </div>
+
+              {itemProduto?.controla_patrimonio===1 && (
+                <div style={{ marginTop:12, display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                  <FormField label="Patrimônio disponível" required>
+                    {loadingPats
+                      ? <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:'var(--fs-md)', color:'var(--t-muted)', height:30 }}><div className="ds-spinner" style={{ width:13, height:13 }}/>Carregando...</div>
+                      : patrimonios.length===0
+                        ? <div style={{ fontSize:'var(--fs-md)', color:'var(--c-warning-text)', background:'var(--c-warning-light)', padding:'6px 10px', borderRadius:'var(--r-sm)', border:'1px solid var(--c-warning)' }}>Nenhum patrimônio disponível.</div>
+                        : <select value={itemPatrimonioId??''} onChange={e=>{
+                            const pid=Number(e.target.value)
+                            const pat=patrimonios.find(p=>p.id===pid)
+                            setItemPatrimonioId(pid||null); setItemPatrimonioNome(pat?.numero_patrimonio??'')
+                          }} className={selectCls}>
+                            <option value="">Selecione o patrimônio...</option>
+                            {patrimonios.map(p=><option key={p.id} value={p.id}>{p.numero_patrimonio}{p.numero_serie?` — ${p.numero_serie}`:''}</option>)}
+                          </select>
+                    }
+                  </FormField>
+                  <FormField
+                    label={getDescricaoCobranca(itemProduto) ? `Preço do período (R$)` : `Preço/Dia (R$)`}
+                    hint={getDescricaoCobranca(itemProduto) || undefined}
+                  >
+                    <div style={{ position:'relative' }}>
+                      <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
+                      <input type="number" step="0.01" min="0" value={itemPreco}
+                        onChange={e=>setItemPreco(Number(e.target.value))}
+                        className={inputCls} style={{ paddingLeft:30 }}/>
+                    </div>
+                  </FormField>
+                </div>
+              )}
+              {itemProduto && !itemProduto.controla_patrimonio && (
+                <div style={{ marginTop:12 }}>
+                  <FormField label={getDescricaoCobranca(itemProduto) ? `Preço do período (R$)` : `Preço/Dia (R$)`} hint={getDescricaoCobranca(itemProduto) || undefined} style={{ maxWidth:200 }}>
+                    <div style={{ position:'relative' }}>
+                      <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)', color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
+                      <input type="number" step="0.01" min="0" value={itemPreco}
+                        onChange={e=>setItemPreco(Number(e.target.value))}
+                        className={inputCls} style={{ paddingLeft:30 }}/>
+                    </div>
+                  </FormField>
+                </div>
+              )}
+              {itemPreco>0 && itemProduto && (
+                <div style={{ marginTop:12, background:'var(--c-primary-light)', border:'1px solid var(--c-primary)', borderRadius:'var(--r-sm)',
+                  padding:'8px 14px', display:'flex', justifyContent:'space-between', alignItems:'center', fontSize:'var(--fs-md)' }}>
+                  <span style={{ color:'var(--c-primary-text)' }}>
+                    {getDescricaoCobranca(itemProduto) || `${dias}d`}
+                    {' × '}{itemProduto.controla_patrimonio ? '1 un' : `${itemQtd} un`}
+                  </span>
+                  <span style={{ fontWeight:800, color:'var(--c-primary)' }}>
+                    {fmt.money(itemPreco*(itemProduto.controla_patrimonio?1:itemQtd))}
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── FORMULÁRIO: ACESSÓRIO ─────────────────────────────────────── */}
+          {modoAcess && (
+            <div className="ds-card" style={{ padding:'14px 16px', border:'2px solid var(--c-warning,#f59e0b)' }}>
+              <div className="ds-section-title" style={{ color:'var(--c-warning-text,#92400e)' }}>
+                🔧 Adicionar Acessório / Produto Avulso
+              </div>
+              <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginBottom:12 }}>
+                Itens cobrados junto à locação (ex: brocas, EPIs, consumíveis). Não geram devolução.
+              </div>
+              <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr auto', gap:10, alignItems:'flex-end' }}>
+                <FormField label="Descrição do acessório" required>
+                  <input
+                    value={acessDescricao}
+                    onChange={e=>setAcessDescricao(e.target.value)}
+                    className={inputCls}
+                    placeholder="Ex: Broca 10mm, EPI, Taxa de frete..."
+                    autoFocus
+                  />
+                </FormField>
+                <FormField label="Quantidade">
+                  <input type="number" min="1" value={acessQtd}
+                    onChange={e=>setAcessQtd(Number(e.target.value))}
+                    className={inputCls} />
+                </FormField>
+                <FormField label="Valor unitário (R$)">
+                  <div style={{ position:'relative' }}>
+                    <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)',
+                      color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
+                    <input type="number" step="0.01" min="0" value={acessPreco||''}
+                      onChange={e=>setAcessPreco(Number(e.target.value))}
+                      className={inputCls} style={{ paddingLeft:30 }} />
+                  </div>
+                </FormField>
+                <div style={{ paddingBottom:1 }}>
+                  <Btn onClick={adicionarAcessorio}
+                    disabled={!acessDescricao.trim() || acessPreco<=0}
+                    size="sm"
+                    style={{ background:'var(--c-warning,#f59e0b)', borderColor:'var(--c-warning,#f59e0b)' }}>
+                    + Adicionar
+                  </Btn>
+                </div>
+              </div>
+              {acessPreco>0 && acessDescricao && (
+                <div style={{ marginTop:10, background:'#fef3c718', border:'1px solid #f59e0b',
+                  borderRadius:'var(--r-sm)', padding:'8px 14px',
+                  display:'flex', justifyContent:'space-between', fontSize:'var(--fs-md)' }}>
+                  <span style={{ color:'#92400e' }}>{acessQtd}× {acessDescricao}</span>
+                  <span style={{ fontWeight:800, color:'#92400e' }}>{fmt.money(acessPreco*acessQtd)}</span>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── LISTA DE ITENS ────────────────────────────────────────────── */}
           {itens.length>0 && (
             <div className="ds-card" style={{ overflow:'hidden' }}>
-              <div style={{ padding:'10px 14px', background:'var(--bg-header)', borderBottom:'1px solid var(--border)',
-                fontWeight:700, fontSize:'var(--fs-md)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                <span>{itens.length} equipamento(s) adicionado(s)</span>
-                <span style={{ color:'var(--c-primary)', fontWeight:800 }}>{fmt.money(subtotal)}</span>
+              {/* Locação */}
+              {itens.filter(i=>i.tipo_item!=='acessorio').length > 0 && (
+                <>
+                  <div style={{ padding:'10px 14px', background:'var(--bg-header)', borderBottom:'1px solid var(--border)',
+                    fontWeight:700, fontSize:'var(--fs-md)', display:'flex', justifyContent:'space-between' }}>
+                    <span>📦 Equipamentos de Locação ({itens.filter(i=>i.tipo_item!=='acessorio').length})</span>
+                    <span style={{ color:'var(--c-primary)', fontWeight:800 }}>
+                      {fmt.money(itens.filter(i=>i.tipo_item!=='acessorio').reduce((s,i)=>s+i.total,0))}
+                    </span>
+                  </div>
+                  <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                    <thead><tr>
+                      <Th>Equipamento</Th><Th>Patrimônio</Th>
+                      <Th right>Qtd</Th><Th right>Preço</Th><Th right>Total</Th><Th></Th>
+                    </tr></thead>
+                    <tbody>
+                      {itens.map((item,i) => item.tipo_item==='acessorio' ? null : (
+                        <tr key={i}>
+                          <td style={{ padding:'9px 12px', fontWeight:500, borderBottom:'1px solid var(--border)' }}>
+                            <div>{item.produto_nome}</div>
+                            <div style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)' }}>
+                              {item._descricaoCobranca}
+                            </div>
+                          </td>
+                          <td style={{ padding:'9px 12px', color:'var(--t-muted)', fontFamily:'monospace', fontSize:'var(--fs-md)', borderBottom:'1px solid var(--border)' }}>{item.patrimonio_num??'—'}</td>
+                          <td style={{ padding:'9px 12px', textAlign:'right', borderBottom:'1px solid var(--border)' }}>{item.quantidade}</td>
+                          <td style={{ padding:'9px 12px', textAlign:'right', borderBottom:'1px solid var(--border)', fontFamily:'var(--font-mono)' }}>{fmt.money(item.preco_unitario)}</td>
+                          <td style={{ padding:'9px 12px', textAlign:'right', fontWeight:700, color:'var(--c-primary)', borderBottom:'1px solid var(--border)', fontFamily:'var(--font-mono)' }}>{fmt.money(item.total)}</td>
+                          <td style={{ padding:'9px 12px', borderBottom:'1px solid var(--border)' }}>
+                            <button onClick={()=>setItens(prev=>prev.filter((_,j)=>j!==i))} className="tbl-btn del" title="Remover">×</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+
+              {/* Acessórios */}
+              {itens.filter(i=>i.tipo_item==='acessorio').length > 0 && (
+                <>
+                  <div style={{ padding:'10px 14px', background:'#fef3c730', borderTop:'1px solid var(--border)', borderBottom:'1px solid var(--border)',
+                    fontWeight:700, fontSize:'var(--fs-md)', display:'flex', justifyContent:'space-between' }}>
+                    <span>🔧 Acessórios / Avulsos ({itens.filter(i=>i.tipo_item==='acessorio').length})</span>
+                    <span style={{ color:'#92400e', fontWeight:800 }}>
+                      {fmt.money(itens.filter(i=>i.tipo_item==='acessorio').reduce((s,i)=>s+i.total,0))}
+                    </span>
+                  </div>
+                  <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                    <thead><tr>
+                      <Th>Descrição</Th><Th right>Qtd</Th><Th right>Unit.</Th><Th right>Total</Th><Th></Th>
+                    </tr></thead>
+                    <tbody>
+                      {itens.map((item,i) => item.tipo_item!=='acessorio' ? null : (
+                        <tr key={i} style={{ background:'#fffbeb' }}>
+                          <td style={{ padding:'9px 12px', fontWeight:500, borderBottom:'1px solid var(--border)' }}>{item.produto_nome}</td>
+                          <td style={{ padding:'9px 12px', textAlign:'right', borderBottom:'1px solid var(--border)' }}>{item.quantidade}</td>
+                          <td style={{ padding:'9px 12px', textAlign:'right', borderBottom:'1px solid var(--border)', fontFamily:'var(--font-mono)' }}>{fmt.money(item.preco_unitario)}</td>
+                          <td style={{ padding:'9px 12px', textAlign:'right', fontWeight:700, color:'#92400e', borderBottom:'1px solid var(--border)', fontFamily:'var(--font-mono)' }}>{fmt.money(item.total)}</td>
+                          <td style={{ padding:'9px 12px', borderBottom:'1px solid var(--border)' }}>
+                            <button onClick={()=>setItens(prev=>prev.filter((_,j)=>j!==i))} className="tbl-btn del" title="Remover">×</button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </>
+              )}
+
+              {/* Total geral */}
+              <div style={{ padding:'10px 16px', display:'flex', justifyContent:'flex-end',
+                gap:8, alignItems:'center', background:'var(--bg-header)', borderTop:'2px solid var(--border)' }}>
+                <span style={{ fontWeight:600, color:'var(--t-muted)' }}>Total:</span>
+                <span style={{ fontWeight:800, fontSize:'var(--fs-lg)', color:'var(--c-primary)' }}>{fmt.money(subtotal)}</span>
               </div>
-              <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><tr>
-                  <Th>Equipamento</Th>
-                  <Th>Patrimônio</Th>
-                  <Th right>Qtd</Th>
-                  <Th right>Preço/período</Th>
-                  <Th right>Prazo</Th>
-                  <Th right>Total</Th>
-                  <Th></Th>
-                </tr></thead>
-                <tbody>
-                  {itens.map((item,i)=>(
-                    <tr key={i}>
-                      <td style={{ padding:'10px 12px', fontWeight:500, borderBottom:'1px solid var(--border)' }}>
-                        <div>{item.produto_nome}</div>
-                        {item.custo_reposicao>0&&<div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>Reposição: {fmt.money(item.custo_reposicao)}</div>}
-                      </td>
-                      <td style={{ padding:'10px 12px', color:'var(--t-muted)', fontFamily:'monospace', fontSize:'var(--fs-md)', borderBottom:'1px solid var(--border)' }}>{item.patrimonio_num??'—'}</td>
-                      <td style={{ padding:'10px 12px', textAlign:'right', borderBottom:'1px solid var(--border)' }}>{item.quantidade}</td>
-                      <td style={{ padding:'10px 12px', textAlign:'right', borderBottom:'1px solid var(--border)' }}>
-                        <div style={{fontWeight:700,fontFamily:'var(--font-mono)'}}>{fmt.money(item.total)}</div>
-                        <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginTop:1}}>
-                          {item._descricaoCobranca ?? getDescricaoCobranca(item._produto)}
-                        </div>
-                      </td>
-                      <td style={{ padding:'10px 12px', textAlign:'right', borderBottom:'1px solid var(--border)', fontSize:'var(--fs-md)', color:'var(--t-muted)' }}>
-                        {item.prazo_entrega_dias>0?`${item.prazo_entrega_dias}d`:'—'}
-                      </td>
-                      <td style={{ padding:'10px 12px', textAlign:'right', fontWeight:700, color:'var(--c-primary)', borderBottom:'1px solid var(--border)' }}>{fmt.money(item.total)}</td>
-                      <td style={{ padding:'10px 12px', borderBottom:'1px solid var(--border)' }}>
-                        <button onClick={()=>setItens(prev=>prev.filter((_,j)=>j!==i))} className="tbl-btn del" title="Remover">×</button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
             </div>
           )}
         </div>
       )}
 
-      {/* ══════════════════════════════════════════════════════════
-          PASSO 4 — REVISÃO E VALORES
-      ══════════════════════════════════════════════════════════ */}
-      {passo===4 && (
+        {passo===4 && (
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
 
           {/* Resumo geral */}
