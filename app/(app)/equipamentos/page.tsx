@@ -309,6 +309,7 @@ export default function EquipamentosPage() {
 
   // ── Fotos ─────────────────────────────────────────────────────────────────
   const [abaForm,      setAbaForm]      = useState<'dados'|'fotos'>('dados')
+  const [abaFormDados, setAbaFormDados] = useState<'identificacao'|'estoque'|'precos'>('identificacao')
   const [catNome,      setCatNome]      = useState('')  // display value para LookupField de categoria
   const [fotos,        setFotos]        = useState<any[]>([])
   const [uploadando,   setUploadando]   = useState(false)
@@ -562,6 +563,7 @@ export default function EquipamentosPage() {
     } else {
       setCatNome('')
     }
+    setAbaFormDados('identificacao')
     setPanel(true)
   }
 
@@ -1204,12 +1206,36 @@ export default function EquipamentosPage() {
 
         {/* ══ ABA DADOS ═══════════════════════════════════════════════ */}
         {(abaForm==='dados'||!form.id) && (
-          <div style={{display:'flex',flexDirection:'column',gap:16}}>
+          <div style={{display:'flex',flexDirection:'column',gap:0}}>
 
-            {/* ── PAINEL 1: Identificação ─────────────────────── */}
-            <div className="panel-section">
-              <div className="panel-section-header">📋 Identificação</div>
-              <div className="panel-section-body">
+            {/* ── TABS INTERNAS ──────────────────────────────────────────── */}
+            <div style={{display:'flex',borderBottom:'2px solid var(--border)',marginBottom:20,gap:0}}>
+              {([
+                ['identificacao','Identificação', !form.nome?.trim()],
+                ['estoque',      'Estoque',       false],
+                ['precos',       'Preços',        false],
+              ] as const).map(([k,l,hasRequired])=>(
+                <button key={k} onClick={()=>setAbaFormDados(k)}
+                  style={{
+                    padding:'9px 18px',border:'none',background:'none',cursor:'pointer',
+                    fontWeight:abaFormDados===k?700:500,
+                    fontSize:'var(--fs-base)',
+                    color:abaFormDados===k?'var(--c-primary)':'var(--t-muted)',
+                    borderBottom:abaFormDados===k?'2px solid var(--c-primary)':'2px solid transparent',
+                    marginBottom:-2,transition:'all .15s',whiteSpace:'nowrap',
+                    display:'flex',alignItems:'center',gap:5,
+                  }}>
+                  {l}
+                  {hasRequired && erro && (
+                    <span style={{width:6,height:6,borderRadius:'50%',background:'var(--c-danger)',flexShrink:0}}/>
+                  )}
+                </button>
+              ))}
+            </div>
+
+            {/* ── ABA: IDENTIFICAÇÃO ─────────────────────────────────────── */}
+            {abaFormDados==='identificacao' && (
+              <div style={{display:'flex',flexDirection:'column',gap:14}}>
                 <FormField label="Nome do Produto" required>
                   <input {...F('nome')} className={inputCls} placeholder="Ex: Andaime Tubular 1,5m" autoFocus />
                 </FormField>
@@ -1241,12 +1267,11 @@ export default function EquipamentosPage() {
                   <textarea {...F('observacoes')} rows={2} className={textareaCls} placeholder="Especificações técnicas, observações..." />
                 </FormField>
               </div>
-            </div>
+            )}
 
-            {/* ── PAINEL 2: Controle de Estoque ───────────────── */}
-            <div className="panel-section">
-              <div className="panel-section-header">📦 Controle de Estoque</div>
-              <div className="panel-section-body">
+            {/* ── ABA: ESTOQUE ───────────────────────────────────────────── */}
+            {abaFormDados==='estoque' && (
+              <div style={{display:'flex',flexDirection:'column',gap:14}}>
                 {/* Tipo de controle */}
                 <div className="form-grid-2" style={{marginBottom:0}}>
                   {[
@@ -1297,12 +1322,11 @@ export default function EquipamentosPage() {
                   </div>
                 )}
               </div>
-            </div>
+            )}
 
-            {/* ── PAINEL 3: Preços de Locação ─────────────────── */}
-            <div className="panel-section">
-              <div className="panel-section-header">💰 Preços de Locação por Período</div>
-              <div className="panel-section-body">
+            {/* ── ABA: PREÇOS ────────────────────────────────────────────── */}
+            {abaFormDados==='precos' && (
+              <div style={{display:'flex',flexDirection:'column',gap:14}}>
                 {periodos.length === 0 ? (
                   <div style={{textAlign:'center',padding:'16px 0',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>
                     Nenhum período cadastrado. Configure os períodos nos Parâmetros.
@@ -1341,7 +1365,7 @@ export default function EquipamentosPage() {
                   </div>
                 )}
               </div>
-            </div>
+            )}
 
           </div>
         )}
