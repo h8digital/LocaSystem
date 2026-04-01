@@ -641,7 +641,6 @@ export default function EquipamentosPage() {
                     {l:'Total',      v:`${viewRow.estoque_total??0} ${viewRow.unidade}`,     c:'var(--t-primary)'},
                     {l:'Locado',     v:`${viewRow.qtd_locada??0} ${viewRow.unidade}`,         c:'var(--c-warning,#f59e0b)'},
                     {l:'Disponível', v:`${viewRow.estoque_disponivel??viewRow.estoque_total??0} ${viewRow.unidade}`, c:'var(--c-primary)'},
-                    {l:'Mínimo',     v:viewRow.controla_patrimonio?'—':`${viewRow.estoque_minimo??0} ${viewRow.unidade}`, c:'var(--t-muted)'},
                   ].map(k=>(
                     <div key={k.l} style={{background:'var(--bg-header)',borderRadius:'var(--r-md)',
                       padding:'10px 12px',border:'1px solid var(--border)',textAlign:'center'}}>
