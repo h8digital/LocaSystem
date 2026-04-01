@@ -1236,9 +1236,7 @@ export default function EquipamentosPage() {
             {/* ── ABA: IDENTIFICAÇÃO ─────────────────────────────────────── */}
             {abaFormDados==='identificacao' && (
               <div style={{display:'flex',flexDirection:'column',gap:14}}>
-                <FormField label="Nome do Produto" required>
-                  <input {...F('nome')} className={inputCls} placeholder="Ex: Andaime Tubular 1,5m" autoFocus />
-                </FormField>
+                
                 <div className="form-grid-2">
                   <FormField label="Código / SKU">
                     <input {...F('codigo')} className={inputCls} placeholder="Ex: AND-001" />
