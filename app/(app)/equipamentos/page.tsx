@@ -958,44 +958,13 @@ export default function EquipamentosPage() {
                 )}
 
                 {/* Últimas movimentações */}
-                <div className="panel-section">
-                  <div style={{padding:'8px 12px',background:'var(--bg-header)',fontWeight:700,
-                    fontSize:'var(--fs-md)',borderBottom:'1px solid var(--border)',
-                    display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                    <span>Últimas Movimentações</span>
-                    <button
-                      onClick={()=>{ setPanelView(false); abrirMovimentacao(viewRow) }}
-                      style={{background:'var(--c-primary)',color:'#fff',border:'none',
-                        borderRadius:'var(--r-sm)',padding:'4px 12px',cursor:'pointer',
-                        fontSize:'var(--fs-md)',fontWeight:600,display:'flex',alignItems:'center',gap:5}}>
-                      + Movimentação
-                    </button>
-                  </div>
-                  {viewLoadingEx ? (
-                    <div style={{padding:'16px',textAlign:'center',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Carregando…</div>
-                  ) : viewMovs.length===0 ? (
-                    <div style={{padding:'16px',textAlign:'center',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Nenhuma movimentação registrada.</div>
-                  ) : (
-                    viewMovs.map((m:any,i:number)=>(
-                      <div key={i} style={{display:'flex',justifyContent:'space-between',alignItems:'center',
-                        padding:'7px 12px',borderBottom:'1px solid var(--border)',fontSize:'var(--fs-md)'}}>
-                        <div style={{display:'flex',alignItems:'center',gap:8}}>
-                          <span style={{fontSize:16}}>{m.tipo==='entrada'?'📥':'📤'}</span>
-                          <div>
-                            <div style={{fontWeight:600,textTransform:'capitalize'}}>{m.tipo}</div>
-                            <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)'}}>{m.observacoes||'—'}</div>
-                          </div>
-                        </div>
-                        <div style={{textAlign:'right'}}>
-                          <div style={{fontWeight:700,color:m.tipo==='entrada'?'var(--c-success,#16a34a)':'var(--c-danger)'}}>
-                            {m.tipo==='entrada'?'+':'-'}{m.quantidade}
-                          </div>
-                          <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)'}}>{new Date(m.created_at).toLocaleDateString('pt-BR')}</div>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                </div>
+                <Btn
+                  variant="primary"
+                  onClick={() => { setPanelView(false); abrirMovimentacao(viewRow) }}
+                  style={{ width:'100%' }}
+                >
+                  📦 Registrar Movimentação
+                </Btn>
 
                 {viewRow.observacoes && (
                   <div style={{background:'var(--bg-header)',borderRadius:'var(--r-md)',padding:'10px 12px',border:'1px solid var(--border)'}}>
@@ -1162,118 +1131,144 @@ export default function EquipamentosPage() {
 
           {/* ══ ABA DADOS ═══════════════════════════════════════════════════ */}
           {(abaForm==='dados'||!form.id) && (
-            <div style={{display:'contents'}}>
+            <div style={{display:'flex',flexDirection:'column',gap:16}}>
 
-              <div>
-                <div className="ds-section-title">Identificação</div>
-                <div className="form-grid-2">
-                  <FormField label="Nome do Produto" required style={{ gridColumn:'span 2' }}>
+              {/* ── PAINEL 1: Identificação ─────────────────────── */}
+              <div className="panel-section">
+                <div className="panel-section-header">📋 Identificação</div>
+                <div className="panel-section-body">
+                  <FormField label="Nome do Produto" required>
                     <input {...F('nome')} className={inputCls} placeholder="Ex: Andaime Tubular 1,5m" autoFocus />
                   </FormField>
-                  <FormField label="Código / SKU">
-                    <input {...F('codigo')} className={inputCls} placeholder="Ex: AND-001" />
-                  </FormField>
-                  <FormField label="Categoria">
-                    <LookupField
-                      value={form.categoria_id || null}
-                      displayValue={catNome}
-                      onChange={(id, row) => {
-                        setForm((f:any) => ({ ...f, categoria_id: id }))
-                        setCatNome(row?.nome ?? '')
-                      }}
-                      table="categorias"
-                      searchColumn="nome"
-                      filter={{ ativo: 1 }}
-                      orderBy="nome"
-                      placeholder="Buscar ou criar categoria..."
-                      createPanelTitle="Nova Categoria"
-                      createPanelWidth="sm"
-                      createPanel={({ onClose, onCreated }: { onClose:()=>void; onCreated:(r:any)=>void }) => (
-                        <CriarCategoriaPanel onClose={onClose} onCreated={onCreated} />
-                      )}
-                    />
-                  </FormField>
-                  <FormField label="Marca">
-                    <input {...F('marca')} className={inputCls} placeholder="Ex: Tramontina" />
-                  </FormField>
-                  <FormField label="Modelo">
-                    <input {...F('modelo')} className={inputCls} placeholder="Ex: Pro 1.5m" />
-                  </FormField>
-                </div>
-              </div>
-
-              <div>
-                <div className="ds-section-title">Controle de Estoque</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10, marginBottom:12 }}>
-                  {[
-                    { v:1, l:'Por Patrimônio',  d:'Cada unidade tem número único (série/patrimônio)' },
-                    { v:0, l:'Por Quantidade',   d:'Itens sem identificação individual' },
-                  ].map(o => (
-                    <div key={o.v} onClick={()=>setForm({...form,controla_patrimonio:o.v})}
-                      style={{ border:`2px solid ${Number(form.controla_patrimonio)===o.v?'var(--c-primary)':'var(--border)'}`,
-                        borderRadius:'var(--r-md)', padding:'10px 14px', cursor:'pointer',
-                        background:Number(form.controla_patrimonio)===o.v?'var(--c-primary-light,#e8f4f8)':'transparent',
-                        transition:'all 150ms' }}>
-                      <div style={{ fontWeight:600, fontSize:'var(--fs-base)', marginBottom:2 }}>{o.l}</div>
-                      <div style={{ fontSize:'var(--fs-md)', color:'var(--t-secondary)' }}>{o.d}</div>
-                    </div>
-                  ))}
-                </div>
-                {Number(form.controla_patrimonio)===0 && (
-                  <div className="kpi-grid">
-                    <FormField label="Unidade">
-                      <input {...F('unidade')} className={inputCls} placeholder="un, kg, m, pç..." />
+                  <div className="form-grid-2">
+                    <FormField label="Código / SKU">
+                      <input {...F('codigo')} className={inputCls} placeholder="Ex: AND-001" />
                     </FormField>
-                    <FormField label="Estoque Atual">
-                      <div style={{position:'relative'}}>
-                        <input type="number" value={form.estoque_total??0} readOnly className={inputCls}
-                          style={{background:'var(--bg-header)',color:'var(--t-muted)',cursor:'not-allowed',paddingRight:32}} />
-                        <span title="Altere pela tela de Movimentação de Ativos (📦)"
-                          style={{position:'absolute',right:9,top:'50%',transform:'translateY(-50%)',fontSize:14,cursor:'help',color:'var(--t-muted)'}}>🔒</span>
-                      </div>
-                      <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginTop:3}}>Altere via Movimentação de Ativos (📦)</div>
+                    <FormField label="Categoria">
+                      <LookupField
+                        value={form.categoria_id || null}
+                        displayValue={catNome}
+                        onChange={(id, row) => { setForm((f:any) => ({ ...f, categoria_id: id })); setCatNome(row?.nome ?? '') }}
+                        table="categorias" searchColumn="nome" filter={{ ativo: 1 }} orderBy="nome"
+                        placeholder="Buscar ou criar categoria..."
+                        createPanelTitle="Nova Categoria" createPanelWidth="sm"
+                        createPanel={({ onClose, onCreated }: { onClose:()=>void; onCreated:(r:any)=>void }) => (
+                          <CriarCategoriaPanel onClose={onClose} onCreated={onCreated} />
+                        )}
+                      />
                     </FormField>
-                    <FormField label="Estoque Mínimo">
-                      <input type="number" min="0" {...F('estoque_minimo')} className={inputCls} />
+                    <FormField label="Marca">
+                      <input {...F('marca')} className={inputCls} placeholder="Ex: Tramontina" />
+                    </FormField>
+                    <FormField label="Modelo">
+                      <input {...F('modelo')} className={inputCls} placeholder="Ex: Pro 1.5m" />
                     </FormField>
                   </div>
-                )}
-              </div>
-
-              <div>
-                <div className="ds-section-title">Preços de Locação por Período</div>
-                <div className="form-grid-2">
-                  {periodos.map(p => {
-                    const campo = campoPreco(p.nome)
-                    return (
-                      <FormField key={p.id} label={`${p.nome} (${p.dias}d)${Number(p.desconto_percentual)>0?` — ${p.desconto_percentual}% desc`:''}`}>
-                        <div style={{ position:'relative' }}>
-                          <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)',
-                            color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
-                          <input type="number" step="0.01" min="0"
-                            value={form[campo]??0}
-                            onChange={e=>setForm({...form,[campo]:e.target.value})}
-                            className={inputCls} style={{ paddingLeft:30 }} />
-                        </div>
-                      </FormField>
-                    )
-                  })}
-                  <FormField label="Prazo de Entrega (dias)">
-                    <input type="number" step="1" min="0" {...F('prazo_entrega_dias')} className={inputCls} placeholder="0" />
-                  </FormField>
-                  <FormField label="Custo de Reposição (perda/dano)">
-                    <div style={{ position:'relative' }}>
-                      <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)',
-                        color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
-                      <input type="number" step="0.01" min="0" {...F('custo_reposicao')} className={inputCls} style={{ paddingLeft:30 }} />
-                    </div>
+                  <FormField label="Descrição / Observações">
+                    <textarea {...F('observacoes')} rows={2} className={textareaCls} placeholder="Especificações técnicas, observações..." />
                   </FormField>
                 </div>
               </div>
 
-              <FormField label="Descrição / Observações">
-                <textarea {...F('observacoes')} rows={2} className={textareaCls} placeholder="Descrição, especificações técnicas..." />
-              </FormField>
+              {/* ── PAINEL 2: Controle de Estoque ───────────────── */}
+              <div className="panel-section">
+                <div className="panel-section-header">📦 Controle de Estoque</div>
+                <div className="panel-section-body">
+                  {/* Tipo de controle */}
+                  <div className="form-grid-2" style={{marginBottom:0}}>
+                    {[
+                      { v:1, l:'Por Patrimônio',  icon:'🏷️', d:'Cada unidade tem número único' },
+                      { v:0, l:'Por Quantidade',   icon:'📊', d:'Itens sem identificação individual' },
+                    ].map(o => (
+                      <div key={o.v} onClick={()=>setForm({...form,controla_patrimonio:o.v})}
+                        style={{
+                          border:`2px solid ${Number(form.controla_patrimonio)===o.v?'var(--c-primary)':'var(--border)'}`,
+                          borderRadius:'var(--r-md)', padding:'12px 14px', cursor:'pointer',
+                          background:Number(form.controla_patrimonio)===o.v?'var(--c-primary-light,#e0f2fe)':'transparent',
+                          transition:'all 150ms', display:'flex', alignItems:'center', gap:12,
+                        }}>
+                        <span style={{fontSize:22}}>{o.icon}</span>
+                        <div>
+                          <div style={{fontWeight:700,fontSize:'var(--fs-base)',color:Number(form.controla_patrimonio)===o.v?'var(--c-primary)':'var(--t-primary)'}}>{o.l}</div>
+                          <div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)',marginTop:1}}>{o.d}</div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  {/* Campos de quantidade (só para controle por quantidade) */}
+                  {Number(form.controla_patrimonio)===0 && (
+                    <div className="form-grid-3" style={{marginTop:14}}>
+                      <FormField label="Unidade">
+                        <input {...F('unidade')} className={inputCls} placeholder="un, kg, m, pç..." />
+                      </FormField>
+                      <FormField label="Estoque Atual">
+                        <input type="number" step="1" min="0" {...F('estoque_total')} className={inputCls} />
+                      </FormField>
+                      <FormField label="Prazo Entrega (dias)">
+                        <input type="number" step="1" min="0" {...F('prazo_entrega_dias')} className={inputCls} placeholder="0" />
+                      </FormField>
+                    </div>
+                  )}
+                  {Number(form.controla_patrimonio)===1 && (
+                    <div className="form-grid-2" style={{marginTop:14}}>
+                      <FormField label="Prazo Entrega (dias)">
+                        <input type="number" step="1" min="0" {...F('prazo_entrega_dias')} className={inputCls} placeholder="0" />
+                      </FormField>
+                      <FormField label="Custo de Reposição (R$)">
+                        <div style={{position:'relative'}}>
+                          <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'var(--t-muted)',fontSize:'var(--fs-md)',pointerEvents:'none'}}>R$</span>
+                          <input type="number" step="0.01" min="0" {...F('custo_reposicao')} className={inputCls} style={{paddingLeft:30}} />
+                        </div>
+                      </FormField>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* ── PAINEL 3: Preços de Locação ─────────────────── */}
+              <div className="panel-section">
+                <div className="panel-section-header">💰 Preços de Locação por Período</div>
+                <div className="panel-section-body">
+                  {periodos.length === 0 ? (
+                    <div style={{textAlign:'center',padding:'16px 0',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>
+                      Nenhum período cadastrado. Configure os períodos nos Parâmetros.
+                    </div>
+                  ) : (
+                    <div className="form-grid-3">
+                      {periodos.map((p:any) => {
+                        const campo = campoPreco(p.nome)
+                        const val = Number(form[campo]??0)
+                        return (
+                          <FormField key={p.id} label={`${p.nome}${Number(p.desconto_percentual)>0?` (${p.desconto_percentual}% desc)`:''}`}>
+                            <div style={{position:'relative'}}>
+                              <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'var(--t-muted)',fontSize:'var(--fs-md)',pointerEvents:'none'}}>R$</span>
+                              <input type="number" step="0.01" min="0"
+                                value={form[campo]??0}
+                                onChange={e=>setForm({...form,[campo]:e.target.value})}
+                                className={inputCls}
+                                style={{paddingLeft:30,borderColor:val>0?'var(--c-primary)':'undefined'}}
+                              />
+                            </div>
+                            {val>0 && <div style={{fontSize:'var(--fs-xs)',color:'var(--c-primary)',marginTop:3,fontWeight:600}}>{p.dias}d → {new Intl.NumberFormat('pt-BR',{style:'currency',currency:'BRL'}).format(val/p.dias)}/dia</div>}
+                          </FormField>
+                        )
+                      })}
+                    </div>
+                  )}
+                  {/* Custo reposição (só para por quantidade — para por patrimônio já está acima) */}
+                  {Number(form.controla_patrimonio)===0 && (
+                    <div style={{marginTop:14}}>
+                      <FormField label="Custo de Reposição (R$)" hint="Valor cobrado em caso de perda ou dano">
+                        <div style={{position:'relative',maxWidth:200}}>
+                          <span style={{position:'absolute',left:9,top:'50%',transform:'translateY(-50%)',color:'var(--t-muted)',fontSize:'var(--fs-md)',pointerEvents:'none'}}>R$</span>
+                          <input type="number" step="0.01" min="0" {...F('custo_reposicao')} className={inputCls} style={{paddingLeft:30}} />
+                        </div>
+                      </FormField>
+                    </div>
+                  )}
+                </div>
+              </div>
 
             </div>
           )}
