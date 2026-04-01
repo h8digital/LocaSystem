@@ -81,7 +81,15 @@ export default function EquipamentosPage() {
   const [saving,     setSaving]     = useState(false)
   const [erro,       setErro]       = useState('')
   const [catNome,    setCatNome]    = useState('')
-  const [aba,        setAba]        = useState<'info'|'precos'>('info')
+  const [aba,        setAba]        = useState<'info'|'precos'|'inventario'>('info')
+  // ── Inventário no painel ──────────────────────────────────────────────────
+  const [patsPanel,     setPatsPanel]     = useState<any[]>([])
+  const [patsLoading,   setPatsLoading]   = useState(false)
+  const [editPat,       setEditPat]       = useState<any>(null)   // patrimônio sendo editado
+  const [novoPat,       setNovoPat]       = useState(false)       // formulário de novo
+  const [patForm,       setPatForm]       = useState<any>({})
+  const [patSaving,     setPatSaving]     = useState(false)
+  const [patErro,       setPatErro]       = useState('')
 
   // ── Painel de preços rápido (hover) ───────────────────────────────────────
   const [precoPainel, setPrecoPainel] = useState<any>(null)
@@ -152,7 +160,9 @@ export default function EquipamentosPage() {
       setFotos(fs ?? [])
     } else {
       setForm(emptyForm()); setEditId(null); setCatNome(''); setFotos([])
+      setPatsPanel([])
     }
+    setEditPat(null); setNovoPat(false); setPatForm({}); setPatErro('')
     setPanel(true)
   }
 
@@ -189,6 +199,53 @@ export default function EquipamentosPage() {
       if (error) { setErro(error.message); setSaving(false); return }
     }
     setSaving(false); setPanel(false); load()
+  }
+
+  // ── Patrimônios no painel ────────────────────────────────────────────────────
+  async function carregarPatsPanel(produtoId: number) {
+    setPatsLoading(true)
+    const { data } = await supabase
+      .from('patrimonios')
+      .select('id, numero_patrimonio, numero_serie, status, data_aquisicao, valor_aquisicao, observacoes, contrato_itens!contrato_itens_patrimonio_id_fkey(id, contratos(status))')
+      .eq('produto_id', produtoId)
+      .is('deleted_at', null)
+      .order('numero_patrimonio')
+    setPatsPanel(data ?? [])
+    setPatsLoading(false)
+  }
+
+  async function salvarPat() {
+    if (!patForm.numero_patrimonio?.trim()) { setPatErro('Nº Patrimônio é obrigatório.'); return }
+    setPatSaving(true); setPatErro('')
+    const payload = {
+      numero_patrimonio: patForm.numero_patrimonio.trim(),
+      numero_serie:      patForm.numero_serie?.trim() || null,
+      status:            patForm.status || 'disponivel',
+      data_aquisicao:    patForm.data_aquisicao || null,
+      valor_aquisicao:   Number(patForm.valor_aquisicao) || null,
+      observacoes:       patForm.observacoes?.trim() || null,
+    }
+    if (editPat) {
+      const { error } = await supabase.from('patrimonios').update(payload).eq('id', editPat.id)
+      if (error) { setPatErro(error.message); setPatSaving(false); return }
+    } else {
+      const { error } = await supabase.from('patrimonios').insert({ ...payload, produto_id: editId })
+      if (error) { setPatErro(error.message); setPatSaving(false); return }
+    }
+    setPatSaving(false); setEditPat(null); setNovoPat(false); setPatForm({})
+    carregarPatsPanel(editId!)
+    load()
+  }
+
+  async function excluirPat(pat: any) {
+    const temContrato = (pat.contrato_itens ?? []).some((ci: any) =>
+      ['ativo','em_devolucao','pendente_manutencao'].includes(ci.contratos?.status)
+    )
+    if (temContrato) { alert('Este patrimônio possui contrato ativo e não pode ser excluído.'); return }
+    if (!confirm(`Excluir patrimônio ${pat.numero_patrimonio}? Esta ação não pode ser desfeita.`)) return
+    await supabase.from('patrimonios').update({ deleted_at: new Date().toISOString() }).eq('id', pat.id)
+    carregarPatsPanel(editId!)
+    load()
   }
 
   // ── Inativar ───────────────────────────────────────────────────────────────
@@ -551,13 +608,22 @@ export default function EquipamentosPage() {
 
         {/* TABS */}
         <div style={{ display:'flex', borderBottom:'2px solid var(--border)', marginBottom:20, gap:0 }}>
-          {([['info','📋 Informações'],['precos','💰 Preços de Locação']] as const).map(([k,l]) => (
-            <button key={k} onClick={() => setAba(k)}
+          {([
+            ['info',      '📋 Informações'],
+            ['precos',    '💰 Preços'],
+            ...(editId && Number(form.controla_patrimonio)===1
+              ? [['inventario', `🏷️ Inventário${patsPanel.length>0?' ('+patsPanel.length+')':''}`]]
+              : []),
+          ] as ['info'|'precos'|'inventario',string][]).map(([k,l]) => (
+            <button key={k} onClick={() => {
+              setAba(k)
+              if (k==='inventario' && editId && patsPanel.length===0) carregarPatsPanel(editId)
+            }}
               style={{ padding:'9px 22px', border:'none', background:'none', cursor:'pointer',
                 fontWeight:aba===k?700:500, fontSize:'var(--fs-base)',
                 color:aba===k?'var(--c-primary)':'var(--t-muted)',
                 borderBottom:aba===k?'2px solid var(--c-primary)':'2px solid transparent',
-                marginBottom:-2, transition:'all .15s' }}>
+                marginBottom:-2, transition:'all .15s', whiteSpace:'nowrap' }}>
               {l}
             </button>
           ))}
@@ -720,6 +786,204 @@ export default function EquipamentosPage() {
                   </div>
                 </FormField>
               </div>
+            )}
+          </div>
+        )}
+
+        {/* ── ABA: INVENTÁRIO ─────────────────────────────────────────── */}
+        {aba === 'inventario' && editId && (
+          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+            {/* Resumo + botão novo */}
+            <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <div style={{ display:'flex', gap:12 }}>
+                {[
+                  { l:'Disponível', v: patsPanel.filter(p=>p.status==='disponivel').length, c:'#16a34a' },
+                  { l:'Locado',     v: patsPanel.filter(p=>p.status==='locado').length,     c:'var(--c-primary)' },
+                  { l:'Manutenção', v: patsPanel.filter(p=>p.status==='manutencao').length, c:'#f59e0b' },
+                  { l:'Total',      v: patsPanel.length,                                    c:'var(--t-secondary)' },
+                ].map(k => (
+                  <div key={k.l} style={{ textAlign:'center', padding:'8px 14px',
+                    background:'var(--bg-header)', border:'1px solid var(--border)',
+                    borderRadius:'var(--r-md)', minWidth:70 }}>
+                    <div style={{ fontWeight:800, fontSize:20, color:k.c }}>{k.v}</div>
+                    <div style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)', fontWeight:600,
+                      textTransform:'uppercase', letterSpacing:'0.04em' }}>{k.l}</div>
+                  </div>
+                ))}
+              </div>
+              <Btn onClick={() => { setNovoPat(true); setEditPat(null); setPatForm({ status:'disponivel' }); setPatErro('') }}>
+                + Novo Patrimônio
+              </Btn>
+            </div>
+
+            {/* Formulário de novo / edição de patrimônio */}
+            {(novoPat || editPat) && (
+              <div style={{ border:'2px solid var(--c-primary)', borderRadius:'var(--r-md)',
+                padding:'16px', background:'var(--c-primary-light,#e0f2fe)' }}>
+                <div style={{ fontWeight:700, fontSize:'var(--fs-base)', marginBottom:14, color:'var(--c-primary)' }}>
+                  {editPat ? `Editar patrimônio ${editPat.numero_patrimonio}` : 'Novo Patrimônio'}
+                </div>
+                {patErro && <div className="ds-alert-error" style={{ marginBottom:12 }}>{patErro}</div>}
+                <div className="form-grid-3">
+                  <FormField label="Nº Patrimônio" required>
+                    <input value={patForm.numero_patrimonio??''} autoFocus
+                      onChange={e=>setPatForm((f:any)=>({...f,numero_patrimonio:e.target.value}))}
+                      className={inputCls} placeholder="Ex: 00080" />
+                  </FormField>
+                  <FormField label="Nº Série">
+                    <input value={patForm.numero_serie??''}
+                      onChange={e=>setPatForm((f:any)=>({...f,numero_serie:e.target.value}))}
+                      className={inputCls} placeholder="Ex: SN-12345" />
+                  </FormField>
+                  <FormField label="Status">
+                    <select value={patForm.status??'disponivel'}
+                      onChange={e=>setPatForm((f:any)=>({...f,status:e.target.value}))}
+                      className={inputCls}>
+                      <option value="disponivel">Disponível</option>
+                      <option value="manutencao">Manutenção</option>
+                      <option value="inativo">Inativo</option>
+                    </select>
+                  </FormField>
+                  <FormField label="Data de Aquisição">
+                    <input type="date" value={patForm.data_aquisicao??''}
+                      onChange={e=>setPatForm((f:any)=>({...f,data_aquisicao:e.target.value}))}
+                      className={inputCls} />
+                  </FormField>
+                  <FormField label="Valor de Aquisição (R$)">
+                    <div style={{ position:'relative' }}>
+                      <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)',
+                        color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
+                      <input type="number" step="0.01" min="0" value={patForm.valor_aquisicao??''}
+                        onChange={e=>setPatForm((f:any)=>({...f,valor_aquisicao:e.target.value}))}
+                        className={inputCls} style={{ paddingLeft:30 }} />
+                    </div>
+                  </FormField>
+                  <FormField label="Observações">
+                    <input value={patForm.observacoes??''}
+                      onChange={e=>setPatForm((f:any)=>({...f,observacoes:e.target.value}))}
+                      className={inputCls} placeholder="Ex: Revisado em 03/2026" />
+                  </FormField>
+                </div>
+                <div style={{ display:'flex', gap:10, marginTop:14 }}>
+                  <Btn variant="secondary" style={{ flex:1 }}
+                    onClick={() => { setNovoPat(false); setEditPat(null); setPatForm({}); setPatErro('') }}>
+                    Cancelar
+                  </Btn>
+                  <Btn style={{ flex:2 }} loading={patSaving} onClick={salvarPat}>
+                    {editPat ? 'Salvar Alterações' : 'Adicionar Patrimônio'}
+                  </Btn>
+                </div>
+              </div>
+            )}
+
+            {/* Lista de patrimônios */}
+            {patsLoading ? (
+              <div style={{ textAlign:'center', padding:'32px', color:'var(--t-muted)' }}>
+                <div className="ds-spinner" style={{ margin:'0 auto 10px' }} />Carregando...
+              </div>
+            ) : patsPanel.length === 0 ? (
+              <div style={{ textAlign:'center', padding:'40px 24px', color:'var(--t-muted)',
+                border:'2px dashed var(--border)', borderRadius:'var(--r-md)' }}>
+                <div style={{ fontSize:40, marginBottom:8 }}>🏷️</div>
+                <div style={{ fontWeight:600, marginBottom:4 }}>Nenhum patrimônio cadastrado</div>
+                <div style={{ fontSize:'var(--fs-sm)' }}>Clique em "+ Novo Patrimônio" para começar</div>
+              </div>
+            ) : (
+              <table className="ds-table">
+                <thead>
+                  <tr>
+                    <th style={{ width:130 }}>Nº Patrimônio</th>
+                    <th style={{ width:130 }}>Nº Série</th>
+                    <th style={{ width:120 }}>Status</th>
+                    <th style={{ width:110 }}>Aquisição</th>
+                    <th style={{ width:120, textAlign:'right' }}>Valor Aquis.</th>
+                    <th>Observações</th>
+                    <th style={{ width:120, textAlign:'center' }}>Ações</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {patsPanel.map((pat: any) => {
+                    const temContratoAtivo = (pat.contrato_itens ?? []).some((ci: any) =>
+                      ['ativo','em_devolucao','pendente_manutencao'].includes(ci.contratos?.status)
+                    )
+                    const statusColors: Record<string,string> = {
+                      disponivel: '#16a34a', locado: 'var(--c-primary)',
+                      manutencao: '#f59e0b', inativo: 'var(--t-muted)'
+                    }
+                    const statusLabels: Record<string,string> = {
+                      disponivel: 'Disponível', locado: 'Locado',
+                      manutencao: 'Manutenção', inativo: 'Inativo'
+                    }
+                    const sc = statusColors[pat.status] ?? 'var(--t-muted)'
+                    return (
+                      <tr key={pat.id}
+                        style={{ background: editPat?.id===pat.id ? 'var(--c-primary-light,#e0f2fe)' : undefined }}>
+                        <td className="tbl-mono" style={{ fontWeight:700 }}>{pat.numero_patrimonio}</td>
+                        <td className="tbl-mono" style={{ color:'var(--t-muted)' }}>{pat.numero_serie||'—'}</td>
+                        <td>
+                          <span style={{ display:'inline-flex', alignItems:'center', gap:5,
+                            fontWeight:600, fontSize:'var(--fs-xs)', padding:'3px 9px',
+                            borderRadius:99, background:sc+'18', color:sc }}>
+                            <span style={{ width:6, height:6, borderRadius:'50%', background:sc }} />
+                            {statusLabels[pat.status] ?? pat.status}
+                            {temContratoAtivo && (
+                              <span style={{ fontSize:10, opacity:.7, marginLeft:2 }} title="Contrato ativo">🔒</span>
+                            )}
+                          </span>
+                        </td>
+                        <td style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)' }}>
+                          {pat.data_aquisicao ? new Date(pat.data_aquisicao+'T00:00:00').toLocaleDateString('pt-BR') : '—'}
+                        </td>
+                        <td className="tbl-mono" style={{ textAlign:'right', fontSize:'var(--fs-sm)', color:'var(--t-muted)' }}>
+                          {pat.valor_aquisicao > 0 ? fmt.money(pat.valor_aquisicao) : '—'}
+                        </td>
+                        <td style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)' }}>
+                          {pat.observacoes || '—'}
+                        </td>
+                        <td style={{ textAlign:'center' }}>
+                          <div style={{ display:'flex', gap:6, justifyContent:'center' }}>
+                            {/* Editar — sempre disponível */}
+                            <button
+                              onClick={() => {
+                                setEditPat(pat)
+                                setNovoPat(false)
+                                setPatErro('')
+                                setPatForm({
+                                  numero_patrimonio: pat.numero_patrimonio,
+                                  numero_serie:      pat.numero_serie ?? '',
+                                  status:            pat.status,
+                                  data_aquisicao:    pat.data_aquisicao ?? '',
+                                  valor_aquisicao:   pat.valor_aquisicao ?? '',
+                                  observacoes:       pat.observacoes ?? '',
+                                })
+                              }}
+                              title="Editar patrimônio"
+                              style={{ padding:'4px 10px', borderRadius:'var(--r-sm)',
+                                border:'1px solid var(--border)', background:'var(--bg-card)',
+                                cursor:'pointer', fontSize:'var(--fs-sm)', color:'var(--t-primary)' }}>
+                              ✏️
+                            </button>
+                            {/* Excluir — apenas se não tem contrato ativo */}
+                            <button
+                              onClick={() => excluirPat(pat)}
+                              disabled={temContratoAtivo}
+                              title={temContratoAtivo ? 'Patrimônio com contrato ativo — não pode ser excluído' : 'Excluir patrimônio'}
+                              style={{ padding:'4px 10px', borderRadius:'var(--r-sm)',
+                                border:`1px solid ${temContratoAtivo ? 'var(--border)' : 'var(--c-danger,#dc2626)'}`,
+                                background:'transparent', cursor:temContratoAtivo?'not-allowed':'pointer',
+                                fontSize:'var(--fs-sm)',
+                                color: temContratoAtivo ? 'var(--t-muted)' : 'var(--c-danger,#dc2626)',
+                                opacity: temContratoAtivo ? 0.4 : 1 }}>
+                              🗑️
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
             )}
           </div>
         )}
