@@ -820,7 +820,18 @@ export default function EquipamentosPage() {
         data={lista}
         onRowClick={row => verDetalhe(row)}
         actions={row => (
-          <div style={{ display:'flex', justifyContent:'center' }}>
+          <div style={{ display:'flex', justifyContent:'center', gap:6 }}>
+            {row.controla_patrimonio===1 && (
+              <button
+                onClick={() => router.push(`/equipamentos/${row.id}`)}
+                title="Ver inventário e detalhes"
+                style={{ padding:'5px 10px', borderRadius:'var(--r-sm)',
+                  border:'1px solid var(--c-primary)', background:'transparent',
+                  color:'var(--c-primary)', cursor:'pointer', fontSize:'var(--fs-xs)',
+                  fontWeight:700, whiteSpace:'nowrap' }}>
+                🏷️ Inventário
+              </button>
+            )}
             <ActionButtons
               onDelete={() => inativar(row.id)}
               deleteConfirm={`Inativar o produto "${row.nome}"?`}
@@ -972,13 +983,24 @@ export default function EquipamentosPage() {
                 )}
 
                 {/* Últimas movimentações */}
-                <Btn
-                  variant="primary"
-                  onClick={() => { setPanelView(false); abrirMovimentacao(viewRow) }}
-                  style={{ width:'100%' }}
-                >
-                  📦 Registrar Movimentação
-                </Btn>
+                <div style={{ display:'flex', gap:10 }}>
+                  {viewRow?.controla_patrimonio===1 && (
+                    <Btn
+                      variant="secondary"
+                      onClick={() => { setPanelView(false); router.push(`/equipamentos/${viewRow.id}`) }}
+                      style={{ flex:1 }}
+                    >
+                      🏷️ Ver Inventário Completo
+                    </Btn>
+                  )}
+                  <Btn
+                    variant="primary"
+                    onClick={() => { setPanelView(false); abrirMovimentacao(viewRow) }}
+                    style={{ flex:1 }}
+                  >
+                    📦 Registrar Movimentação
+                  </Btn>
+                </div>
 
                 {viewRow.observacoes && (
                   <div style={{background:'var(--bg-header)',borderRadius:'var(--r-md)',padding:'10px 12px',border:'1px solid var(--border)'}}>
