@@ -53,6 +53,29 @@ export default function FinanceiroPage() {
 
   const load = useCallback(async () => {
     setLoading(true)
+
+    // ── Query SEM filtros → para os KPIs globais ──────────────────────────
+    const { data: todas } = await supabase
+      .from('faturas')
+      .select('valor, valor_recebido, saldo_restante, status, data_vencimento')
+      .order('data_vencimento', { ascending: true })
+
+    const hoje = new Date().toISOString().split('T')[0]
+    const listaTotal = todas ?? []
+    setKpis({
+      total:     listaTotal.reduce((s,f) => s + Number(f.valor), 0),
+      recebido:  listaTotal.reduce((s,f) => s + Number(f.valor_recebido ?? 0), 0),
+      pendente:  listaTotal
+        .filter(f => f.status !== 'pago' && f.status !== 'cancelado')
+        .reduce((s,f) => s + Number(f.saldo_restante ?? f.valor), 0),
+      vencidas:  listaTotal
+        .filter(f => f.status === 'pendente' && f.data_vencimento < hoje)
+        .reduce((s,f) => s + Number(f.saldo_restante ?? f.valor), 0),
+      nVencidas: listaTotal
+        .filter(f => f.status === 'pendente' && f.data_vencimento < hoje).length,
+    })
+
+    // ── Query COM filtros → para a tabela ─────────────────────────────────
     let q = supabase
       .from('faturas')
       .select('*, contratos(numero, clientes(nome))')
@@ -108,78 +131,39 @@ export default function FinanceiroPage() {
 
   // ── Impressão de recibo / fatura ──────────────────────────────────────────
   async function imprimirRecibo(fat: any) {
-    const { data: recs } = await supabase
-      .from('fatura_recebimentos').select('*, usuarios(nome)')
-      .eq('fatura_id', fat.id).order('data_recebimento')
-    const cliente = fat.contratos?.clientes?.nome ?? '—'
-    const contrato = fat.contratos?.numero ?? '—'
-    const w = window.open('', '_blank', 'width=700,height=900')
-    if (!w) return
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Recibo ${fat.numero}</title>
-    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:0;padding:20px}
-    .header{text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px}
-    .title{font-size:18px;font-weight:bold}
-    .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee}
-    .lbl{color:#555;font-weight:600} .val{font-weight:700}
-    .total{font-size:15px;font-weight:bold;background:#f5f5f5;padding:10px;border-radius:4px;margin-top:12px}
-    .ass{margin-top:60px;border-top:1px solid #000;padding-top:8px;width:200px}
-    </style></head><body>
-    <div class="header"><div class="title">RECIBO DE PAGAMENTO</div><div>${fat.numero}</div></div>
-    <div class="row"><span class="lbl">Cliente:</span><span class="val">${cliente}</span></div>
-    <div class="row"><span class="lbl">Contrato:</span><span class="val">${contrato}</span></div>
-    <div class="row"><span class="lbl">Tipo:</span><span class="val">${fat.tipo}</span></div>
-    <div class="row"><span class="lbl">Valor Total:</span><span class="val">${Number(fat.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>
-    <div class="row"><span class="lbl">Valor Recebido:</span><span class="val">${Number(fat.valor_recebido||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>
-    ${(recs??[]).map((r:any)=>`<div class="row"><span class="lbl">${r.data_recebimento} — ${r.forma_pagamento??''}:</span><span class="val">${Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>`).join('')}
-    <div class="total">Saldo Restante: ${Number(fat.saldo_restante??0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</div>
-    <div style="margin-top:40px;font-size:11px;color:#888;text-align:center">Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</div>
-    <div class="ass">Assinatura</div>
-    </body></html>`)
-    w.document.close(); w.print()
+    try {
+      const res = await fetch('/api/documentos/fatura', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fatura_id: fat.id, tipo: 'recibo' }),
+      })
+      const result = await res.json()
+      if (!result.ok) { alert('Erro ao gerar recibo: ' + result.error); return }
+      const w = window.open('', '_blank', 'width=900,height=700')
+      if (!w) return
+      w.document.write(result.html)
+      w.document.close()
+      setTimeout(() => w.print(), 800)
+    } catch(e: any) { alert('Erro: ' + e.message) }
   }
 
   async function imprimirFatura(fat: any) {
-    const cliente = fat.contratos?.clientes?.nome ?? '—'
-    const contrato = fat.contratos?.numero ?? '—'
-    const { data: todasFat } = await supabase.from('faturas')
-      .select('tipo, valor, valor_recebido, status, descricao')
-      .eq('contrato_id', fat.contrato_id).neq('status','cancelado')
-    const discriminacao = (todasFat??[]).map((f:any)=>
-      `<div class="row"><span class="lbl">${f.tipo?.toUpperCase()}:</span><span>${Number(f.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>`
-    ).join('')
-    const w = window.open('', '_blank', 'width=700,height=900')
-    if (!w) return
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fatura ${fat.numero}</title>
-    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:0;padding:20px}
-    .header{text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px}
-    .title{font-size:18px;font-weight:bold}.subtitle{color:#555;font-size:13px}
-    .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee}
-    .lbl{color:#555;font-weight:600} .section{font-weight:bold;margin-top:14px;margin-bottom:6px;font-size:13px}
-    .total{font-size:15px;font-weight:bold;background:#f5f5f5;padding:10px;border-radius:4px;margin-top:12px}
-    </style></head><body>
-    <div class="header"><div class="title">FATURA DE LOCAÇÃO</div><div class="subtitle">${fat.numero}</div></div>
-    <div class="row"><span class="lbl">Cliente:</span><span>${cliente}</span></div>
-    <div class="row"><span class="lbl">Contrato:</span><span>${contrato}</span></div>
-    <div class="row"><span class="lbl">Vencimento:</span><span>${fat.data_vencimento}</span></div>
-    <div class="row"><span class="lbl">Descrição:</span><span>${fat.descricao??'—'}</span></div>
-    <div class="section">Discriminação por Tipo</div>
-    ${discriminacao}
-    <div class="total">Total da Fatura: ${Number(fat.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}<br>
-    Recebido: ${Number(fat.valor_recebido||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}<br>
-    Saldo: ${Number(fat.saldo_restante||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</div>
-    <div style="margin-top:40px;font-size:11px;color:#888;text-align:center">Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</div>
-    </body></html>`)
-    w.document.close(); w.print()
+    try {
+      const res = await fetch('/api/documentos/fatura', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fatura_id: fat.id, tipo: 'fatura' }),
+      })
+      const result = await res.json()
+      if (!result.ok) { alert('Erro ao gerar fatura: ' + result.error); return }
+      const w = window.open('', '_blank', 'width=900,height=700')
+      if (!w) return
+      w.document.write(result.html)
+      w.document.close()
+      setTimeout(() => w.print(), 800)
+    } catch(e: any) { alert('Erro: ' + e.message) }
   }
 
-  const hoje = new Date().toISOString().split('T')[0]
-    setKpis({
-      total:    lista.reduce((s,f) => s + Number(f.valor), 0),
-      recebido: lista.reduce((s,f) => s + Number(f.valor_recebido ?? 0), 0),
-      pendente: lista.filter(f=>f.status!=='pago'&&f.status!=='cancelado').reduce((s,f)=>s+Number(f.saldo_restante??f.valor),0),
-      vencidas: lista.filter(f=>f.status==='pendente'&&f.data_vencimento<hoje).reduce((s,f)=>s+Number(f.saldo_restante??f.valor),0),
-      nVencidas:lista.filter(f=>f.status==='pendente'&&f.data_vencimento<hoje).length,
-    })
     setLoading(false)
   }, [filters])
 
@@ -332,68 +316,37 @@ export default function FinanceiroPage() {
 
   // ── Impressão de recibo / fatura ──────────────────────────────────────────
   async function imprimirRecibo(fat: any) {
-    const { data: recs } = await supabase
-      .from('fatura_recebimentos').select('*, usuarios(nome)')
-      .eq('fatura_id', fat.id).order('data_recebimento')
-    const cliente = fat.contratos?.clientes?.nome ?? '—'
-    const contrato = fat.contratos?.numero ?? '—'
-    const w = window.open('', '_blank', 'width=700,height=900')
-    if (!w) return
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Recibo ${fat.numero}</title>
-    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:0;padding:20px}
-    .header{text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px}
-    .title{font-size:18px;font-weight:bold}
-    .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee}
-    .lbl{color:#555;font-weight:600} .val{font-weight:700}
-    .total{font-size:15px;font-weight:bold;background:#f5f5f5;padding:10px;border-radius:4px;margin-top:12px}
-    .ass{margin-top:60px;border-top:1px solid #000;padding-top:8px;width:200px}
-    </style></head><body>
-    <div class="header"><div class="title">RECIBO DE PAGAMENTO</div><div>${fat.numero}</div></div>
-    <div class="row"><span class="lbl">Cliente:</span><span class="val">${cliente}</span></div>
-    <div class="row"><span class="lbl">Contrato:</span><span class="val">${contrato}</span></div>
-    <div class="row"><span class="lbl">Tipo:</span><span class="val">${fat.tipo}</span></div>
-    <div class="row"><span class="lbl">Valor Total:</span><span class="val">${Number(fat.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>
-    <div class="row"><span class="lbl">Valor Recebido:</span><span class="val">${Number(fat.valor_recebido||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>
-    ${(recs??[]).map((r:any)=>`<div class="row"><span class="lbl">${r.data_recebimento} — ${r.forma_pagamento??''}:</span><span class="val">${Number(r.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>`).join('')}
-    <div class="total">Saldo Restante: ${Number(fat.saldo_restante??0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</div>
-    <div style="margin-top:40px;font-size:11px;color:#888;text-align:center">Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</div>
-    <div class="ass">Assinatura</div>
-    </body></html>`)
-    w.document.close(); w.print()
+    try {
+      const res = await fetch('/api/documentos/fatura', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fatura_id: fat.id, tipo: 'recibo' }),
+      })
+      const result = await res.json()
+      if (!result.ok) { alert('Erro ao gerar recibo: ' + result.error); return }
+      const w = window.open('', '_blank', 'width=900,height=700')
+      if (!w) return
+      w.document.write(result.html)
+      w.document.close()
+      setTimeout(() => w.print(), 800)
+    } catch(e: any) { alert('Erro: ' + e.message) }
   }
 
   async function imprimirFatura(fat: any) {
-    const cliente = fat.contratos?.clientes?.nome ?? '—'
-    const contrato = fat.contratos?.numero ?? '—'
-    const { data: todasFat } = await supabase.from('faturas')
-      .select('tipo, valor, valor_recebido, status, descricao')
-      .eq('contrato_id', fat.contrato_id).neq('status','cancelado')
-    const discriminacao = (todasFat??[]).map((f:any)=>
-      `<div class="row"><span class="lbl">${f.tipo?.toUpperCase()}:</span><span>${Number(f.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</span></div>`
-    ).join('')
-    const w = window.open('', '_blank', 'width=700,height=900')
-    if (!w) return
-    w.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Fatura ${fat.numero}</title>
-    <style>body{font-family:Arial,sans-serif;font-size:12px;margin:0;padding:20px}
-    .header{text-align:center;border-bottom:2px solid #000;padding-bottom:12px;margin-bottom:16px}
-    .title{font-size:18px;font-weight:bold}.subtitle{color:#555;font-size:13px}
-    .row{display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid #eee}
-    .lbl{color:#555;font-weight:600} .section{font-weight:bold;margin-top:14px;margin-bottom:6px;font-size:13px}
-    .total{font-size:15px;font-weight:bold;background:#f5f5f5;padding:10px;border-radius:4px;margin-top:12px}
-    </style></head><body>
-    <div class="header"><div class="title">FATURA DE LOCAÇÃO</div><div class="subtitle">${fat.numero}</div></div>
-    <div class="row"><span class="lbl">Cliente:</span><span>${cliente}</span></div>
-    <div class="row"><span class="lbl">Contrato:</span><span>${contrato}</span></div>
-    <div class="row"><span class="lbl">Vencimento:</span><span>${fat.data_vencimento}</span></div>
-    <div class="row"><span class="lbl">Descrição:</span><span>${fat.descricao??'—'}</span></div>
-    <div class="section">Discriminação por Tipo</div>
-    ${discriminacao}
-    <div class="total">Total da Fatura: ${Number(fat.valor).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}<br>
-    Recebido: ${Number(fat.valor_recebido||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}<br>
-    Saldo: ${Number(fat.saldo_restante||0).toLocaleString('pt-BR',{style:'currency',currency:'BRL'})}</div>
-    <div style="margin-top:40px;font-size:11px;color:#888;text-align:center">Documento gerado em ${new Date().toLocaleDateString('pt-BR')} às ${new Date().toLocaleTimeString('pt-BR')}</div>
-    </body></html>`)
-    w.document.close(); w.print()
+    try {
+      const res = await fetch('/api/documentos/fatura', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fatura_id: fat.id, tipo: 'fatura' }),
+      })
+      const result = await res.json()
+      if (!result.ok) { alert('Erro ao gerar fatura: ' + result.error); return }
+      const w = window.open('', '_blank', 'width=900,height=700')
+      if (!w) return
+      w.document.write(result.html)
+      w.document.close()
+      setTimeout(() => w.print(), 800)
+    } catch(e: any) { alert('Erro: ' + e.message) }
   }
 
   const hoje = new Date().toISOString().split('T')[0]

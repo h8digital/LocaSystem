@@ -42,13 +42,18 @@ export default function LookupField({
     if (!wrapRef.current) return
     const rect = wrapRef.current.getBoundingClientRect()
     const viewH = window.innerHeight
-    const dropH = 260  // max expected dropdown height
-    const below = rect.bottom + dropH < viewH
+    const dropH = 280  // max expected dropdown height
+    const spaceBelow = viewH - rect.bottom
+    const spaceAbove = rect.top
+
+    // Preferir abaixo. Só abre acima se não couber abaixo E couber acima
+    const above = spaceBelow < dropH && spaceAbove > spaceBelow
+
     setDropPos({
-      top:   below ? rect.bottom + 4 : rect.top - dropH - 4,
+      top:   above ? Math.max(4, rect.top - Math.min(dropH, spaceAbove) - 4) : rect.bottom + 2,
       left:  rect.left,
       width: rect.width,
-      above: !below,
+      above,
     })
   }, [])
 
@@ -71,11 +76,15 @@ export default function LookupField({
   useEffect(() => {
     if (!open) return
     calcPos()
+    // Captura scroll em qualquer ancestral (útil para containers com overflow:auto)
+    const scrollParent = wrapRef.current?.closest('[style*="overflow"]') ?? window
     window.addEventListener('scroll',  calcPos, true)
     window.addEventListener('resize',  calcPos)
+    scrollParent.addEventListener('scroll', calcPos, true)
     return () => {
       window.removeEventListener('scroll', calcPos, true)
       window.removeEventListener('resize', calcPos)
+      scrollParent.removeEventListener('scroll', calcPos, true)
     }
   }, [open, calcPos])
 
@@ -197,7 +206,9 @@ export default function LookupField({
             left:   dropPos.left,
             width:  dropPos.width,
             zIndex: 9999,
-            maxHeight: 260,
+            maxHeight: dropPos.above
+              ? Math.min(280, dropPos.top - 8)
+              : Math.min(280, window.innerHeight - dropPos.top - 8),
             overflowY: 'auto',
           }}
         >
