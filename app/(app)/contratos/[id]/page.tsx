@@ -270,24 +270,48 @@ export default function VerContratoPage() {
     if (!formPgto.valor_pago || Number(formPgto.valor_pago) <= 0) { setErroPgto('Informe o valor pago.'); return }
     if (!formPgto.data_pagamento) { setErroPgto('Informe a data do pagamento.'); return }
     setSalvandoPgto(true); setErroPgto('')
+    const valorPago    = Number(formPgto.valor_pago)
+    const jaRecebido   = Number(faturaAlvo?.valor_recebido ?? 0)
+    const novoRecebido = jaRecebido + valorPago
+    const novoSaldo    = Number(faturaAlvo?.valor ?? 0) - novoRecebido
+    const novoStatus   = novoSaldo <= 0.005 ? 'pago' : 'parcial'
+    await supabase.from('fatura_recebimentos').insert({
+      fatura_id:        faturaAlvo?.id,
+      valor:            valorPago,
+      data_recebimento: formPgto.data_pagamento,
+      forma_pagamento:  formPgto.forma_pagamento,
+      observacoes:      formPgto.observacoes || null,
+    })
     await supabase.from('faturas').update({
-      status:          'pago',
-      valor_pago:      Number(formPgto.valor_pago),
-      data_pagamento:  formPgto.data_pagamento,
+      status:          novoStatus,
+      valor_recebido:  novoRecebido,
+      saldo_restante:  Math.max(0, novoSaldo),
+      data_pagamento:  novoStatus === 'pago' ? formPgto.data_pagamento : null,
       forma_pagamento: formPgto.forma_pagamento,
-      observacoes:     formPgto.observacoes || null,
     }).eq('id', faturaAlvo.id)
-    const { data: f } = await supabase.from('faturas').select('*').eq('contrato_id', id).order('data_vencimento')
+    const [{ data: f }, sRes] = await Promise.all([
+      supabase.from('faturas').select('*').eq('contrato_id', id).order('data_vencimento'),
+      supabase.from('contrato_saldo').select('*').eq('contrato_id', id).maybeSingle(),
+    ])
     setFaturas(f ?? [])
+    setSaldoInfo(sRes?.data ?? sRes ?? null)
     setSalvandoPgto(false)
     setPainelPgto(false)
   }
 
   async function estornarPagamento(fatura: any) {
     if (!confirm(`Estornar pagamento da fatura ${fatura.numero}?`)) return
-    await supabase.from('faturas').update({ status:'pendente', valor_pago:null, data_pagamento:null }).eq('id', fatura.id)
-    const { data: f } = await supabase.from('faturas').select('*').eq('contrato_id', id).order('data_vencimento')
+    await supabase.from('fatura_recebimentos').delete().eq('fatura_id', fatura.id)
+    await supabase.from('faturas').update({
+      status:'pendente', valor_recebido:0, saldo_restante:fatura.valor,
+      data_pagamento:null, forma_pagamento:null
+    }).eq('id', fatura.id)
+    const [{ data: f }, sRes] = await Promise.all([
+      supabase.from('faturas').select('*').eq('contrato_id', id).order('data_vencimento'),
+      supabase.from('contrato_saldo').select('*').eq('contrato_id', id).maybeSingle(),
+    ])
     setFaturas(f ?? [])
+    setSaldoInfo(sRes?.data ?? sRes ?? null)
   }
 
   async function criarFaturaAvulsa() {
@@ -439,8 +463,8 @@ export default function VerContratoPage() {
     contrato.local_uso_cidade,contrato.local_uso_estado,
   ].filter(Boolean).join(', ')
 
-  const totalPago    =faturas.filter(f=>f.status==='pago').reduce((s,f)=>s+Number(f.valor_pago??f.valor),0)
-  const totalPendente=faturas.filter(f=>f.status!=='pago').reduce((s,f)=>s+Number(f.valor),0)
+  const totalPago    =faturas.filter(f=>f.status==='pago').reduce((s,f)=>s+Number(f.valor_recebido??f.valor),0)
+  const totalPendente=faturas.filter(f=>f.status!=='pago').reduce((s,f)=>s+Number(f.saldo_restante??f.valor),0)
 
   const TABS=[
     {key:'dados',      label:'Dados do Contrato'},
@@ -701,12 +725,24 @@ export default function VerContratoPage() {
 
               <div className="form-grid-2">
                 <div style={{background:'var(--c-success-light)',borderRadius:'var(--r-md)',padding:'12px 16px',border:'1px solid var(--c-success)'}}>
-                  <div style={{fontSize:'var(--fs-md)',color:'var(--c-success-text)',marginBottom:4}}>Recebido</div>
-                  <div style={{fontWeight:700,fontSize:'var(--fs-lg)',color:'var(--c-success-text)'}}>{fmt.money(totalPago)}</div>
+                  <div style={{fontSize:'var(--fs-md)',color:'var(--c-success-text)',marginBottom:4,fontWeight:600}}>Recebido</div>
+                  <div style={{fontWeight:800,fontSize:'var(--fs-lg)',color:'var(--c-success-text)'}}>
+                    {fmt.money(saldoInfo?.total_recebido ?? totalPago)}
+                  </div>
+                  {Number(saldoInfo?.total_recebido ?? totalPago) > 0 && (
+                    <div style={{fontSize:'var(--fs-xs)',color:'var(--c-success-text)',marginTop:4,opacity:.75}}>
+                      {faturas.filter(f=>f.status==='pago').length} fatura(s) quitada(s)
+                    </div>
+                  )}
                 </div>
                 <div style={{background:totalPendente>0?'var(--c-danger-light)':'var(--c-success-light)',borderRadius:'var(--r-md)',padding:'12px 16px',border:`1px solid ${totalPendente>0?'var(--c-danger)':'var(--c-success)'}`}}>
-                  <div style={{fontSize:'var(--fs-md)',color:totalPendente>0?'var(--c-danger-text)':'var(--c-success-text)',marginBottom:4}}>Em Aberto</div>
-                  <div style={{fontWeight:700,fontSize:'var(--fs-lg)',color:totalPendente>0?'var(--c-danger)':'var(--c-success-text)'}}>{fmt.money(totalPendente)}</div>
+                  <div style={{fontSize:'var(--fs-md)',color:totalPendente>0?'var(--c-danger-text)':'var(--c-success-text)',marginBottom:4,fontWeight:600}}>Em Aberto</div>
+                  <div style={{fontWeight:800,fontSize:'var(--fs-lg)',color:totalPendente>0?'var(--c-danger)':'var(--c-success-text)'}}>
+                    {fmt.money(saldoInfo?.saldo_devedor ?? totalPendente)}
+                  </div>
+                  {totalPendente === 0 && (
+                    <div style={{fontSize:'var(--fs-xs)',color:'var(--c-success-text)',marginTop:4,opacity:.75}}>✓ Contrato quitado</div>
+                  )}
                 </div>
               </div>
               </div>
@@ -737,7 +773,7 @@ export default function VerContratoPage() {
                           <Td muted>{f.tipo?.replace(/_/g,' ').replace(/\w/g,(x:string)=>x.toUpperCase())}</Td>
                           <Td muted>{fmt.date(f.data_vencimento)}</Td>
                           <Td right bold>{fmt.money(f.valor)}</Td>
-                          <Td right>{f.status==='pago'?fmt.money(f.valor_pago??f.valor):'—'}</Td>
+                          <Td right>{f.valor_recebido>0?fmt.money(f.valor_recebido):'—'}</Td>
                           <td style={{padding:'8px 16px',borderBottom:'1px solid var(--border)',fontSize:'var(--fs-md)',color:'var(--t-muted)'}}>
                             {f.status==='pago'
                               ?<>{fmt.date(f.data_pagamento)} · {(f.forma_pagamento??'').replace(/_/g,' ')}</>
