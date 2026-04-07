@@ -501,54 +501,118 @@ export default function EquipamentosPage() {
 
             {/* ── PAINEL DE PREÇOS RÁPIDO ─────────────────────────────────── */}
             {precoPainel && (
-              <div style={{ borderTop:'2px solid var(--c-primary)', background:'var(--bg-card)',
-                padding:'16px 20px', animation:'fadeIn .15s ease' }}>
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between',
-                  marginBottom:14 }}>
-                  <div>
-                    <span style={{ fontWeight:700, fontSize:'var(--fs-base)', color:'var(--t-primary)' }}>
-                      {precoPainel.nome}
-                    </span>
-                    <span style={{ marginLeft:10, fontSize:'var(--fs-sm)', color:'var(--t-muted)' }}>
-                      — Tabela de Preços de Locação
-                    </span>
+              <div
+                style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)',
+                  zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
+                onClick={() => setPrecoPainel(null)}
+              >
+                <div
+                  style={{ background:'var(--bg-card)', borderRadius:'var(--r-lg)',
+                    width:'100%', maxWidth:680, boxShadow:'var(--shadow-lg)',
+                    display:'flex', flexDirection:'column', maxHeight:'90vh', overflow:'hidden' }}
+                  onClick={e => e.stopPropagation()}
+                >
+                  {/* Header */}
+                  <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)',
+                    display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <div>
+                      <div style={{ fontWeight:800, fontSize:'var(--fs-lg)', color:'var(--t-primary)' }}>
+                        {precoPainel.nome}
+                      </div>
+                      <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginTop:2 }}>
+                        {[precoPainel.marca, precoPainel.modelo, precoPainel.categorias?.nome]
+                          .filter(Boolean).join(' · ')}
+                      </div>
+                    </div>
+                    <button onClick={() => setPrecoPainel(null)}
+                      style={{ background:'none', border:'none', cursor:'pointer',
+                        fontSize:22, color:'var(--t-muted)', lineHeight:1, padding:'0 4px' }}>
+                      ×
+                    </button>
                   </div>
-                  <button onClick={() => setPrecoPainel(null)}
-                    style={{ background:'none', border:'none', cursor:'pointer',
-                      fontSize:18, color:'var(--t-muted)', lineHeight:1 }}>×</button>
-                </div>
-                <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))', gap:10 }}>
-                  {[
-                    { l:'Diário',      v:precoPainel.preco_locacao_diario,  d:1   },
-                    { l:'FDS',         v:precoPainel.preco_fds,              d:2   },
-                    { l:'Semanal',     v:precoPainel.preco_locacao_semanal,  d:7   },
-                    { l:'Quinzenal',   v:precoPainel.preco_quinzenal,        d:15  },
-                    { l:'Mensal',      v:precoPainel.preco_locacao_mensal,   d:30  },
-                    { l:'Trimestral',  v:precoPainel.preco_trimestral,       d:90  },
-                    { l:'Semestral',   v:precoPainel.preco_semestral,        d:180 },
-                    { l:'Custo Repos.',v:precoPainel.custo_reposicao,        d:0   },
-                  ].map(item => (
-                    <div key={item.l} style={{ padding:'10px 14px',
-                      background: item.v > 0 ? 'var(--c-primary-light,#e0f2fe)' : 'var(--bg-header)',
-                      borderRadius:'var(--r-md)',
-                      border:`1px solid ${item.v > 0 ? 'var(--c-primary)' : 'var(--border)'}`,
-                      borderLeft:`3px solid ${item.v > 0 ? 'var(--c-primary)' : 'var(--border)'}` }}>
-                      <div style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--t-muted)',
-                        textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:4 }}>
-                        {item.l}
-                      </div>
-                      <div style={{ fontWeight:800, fontSize:'var(--fs-lg)',
-                        fontFamily:'var(--font-mono)',
-                        color: item.v > 0 ? 'var(--c-primary)' : 'var(--t-light)' }}>
-                        {item.v > 0 ? fmt.money(item.v) : '—'}
-                      </div>
-                      {item.v > 0 && item.d > 1 && (
-                        <div style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)', marginTop:3 }}>
-                          {fmt.money(item.v / item.d)}/dia
+
+                  {/* Preços por período (da tabela de parâmetros) */}
+                  <div style={{ padding:'20px', overflowY:'auto' }}>
+                    <div style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--t-muted)',
+                      textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:14 }}>
+                      Tabela de Preços de Locação
+                    </div>
+                    <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(150px,1fr))', gap:10 }}>
+                      {periodos.map((per: any) => {
+                        const campo = campoPreco(per.nome)
+                        const val   = Number(precoPainel[campo] ?? 0)
+                        return (
+                          <div key={per.id} style={{
+                            padding:'12px 14px', borderRadius:'var(--r-md)',
+                            background: val > 0 ? 'var(--c-primary-light,#e0f2fe)' : 'var(--bg-header)',
+                            border:`1px solid ${val > 0 ? 'var(--c-primary)' : 'var(--border)'}`,
+                            borderLeft:`3px solid ${val > 0 ? 'var(--c-primary)' : 'var(--border)'}`,
+                          }}>
+                            <div style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--t-muted)',
+                              textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:4 }}>
+                              {per.nome}
+                              <span style={{ fontWeight:400, marginLeft:4 }}>({per.dias}d)</span>
+                            </div>
+                            <div style={{ fontWeight:800, fontSize:'var(--fs-lg)',
+                              fontFamily:'var(--font-mono)',
+                              color: val > 0 ? 'var(--c-primary)' : 'var(--t-light)' }}>
+                              {val > 0 ? fmt.money(val) : '—'}
+                            </div>
+                            {val > 0 && per.dias > 1 && (
+                              <div style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)', marginTop:3 }}>
+                                {fmt.money(val / per.dias)}/dia
+                              </div>
+                            )}
+                          </div>
+                        )
+                      })}
+
+                      {/* Custo de Reposição — sempre no final */}
+                      {Number(precoPainel.custo_reposicao) > 0 && (
+                        <div style={{
+                          padding:'12px 14px', borderRadius:'var(--r-md)',
+                          background:'var(--c-warning-light,#fef3c7)',
+                          border:'1px solid var(--c-warning,#f59e0b)',
+                          borderLeft:'3px solid var(--c-warning,#f59e0b)',
+                        }}>
+                          <div style={{ fontSize:'var(--fs-xs)', fontWeight:700,
+                            color:'var(--c-warning-text,#92400e)',
+                            textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:4 }}>
+                            Custo Reposição
+                          </div>
+                          <div style={{ fontWeight:800, fontSize:'var(--fs-lg)',
+                            fontFamily:'var(--font-mono)', color:'var(--c-warning-text,#92400e)' }}>
+                            {fmt.money(precoPainel.custo_reposicao)}
+                          </div>
                         </div>
                       )}
                     </div>
-                  ))}
+
+                    {periodos.length === 0 && (
+                      <div style={{ textAlign:'center', padding:'24px', color:'var(--t-muted)' }}>
+                        Nenhum período configurado. Acesse Parâmetros → Períodos de Locação.
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Footer */}
+                  <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)',
+                    display:'flex', justifyContent:'flex-end', background:'var(--bg-header)' }}>
+                    <button
+                      onClick={() => { setPrecoPainel(null); abrir(precoPainel) }}
+                      style={{ padding:'7px 16px', borderRadius:'var(--r-md)',
+                        border:'1px solid var(--border)', background:'var(--bg-card)',
+                        cursor:'pointer', fontSize:'var(--fs-sm)', color:'var(--t-secondary)',
+                        marginRight:8, fontWeight:500 }}>
+                      ✏️ Editar Preços
+                    </button>
+                    <button onClick={() => setPrecoPainel(null)}
+                      style={{ padding:'7px 20px', borderRadius:'var(--r-md)',
+                        border:'none', background:'var(--c-primary)', color:'#fff',
+                        cursor:'pointer', fontSize:'var(--fs-sm)', fontWeight:700 }}>
+                      Fechar
+                    </button>
+                  </div>
                 </div>
               </div>
             )}
