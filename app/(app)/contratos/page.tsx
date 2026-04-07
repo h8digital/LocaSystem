@@ -58,12 +58,31 @@ export default function ContratosPage() {
     }
 
     async function excluir() {
-      if (!confirm(`Excluir o contrato ${row.numero}?\n\nEsta ação é irreversível.`)) return
-      await supabase.from('contrato_itens').delete().eq('contrato_id', row.id)
-      await supabase.from('faturas').delete().eq('contrato_id', row.id)
-      await supabase.from('devolucoes').delete().eq('contrato_id', row.id)
-      await supabase.from('contratos').delete().eq('id', row.id)
-      load()
+      if (!confirm(`Excluir o contrato ${row.numero}?\n\nTodos os itens, faturas e documentos vinculados serão removidos.\nEsta ação é irreversível.`)) return
+      try {
+        // 1. Liberar patrimônios que estavam reservados neste contrato
+        const { data: itens } = await supabase
+          .from('contrato_itens')
+          .select('patrimonio_id')
+          .eq('contrato_id', row.id)
+          .not('patrimonio_id', 'is', null)
+        if (itens && itens.length > 0) {
+          const ids = itens.map((i: any) => i.patrimonio_id).filter(Boolean)
+          if (ids.length > 0) {
+            await supabase.from('patrimonios')
+              .update({ status: 'disponivel' })
+              .in('id', ids)
+          }
+        }
+        // 2. Excluir o contrato — CASCADE remove automaticamente:
+        //    contrato_itens, faturas, fatura_recebimentos, devolucoes,
+        //    doc_gerados, email_log, manutencoes, contrato_timeline, contrato_aprovacoes
+        const { error } = await supabase.from('contratos').delete().eq('id', row.id)
+        if (error) { alert(`Erro ao excluir: ${error.message}`); return }
+        load()
+      } catch(e: any) {
+        alert(`Erro inesperado: ${e.message}`)
+      }
     }
 
     // Ações secundárias variam por status
