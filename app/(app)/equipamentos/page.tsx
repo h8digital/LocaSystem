@@ -103,6 +103,7 @@ export default function EquipamentosPage() {
   // ── Load ───────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
     setLoading(true)
+    // Query principal — sem joins pesados
     let q = supabase.from('produtos')
       .select(`id, nome, codigo, marca, modelo, controla_patrimonio, unidade,
                estoque_total, custo_reposicao, ativo, observacoes,
@@ -110,8 +111,6 @@ export default function EquipamentosPage() {
                preco_quinzenal, preco_locacao_mensal, preco_trimestral, preco_semestral,
                prazo_entrega_dias, categoria_id,
                categorias(nome),
-               contrato_itens(quantidade, contratos(status)),
-               patrimonios(id, status, deleted_at),
                produto_fotos(url, principal)`)
       .eq('ativo', 1).order('nome')
     if (catFilt)  q = q.eq('categoria_id', catFilt)
@@ -119,20 +118,49 @@ export default function EquipamentosPage() {
     if (busca)    q = q.ilike('nome', `%${busca}%`)
     const { data } = await q
 
-    const enriched = (data ?? []).map((p: any) => {
-      const patsAtivos = (p.patrimonios ?? []).filter((x:any) => !x.deleted_at)
-      const dispPat   = patsAtivos.filter((x:any) => x.status === 'disponivel').length
-      const locPat    = patsAtivos.filter((x:any) => x.status === 'locado').length
-      const totalPat  = patsAtivos.length
-      const qtdLocada = p.controla_patrimonio
-        ? locPat
-        : (p.contrato_itens ?? []).filter((ci:any) => ci.contratos?.status === 'ativo')
-            .reduce((s:number, ci:any) => s + Number(ci.quantidade), 0)
+    if (!data?.length) { setLista([]); setLoading(false); return }
+
+    // Buscar contagem de patrimônios por produto (uma query só)
+    const ids = data.map((p: any) => p.id)
+    const { data: pats } = await supabase
+      .from('patrimonios')
+      .select('produto_id, status')
+      .in('produto_id', ids)
+      .is('deleted_at', null)
+
+    // Buscar estoque locado para produtos por quantidade
+    const idsQtd = data.filter((p:any) => !p.controla_patrimonio).map((p:any) => p.id)
+    let locadoMap: Record<number,number> = {}
+    if (idsQtd.length > 0) {
+      const { data: cis } = await supabase
+        .from('contrato_itens')
+        .select('produto_id, quantidade, contratos(status)')
+        .in('produto_id', idsQtd)
+      ;(cis ?? []).forEach((ci: any) => {
+        if (ci.contratos?.status === 'ativo') {
+          locadoMap[ci.produto_id] = (locadoMap[ci.produto_id] ?? 0) + Number(ci.quantidade)
+        }
+      })
+    }
+
+    // Agrupar patrimônios por produto
+    const patMap: Record<number, {disp:number;loc:number;total:number}> = {}
+    ;(pats ?? []).forEach((pat: any) => {
+      if (!patMap[pat.produto_id]) patMap[pat.produto_id] = { disp:0, loc:0, total:0 }
+      patMap[pat.produto_id].total++
+      if (pat.status === 'disponivel') patMap[pat.produto_id].disp++
+      if (pat.status === 'locado')     patMap[pat.produto_id].loc++
+    })
+
+    const enriched = data.map((p: any) => {
+      const pm       = patMap[p.id] ?? { disp:0, loc:0, total:0 }
+      const qtdLocada = p.controla_patrimonio ? pm.loc : (locadoMap[p.id] ?? 0)
       const disponivel = p.controla_patrimonio
-        ? dispPat
+        ? pm.disp
         : Math.max(0, (p.estoque_total ?? 0) - qtdLocada)
       const foto = (p.produto_fotos ?? []).find((f:any) => f.principal)?.url ?? null
-      return { ...p, dispPat, locPat, totalPat, disponivel, qtdLocada, foto }
+      return { ...p, dispPat: pm.disp, locPat: pm.loc, totalPat: pm.total,
+               disponivel, qtdLocada, foto }
     })
     setLista(enriched)
     setLoading(false)
