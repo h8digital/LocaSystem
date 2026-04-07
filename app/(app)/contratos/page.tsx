@@ -9,7 +9,7 @@ import type { AcaoSecundaria } from '@/components/ui/ActionButtons'
 export default function ContratosPage() {
   const [contratos, setContratos] = useState<any[]>([])
   const [loading,   setLoading]   = useState(true)
-  const [filters,   setFilters]   = useState<Record<string,string>>({ busca:'', status:'' })
+  const [filters,   setFilters]   = useState<Record<string,string>>({ busca:'', status:'', data_inicio_de:'', data_inicio_ate:'', data_fim_de:'', data_fim_ate:'' })
   const [totais,    setTotais]    = useState({ total:0, ativos:0, valor:0, vencidos:0, pendente_manutencao:0 })
   const router = useRouter()
 
@@ -19,8 +19,12 @@ export default function ContratosPage() {
       .from('contratos')
       .select('*, clientes(nome), usuarios(nome)')
       .order('created_at', { ascending:false })
-    if (filters.status) q = q.eq('status', filters.status)
-    if (filters.busca)  q = q.ilike('numero', `%${filters.busca}%`)
+    if (filters.status)        q = q.eq('status', filters.status)
+    if (filters.busca)         q = q.or(`numero.ilike.%${filters.busca}%,clientes.nome.ilike.%${filters.busca}%`)
+    if (filters.data_inicio_de)  q = q.gte('data_inicio', filters.data_inicio_de)
+    if (filters.data_inicio_ate) q = q.lte('data_inicio', filters.data_inicio_ate)
+    if (filters.data_fim_de)     q = q.gte('data_fim', filters.data_fim_de)
+    if (filters.data_fim_ate)    q = q.lte('data_fim', filters.data_fim_ate)
     const { data } = await q.limit(100)
     setContratos(data ?? [])
 
@@ -189,17 +193,78 @@ export default function ContratosPage() {
         </div>
       </div>
 
-      <Filters
-        fields={[
-          { type:'text',   key:'busca',  placeholder:'Buscar por número ou cliente...', width:'280px' },
-          { type:'select', key:'status', placeholder:'Todos os status',
-            options:['rascunho','ativo','encerrado','cancelado','inadimplente']
-              .map(s => ({ value:s, label:s.charAt(0).toUpperCase()+s.slice(1) })) },
-        ]}
-        values={filters}
-        onChange={(k,v) => setFilters(f => ({ ...f,[k]:v }))}
-        onClear={() => setFilters({ busca:'', status:'' })}
-      />
+      <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'flex-end' }}>
+        {/* Busca */}
+        <div style={{ position:'relative', flex:'2 1 240px', minWidth:200 }}>
+          <span style={{ position:'absolute', left:10, top:'50%', transform:'translateY(-50%)',
+            color:'var(--t-muted)', fontSize:14, pointerEvents:'none' }}>🔍</span>
+          <input
+            value={filters.busca}
+            onChange={e => setFilters(f => ({ ...f, busca: e.target.value }))}
+            placeholder="Buscar por número ou cliente..."
+            className="ds-input"
+            style={{ paddingLeft:32, width:'100%' }}
+          />
+        </div>
+
+        {/* Status */}
+        <select
+          value={filters.status}
+          onChange={e => setFilters(f => ({ ...f, status: e.target.value }))}
+          className="ds-input"
+          style={{ flex:'1 1 160px', minWidth:140 }}
+        >
+          <option value="">Todos os status</option>
+          {['rascunho','ativo','encerrado','cancelado','inadimplente'].map(s => (
+            <option key={s} value={s}>{s.charAt(0).toUpperCase()+s.slice(1)}</option>
+          ))}
+        </select>
+
+        {/* Data de Início */}
+        <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+          <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--t-muted)',
+            textTransform:'uppercase', letterSpacing:'0.05em' }}>Início</span>
+          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+            <input type="date" value={filters.data_inicio_de}
+              onChange={e => setFilters(f => ({ ...f, data_inicio_de: e.target.value }))}
+              className="ds-input" style={{ width:140 }}
+              title="Início a partir de" />
+            <span style={{ color:'var(--t-muted)', fontSize:'var(--fs-sm)' }}>até</span>
+            <input type="date" value={filters.data_inicio_ate}
+              onChange={e => setFilters(f => ({ ...f, data_inicio_ate: e.target.value }))}
+              className="ds-input" style={{ width:140 }}
+              title="Início até" />
+          </div>
+        </div>
+
+        {/* Data de Fim / Devolução */}
+        <div style={{ display:'flex', flexDirection:'column', gap:3 }}>
+          <span style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--t-muted)',
+            textTransform:'uppercase', letterSpacing:'0.05em' }}>Devolução</span>
+          <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+            <input type="date" value={filters.data_fim_de}
+              onChange={e => setFilters(f => ({ ...f, data_fim_de: e.target.value }))}
+              className="ds-input" style={{ width:140 }}
+              title="Devolução a partir de" />
+            <span style={{ color:'var(--t-muted)', fontSize:'var(--fs-sm)' }}>até</span>
+            <input type="date" value={filters.data_fim_ate}
+              onChange={e => setFilters(f => ({ ...f, data_fim_ate: e.target.value }))}
+              className="ds-input" style={{ width:140 }}
+              title="Devolução até" />
+          </div>
+        </div>
+
+        {/* Limpar */}
+        {Object.values(filters).some(v => v) && (
+          <button
+            onClick={() => setFilters({ busca:'', status:'', data_inicio_de:'', data_inicio_ate:'', data_fim_de:'', data_fim_ate:'' })}
+            style={{ background:'none', border:'none', color:'var(--t-muted)', cursor:'pointer',
+              fontSize:'var(--fs-sm)', fontWeight:600, textDecoration:'underline',
+              whiteSpace:'nowrap', padding:'4px 0' }}>
+            Limpar filtros
+          </button>
+        )}
+      </div>
 
       <DataTable
         loading={loading}
