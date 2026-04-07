@@ -71,7 +71,7 @@ export default function EquipamentoDetalhe() {
 
   if (loading) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', minHeight:300 }}>
-      <div className="ds-spinner" />
+      <div style={{display:"flex",alignItems:"center",gap:5,margin:"0 auto 12px",width:"fit-content"}}><div style={{width:7,height:7,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out infinite",opacity:.3}}/><div style={{width:7,height:7,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out 0.2s infinite",opacity:.3}}/><div style={{width:7,height:7,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out 0.4s infinite",opacity:.3}}/></div>
     </div>
   )
   if (!produto) return (

@@ -593,7 +593,7 @@ export default function FinanceiroPage() {
             {loadingRec ? (
               <div style={{ display:'flex', alignItems:'center', gap:8, color:'var(--t-muted)',
                 fontSize:'var(--fs-md)', padding:'12px 0' }}>
-                <div className="ds-spinner" style={{ width:14, height:14 }} /> Carregando...
+                <div style={{width:6,height:6,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out infinite",display:"inline-block",verticalAlign:"middle",flexShrink:0}}/> Carregando...
               </div>
             ) : recebimentos.length === 0 ? (
               <div style={{ color:'var(--t-muted)', fontSize:'var(--fs-md)', padding:'12px 0',

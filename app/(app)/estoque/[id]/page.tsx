@@ -95,7 +95,7 @@ export default function EstoqueDetalheProductPage() {
 
   if (loading) return (
     <div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'60vh', gap:10, color:'var(--t-muted)' }}>
-      <div className="ds-spinner" style={{ width:20, height:20 }}/> Carregando...
+      <div style={{display:"inline-block",width:6,height:6,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out infinite",verticalAlign:"middle",flexShrink:0}}/> Carregando...
     </div>
   )
   if (!produto) return (

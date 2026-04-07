@@ -45,7 +45,7 @@ export default function DashboardPage() {
 
   if(loading) return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'60vh',gap:10}}>
-      <div className="ds-spinner" style={{width:20,height:20}}/>
+      <div style={{width:6,height:6,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out infinite",display:"inline-block",verticalAlign:"middle",flexShrink:0}}/>
       <span style={{color:'var(--t-muted)',fontSize:'var(--fs-base)'}}>Carregando...</span>
     </div>
   )

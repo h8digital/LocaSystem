@@ -348,7 +348,7 @@ export default function EquipamentosPage() {
       <div className="ds-card">
         {loading ? (
           <div style={{ padding:'60px 24px', textAlign:'center', color:'var(--t-muted)' }}>
-            <div className="ds-spinner" style={{ margin:'0 auto 12px' }} />
+            <div style={{display:"flex",alignItems:"center",gap:5,margin:"0 auto 12px",width:"fit-content"}}><div style={{width:7,height:7,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out infinite",opacity:.3}}/><div style={{width:7,height:7,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out 0.2s infinite",opacity:.3}}/><div style={{width:7,height:7,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out 0.4s infinite",opacity:.3}}/></div>
             Carregando equipamentos...
           </div>
         ) : lista.length === 0 ? (
@@ -1000,7 +1000,7 @@ export default function EquipamentosPage() {
             {/* Lista de patrimônios */}
             {patsLoading ? (
               <div style={{ textAlign:'center', padding:'32px', color:'var(--t-muted)' }}>
-                <div className="ds-spinner" style={{ margin:'0 auto 10px' }} />Carregando...
+                <div style={{display:"flex",alignItems:"center",gap:5,margin:"0 auto 12px",width:"fit-content"}}><div style={{width:7,height:7,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out infinite",opacity:.3}}/><div style={{width:7,height:7,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out 0.2s infinite",opacity:.3}}/><div style={{width:7,height:7,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out 0.4s infinite",opacity:.3}}/></div>Carregando...
               </div>
             ) : patsPanel.length === 0 ? (
               <div style={{ textAlign:'center', padding:'40px 24px', color:'var(--t-muted)',

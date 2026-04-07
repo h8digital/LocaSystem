@@ -727,14 +727,32 @@ button, input, select, textarea { font-family: var(--font); font-size: var(--fon
 /* ════════════════════════════════════════════════════════════
    SPINNER
    ════════════════════════════════════════════════════════════ */
+/* Loading indicator — bolinha pulsante discreta */
 .ds-spinner, .spinner {
-  border: 2px solid var(--border);
-  border-top-color: var(--c-primary);
-  border-radius: 50%;
-  animation: spin 0.6s linear infinite;
+  display: inline-block;
   flex-shrink: 0;
+  border: none;
+  border-radius: 50%;
+  background: var(--c-primary);
+  width: 8px;
+  height: 8px;
+  animation: dot-pulse 1.2s ease-in-out infinite;
+  box-shadow: 12px 0 0 -2px var(--c-primary), 24px 0 0 -2px var(--c-primary);
 }
-@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes dot-pulse {
+  0%, 100% {
+    opacity: 0.25;
+    box-shadow: 12px 0 0 -2px var(--c-primary), 24px 0 0 -2px var(--c-primary);
+  }
+  33% {
+    opacity: 1;
+    box-shadow: 12px 0 0 0px var(--c-primary), 24px 0 0 -2px var(--c-primary);
+  }
+  66% {
+    opacity: 0.7;
+    box-shadow: 12px 0 0 -2px var(--c-primary), 24px 0 0 0px var(--c-primary);
+  }
+}
 
 /* ════════════════════════════════════════════════════════════
    ALERTAS

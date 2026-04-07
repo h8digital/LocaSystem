@@ -38,7 +38,7 @@ export default function LoginPage() {
                 <input type="password" value={senha} onChange={e=>setSenha(e.target.value)} className="ds-input" placeholder="••••••••" required style={{height:32}}/>
               </div>
               <button type="submit" disabled={loading} className="ds-btn ds-btn-primary" style={{width:'100%',height:34,fontSize:14,fontWeight:700,marginTop:4}}>
-                {loading?<span style={{display:'flex',alignItems:'center',gap:8,justifyContent:'center'}}><span className="ds-spinner" style={{width:14,height:14}}/>Entrando...</span>:'Entrar'}
+                {loading?<span style={{display:'flex',alignItems:'center',gap:8,justifyContent:'center'}}><span style={{display:"inline-block",width:6,height:6,borderRadius:"50%",background:"currentColor",animation:"dot-pulse 1.2s ease-in-out infinite",verticalAlign:"middle",marginRight:4,opacity:.7}}/>Entrando...</span>:'Entrar'}
               </button>
             </form>
           </div>

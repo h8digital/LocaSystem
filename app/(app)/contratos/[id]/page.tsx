@@ -491,7 +491,7 @@ export default function VerContratoPage() {
 
   if(loading) return(
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'60vh',gap:10,color:'var(--t-muted)'}}>
-      <div className="ds-spinner" style={{width:20,height:20}}/>Carregando...
+      <div style={{width:6,height:6,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out infinite",display:"inline-block",verticalAlign:"middle",flexShrink:0}}/>Carregando...
     </div>
   )
   if(!contrato) return <div style={{textAlign:'center',padding:48,color:'var(--t-muted)'}}>Contrato não encontrado.</div>

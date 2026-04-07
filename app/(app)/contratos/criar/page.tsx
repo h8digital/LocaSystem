@@ -362,7 +362,7 @@ export default function CriarContratoPage() {
             </div>
           ) : loadingEnderecos ? (
             <div style={{ display:'flex', alignItems:'center', gap:8, color:'var(--t-muted)' }}>
-              <div className="ds-spinner" style={{ width:14, height:14 }}/> Carregando endereços...
+              <div style={{display:"inline-block",width:6,height:6,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out infinite",verticalAlign:"middle",flexShrink:0}}/> Carregando endereços...
             </div>
           ) : enderecosCliente.length===0 ? (
             <div style={{ background:'var(--c-warning-light)', border:'1px solid var(--c-warning)', borderRadius:'var(--r-md)', padding:'12px 16px', fontSize:'var(--fs-md)', color:'var(--c-warning-text)' }}>
@@ -486,7 +486,7 @@ export default function CriarContratoPage() {
                 <div style={{ marginTop:12, display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
                   <FormField label="Patrimônio disponível" required>
                     {loadingPats
-                      ? <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:'var(--fs-md)', color:'var(--t-muted)', height:30 }}><div className="ds-spinner" style={{ width:13, height:13 }}/>Carregando...</div>
+                      ? <div style={{ display:'flex', alignItems:'center', gap:6, fontSize:'var(--fs-md)', color:'var(--t-muted)', height:30 }}><div style={{display:"inline-block",width:6,height:6,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out infinite",verticalAlign:"middle",flexShrink:0}}/>Carregando...</div>
                       : patrimonios.length===0
                         ? <div style={{ fontSize:'var(--fs-md)', color:'var(--c-warning-text)', background:'var(--c-warning-light)', padding:'6px 10px', borderRadius:'var(--r-sm)', border:'1px solid var(--c-warning)' }}>Nenhum patrimônio disponível.</div>
                         : <select value={itemPatrimonioId??''} onChange={e=>{

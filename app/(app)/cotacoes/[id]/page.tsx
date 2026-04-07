@@ -114,7 +114,7 @@ export default function CotacaoDetalhePage() {
 
   if (loading) return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: 40, color: 'var(--t-muted)', fontSize: 'var(--fs-base)' }}>
-      <div className="ds-spinner" style={{ width: 18, height: 18 }} /> Carregando...
+      <div style={{display:"inline-block",width:6,height:6,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out infinite",verticalAlign:"middle",flexShrink:0}}/> Carregando...
     </div>
   )
   if (!cot) return <div style={{ padding: 40, color: 'var(--t-muted)' }}>Cotação não encontrada.</div>

@@ -255,7 +255,7 @@ export default function CriarCotacaoPage(){
 
       <Stepper passo={passo}/>
 
-      {loadingUser&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'var(--bg-header)',border:'1px solid var(--border)',borderRadius:'var(--r-sm)',fontSize:'var(--fs-md)',color:'var(--t-muted)',marginBottom:12}}><div className="ds-spinner" style={{width:13,height:13}}/>Carregando sessão...</div>}
+      {loadingUser&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'var(--bg-header)',border:'1px solid var(--border)',borderRadius:'var(--r-sm)',fontSize:'var(--fs-md)',color:'var(--t-muted)',marginBottom:12}}><div style={{width:6,height:6,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out infinite",display:"inline-block",verticalAlign:"middle",flexShrink:0}}/>Carregando sessão...</div>}
       {erro&&<div className="ds-alert-error" style={{marginBottom:16}}>{erro}</div>}
 
       {/* ══ PASSO 1 — CLIENTE E PERÍODO ══════════════════════════════════ */}
