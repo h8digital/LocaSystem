@@ -252,6 +252,20 @@ export default function EquipamentosPage() {
   async function salvarPat() {
     if (!patForm.numero_patrimonio?.trim()) { setPatErro('Nº Patrimônio é obrigatório.'); return }
     setPatSaving(true); setPatErro('')
+    const numPat = patForm.numero_patrimonio.trim()
+
+    // Verificar duplicidade (ignora soft-deleted e o próprio registro em edição)
+    let dupQ = supabase.from('patrimonios')
+      .select('id, produtos(nome)')
+      .eq('numero_patrimonio', numPat)
+      .is('deleted_at', null)
+    if (editPat) dupQ = dupQ.neq('id', editPat.id)
+    const { data: dup } = await dupQ.limit(1)
+    if (dup && dup.length > 0) {
+      setPatErro(`Nº Patrimônio "${numPat}" já está cadastrado para o produto "${(dup[0].produtos as any)?.nome ?? 'outro produto'}".`)
+      setPatSaving(false); return
+    }
+
     const payload = {
       numero_patrimonio: patForm.numero_patrimonio.trim(),
       numero_serie:      patForm.numero_serie?.trim() || null,
@@ -274,11 +288,49 @@ export default function EquipamentosPage() {
   }
 
   async function excluirPat(pat: any) {
-    const temContrato = (pat.contrato_itens ?? []).some((ci: any) =>
+    const [
+      { data: contratos },
+      { data: movimentacoes },
+      { data: devItens },
+      { data: manutencoes },
+    ] = await Promise.all([
+      supabase.from('contrato_itens').select('id, contratos(status,numero)').eq('patrimonio_id', pat.id),
+      supabase.from('estoque_movimentacoes').select('id').eq('patrimonio_id', pat.id).limit(1),
+      supabase.from('devolucao_itens').select('id').eq('patrimonio_id', pat.id).limit(1),
+      supabase.from('manutencoes').select('id').eq('patrimonio_id', pat.id).limit(1),
+    ])
+
+    const contratosAtivos = (contratos ?? []).filter((ci:any) =>
       ['ativo','em_devolucao','pendente_manutencao'].includes(ci.contratos?.status)
     )
-    if (temContrato) { alert('Este patrimônio possui contrato ativo e não pode ser excluído.'); return }
-    if (!confirm(`Excluir patrimônio ${pat.numero_patrimonio}? Esta ação não pode ser desfeita.`)) return
+    if (contratosAtivos.length > 0) {
+      alert('Patrimônio ' + pat.numero_patrimonio + ' possui contrato ativo (' + (contratosAtivos[0].contratos as any)?.numero + ') — não pode ser excluído.')
+      return
+    }
+
+    const temHistorico = (contratos?.length ?? 0) > 0
+      || (movimentacoes?.length ?? 0) > 0
+      || (devItens?.length ?? 0) > 0
+      || (manutencoes?.length ?? 0) > 0
+
+    if (temHistorico) {
+      const deps: string[] = []
+      if ((contratos?.length ?? 0) > 0) deps.push(contratos!.length + ' contrato(s) vinculado(s)')
+      if ((movimentacoes?.length ?? 0) > 0) deps.push('movimentações de estoque')
+      if ((devItens?.length ?? 0) > 0) deps.push('registros de devolução')
+      if ((manutencoes?.length ?? 0) > 0) deps.push('ordens de manutenção')
+      alert(
+        'O patrimônio ' + pat.numero_patrimonio + ' possui histórico e não pode ser excluído fisicamente:\n\n' +
+        deps.map(d => '• ' + d).join('\n') +
+        '\n\nEle foi marcado como INATIVO para preservar o histórico.'
+      )
+      await supabase.from('patrimonios').update({ deleted_at: new Date().toISOString(), status: 'inativo' }).eq('id', pat.id)
+      carregarPatsPanel(editId!)
+      load()
+      return
+    }
+
+    if (!confirm('Excluir patrimônio ' + pat.numero_patrimonio + '?\n\nEste patrimônio não possui histórico e será removido permanentemente.')) return
     await supabase.from('patrimonios').update({ deleted_at: new Date().toISOString() }).eq('id', pat.id)
     carregarPatsPanel(editId!)
     load()
@@ -286,7 +338,44 @@ export default function EquipamentosPage() {
 
   // ── Inativar ───────────────────────────────────────────────────────────────
   async function inativar(id: number, nome: string) {
-    if (!confirm(`Inativar o produto "${nome}"? Ele não aparecerá mais nas listagens.`)) return
+    const [
+      { data: contratos },
+      { data: movimentacoes },
+      { data: cotacoes },
+      { data: patrimonios },
+    ] = await Promise.all([
+      supabase.from('contrato_itens').select('id, contratos(status,numero)').eq('produto_id', id),
+      supabase.from('estoque_movimentacoes').select('id').eq('produto_id', id).limit(1),
+      supabase.from('cotacao_itens').select('id').eq('produto_id', id).limit(1),
+      supabase.from('patrimonios').select('id, numero_patrimonio, status').eq('produto_id', id).is('deleted_at', null),
+    ])
+
+    const contratosAtivos = (contratos ?? []).filter((ci:any) =>
+      ['ativo','em_devolucao','pendente_manutencao'].includes(ci.contratos?.status)
+    )
+    if (contratosAtivos.length > 0) {
+      alert('O produto "' + nome + '" possui ' + contratosAtivos.length + ' contrato(s) ativo(s) e não pode ser inativado.\n\nEncerre os contratos antes de inativar o produto.')
+      return
+    }
+
+    const patsLocados = (patrimonios ?? []).filter((p:any) => p.status === 'locado')
+    if (patsLocados.length > 0) {
+      alert('O produto "' + nome + '" possui ' + patsLocados.length + ' patrimônio(s) atualmente locado(s).\n\nRegistre a devolução antes de inativar.')
+      return
+    }
+
+    const deps: string[] = []
+    if ((contratos?.length ?? 0) > 0) deps.push(contratos!.length + ' contrato(s) histórico(s)')
+    if ((movimentacoes?.length ?? 0) > 0) deps.push('movimentações de estoque')
+    if ((cotacoes?.length ?? 0) > 0) deps.push('cotações')
+    if ((patrimonios?.length ?? 0) > 0) deps.push(patrimonios!.length + ' patrimônio(s) cadastrado(s)')
+
+    const aviso = deps.length > 0
+      ? '\n\nEste produto possui:\n' + deps.map(d => '• ' + d).join('\n') + '\n\nOs dados serão preservados para histórico.'
+      : ''
+
+    if (!confirm('Inativar o produto "' + nome + '"?' + aviso + '\n\nEle não aparecerá mais nas listagens e buscas.')) return
+
     await supabase.from('produtos').update({ ativo: 0 }).eq('id', id)
     load()
   }
