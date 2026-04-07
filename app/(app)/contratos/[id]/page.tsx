@@ -81,7 +81,7 @@ export default function VerContratoPage() {
   useEffect(() => {
     async function load() {
       const [{ data:c },{ data:i },{ data:f }, s,{ data:t },{ data:per },{ data:d },{ data:el }] = await Promise.all([
-        supabase.from('contratos').select('*, clientes(*), usuarios(nome)').eq('id', id).single(),
+        supabase.from('contratos').select('*, clientes(*), usuarios(nome), periodos_locacao(nome, dias)').eq('id', id).single(),
         supabase.from('contrato_itens').select('*, produtos(nome), patrimonios(numero_patrimonio)').eq('contrato_id', id),
         supabase.from('faturas').select('*').eq('contrato_id', id).order('data_vencimento'),
         supabase.from('contrato_saldo').select('*').eq('contrato_id', id).maybeSingle(),
@@ -420,7 +420,7 @@ export default function VerContratoPage() {
     // Recarregar
     const [{ data: itensAtualizados }, { data: c2 }] = await Promise.all([
       supabase.from('contrato_itens').select('*, produtos(nome), patrimonios(numero_patrimonio)').eq('contrato_id', id),
-      supabase.from('contratos').select('*, clientes(*), usuarios(nome)').eq('id', id).single(),
+      supabase.from('contratos').select('*, clientes(*), usuarios(nome), periodos_locacao(nome, dias)').eq('id', id).single(),
     ])
     setItens(itensAtualizados ?? [])
     if (c2) setContrato(c2)
@@ -547,44 +547,50 @@ export default function VerContratoPage() {
           {/* ════ DADOS ════════════════════════════════════════════════ */}
           {aba==='dados'&&(
             <div style={{display:'flex',flexDirection:'column',gap:20}}>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(4,1fr)',gap:10}}>
+
+              {/* KPIs financeiros */}
+              <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10}}>
                 {[
-                  {l:'Total',  v:fmt.money(contrato.total),       c:'var(--c-primary)'},
-                  {l:'Caução', v:fmt.money(contrato.caucao),      c:'var(--t-primary)'},
-                  {l:'Início', v:fmt.date(contrato.data_inicio),  c:'var(--t-primary)'},
-                  {l:'Fim',    v:fmt.date(contrato.data_fim),     c:'var(--t-primary)'},
+                  {l:'Total',    v:fmt.money(contrato.total),    c:'var(--c-primary)',   bold:true},
+                  {l:'Subtotal', v:fmt.money(contrato.subtotal), c:'var(--t-secondary)', bold:false},
+                  {l:'Desconto', v:fmt.money(contrato.desconto), c:Number(contrato.desconto)>0?'var(--c-success-text)':'var(--t-muted)', bold:false},
+                  {l:'Frete',    v:fmt.money(contrato.frete??0), c:Number(contrato.frete)>0?'var(--c-warning-text)':'var(--t-muted)', bold:false},
+                  {l:'Caucao',   v:fmt.money(contrato.caucao),   c:'var(--t-secondary)', bold:false},
                 ].map(k=>(
-                  <div key={k.l} style={{background:'var(--bg-header)',borderRadius:'var(--r-md)',padding:'12px 14px',border:'1px solid var(--border)'}}>
-                    <div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)',marginBottom:4}}>{k.l}</div>
-                    <div style={{fontWeight:700,color:k.c}}>{k.v}</div>
+                  <div key={k.l} className="ds-card" style={{padding:'12px 14px'}}>
+                    <div style={{fontSize:'var(--fs-xs)',fontWeight:700,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>{k.l==='Caucao'?'Caução':k.l}</div>
+                    <div style={{fontWeight:k.bold?800:700,fontSize:k.bold?'var(--fs-lg)':'var(--fs-base)',color:k.c}}>{k.v}</div>
                   </div>
                 ))}
               </div>
 
-              <div>
+              {/* Informações Gerais */}
+              <div className="ds-card" style={{padding:'16px 20px'}}>
                 <div className="ds-section-title">Informações Gerais</div>
-                <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:16}}>
-                  <Campo label="Cliente"           value={contrato.clientes?.nome}/>
-                  <Campo label="Vendedor"          value={(contrato.usuarios as any)?.nome}/>
-                  <Campo label="Forma de Pagamento" value={(contrato.forma_pagamento??'').replace(/_/g,' ').replace(/\b\w/g,(c:string)=>c.toUpperCase())}/>
-                  <Campo label="Início"            value={fmt.date(contrato.data_inicio)}/>
-                  <Campo label="Fim Previsto"      value={fmt.date(contrato.data_fim)}/>
-                  <Campo label="Caução"            value={fmt.money(contrato.caucao)}/>
+                <div className="form-grid-3" style={{gap:18}}>
+                  <Campo label="Cliente"            value={contrato.clientes?.nome}/>
+                  <Campo label="Vendedor"           value={(contrato.usuarios as any)?.nome}/>
+                  <Campo label="Forma de Pagamento" value={(contrato.forma_pagamento??'').replace(/_/g,' ').replace(/\w/g,(ch:string)=>ch.toUpperCase())}/>
+                  <Campo label="Início"             value={fmt.date(contrato.data_inicio)}/>
+                  <Campo label="Fim Previsto"       value={fmt.date(contrato.data_fim)}/>
+                  <Campo label="Período de Locação" value={(contrato as any).periodos_locacao?.nome?`${(contrato as any).periodos_locacao.nome} (${(contrato as any).periodos_locacao.dias}d)`:'—'}/>
                   {contrato.data_devolucao_real&&<Campo label="Devolução Real" value={fmt.date(contrato.data_devolucao_real)}/>}
                   {Number(contrato.comissao_percentual)>0&&<Campo label={`Comissão (${contrato.comissao_percentual}%)`} value={fmt.money(contrato.comissao_valor)}/>}
+                  {Number(contrato.frete)>0&&<Campo label="Frete" value={fmt.money(contrato.frete)}/>}
                 </div>
                 {contrato.observacoes&&(
-                  <div style={{marginTop:14}}>
-                    <div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)',marginBottom:4}}>Observações</div>
+                  <div style={{marginTop:16,paddingTop:14,borderTop:'1px solid var(--border)'}}>
+                    <div style={{fontSize:'var(--fs-xs)',fontWeight:700,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>Observações</div>
                     <div style={{fontSize:'var(--fs-base)',color:'var(--t-secondary)',lineHeight:1.6}}>{contrato.observacoes}</div>
                   </div>
                 )}
               </div>
 
+              {/* Local de Uso */}
               {(enderecoUso||contrato.local_uso_referencia)&&(
-                <div>
+                <div className="ds-card" style={{padding:'16px 20px'}}>
                   <div className="ds-section-title">Local de Uso dos Equipamentos</div>
-                  <div style={{display:'grid',gridTemplateColumns:'repeat(2,1fr)',gap:14}}>
+                  <div className="form-grid-2" style={{gap:14}}>
                     {enderecoUso&&(
                       <div style={{gridColumn:'span 2'}}>
                         <Campo label="Endereço" value={<>{enderecoUso}{contrato.local_uso_cep&&` — CEP ${contrato.local_uso_cep}`}</>}/>
@@ -599,8 +605,8 @@ export default function VerContratoPage() {
                   {enderecoUso&&(
                     <a href={`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(enderecoUso)}`}
                       target="_blank" rel="noopener"
-                      style={{display:'inline-flex',alignItems:'center',gap:6,marginTop:10,
-                        fontSize:'var(--fs-md)',color:'var(--c-primary)',textDecoration:'none',fontWeight:500}}>
+                      style={{display:'inline-flex',alignItems:'center',gap:6,marginTop:14,
+                        fontSize:'var(--fs-md)',color:'var(--c-primary)',textDecoration:'none',fontWeight:600}}>
                       Abrir no Google Maps →
                     </a>
                   )}

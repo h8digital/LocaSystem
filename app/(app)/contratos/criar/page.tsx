@@ -707,6 +707,7 @@ export default function CriarContratoPage() {
               {[
                 { l:'Desconto (R$)',    f:'desconto' },
                 { l:'Acréscimo (R$)',   f:'acrescimo' },
+                { l:'Frete (R$)',       f:'frete' },
                 { l:'Caução (R$)',      f:'caucao' },
                 { l:'Comissão (%)',     f:'comissao_percentual' },
               ].map(x=>(

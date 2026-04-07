@@ -13,6 +13,12 @@ export function createServerClient() {
 // Formatadores
 export const fmt = {
   money: (v: number) => new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(v),
-  date: (d: string) => d ? new Date(d + 'T00:00:00').toLocaleDateString('pt-BR') : '—',
+  date: (d: string) => {
+    if (!d) return '—'
+    // Aceita tanto 'YYYY-MM-DD' quanto timestamps completos 'YYYY-MM-DD HH:MM:SS...'
+    const s = d.includes('T') || d.includes(' ') ? d : d + 'T12:00:00'
+    const dt = new Date(s)
+    return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('pt-BR')
+  },
   datetime: (d: string) => d ? new Date(d).toLocaleString('pt-BR') : '—',
 }
