@@ -1,8 +1,8 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, Suspense } from 'react'
 import { calcularPrecoItem, calcularDias, type PrecosProduto } from '@/lib/calcularCobranca'
 import { supabase, fmt } from '@/lib/supabase'
-import { useRouter, useParams } from 'next/navigation'
+import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import { Badge, Btn, Tabs, SlidePanel, FormField, inputCls, selectCls, textareaCls, LookupField, ActionButtons } from '@/components/ui'
 import type { AcaoSecundaria } from '@/components/ui/ActionButtons'
 
@@ -42,10 +42,18 @@ export default function VerContratoPage() {
   // E-mail
   const [emailLog,      setEmailLog]      = useState<any[]>([])
   const [timeline,      setTimeline]      = useState<any[]>([])
+  const [novaAnotacao,  setNovaAnotacao]  = useState('')
+  const [salvandoAnot,  setSalvandoAnot]  = useState(false)
+  const [erroAnot,      setErroAnot]      = useState('')
   const [enviandoEmail, setEnviandoEmail] = useState(false)
   const [erroEmail,     setErroEmail]     = useState('')
   const [okEmail,       setOkEmail]       = useState('')
   const [aba,        setAba]        = useState('dados')
+  const searchParams = useSearchParams()
+  useEffect(() => {
+    const abaParam = searchParams.get('aba')
+    if (abaParam) setAba(abaParam)
+  }, [searchParams])
   // ── Pagamento / Fatura ──────────────────────────────────
   const [painelPgto,    setPainelPgto]    = useState(false)
   const [faturaAlvo,    setFaturaAlvo]    = useState<any>(null)
@@ -297,6 +305,37 @@ export default function VerContratoPage() {
     setSaldoInfo(sRes?.data ?? sRes ?? null)
     setSalvandoPgto(false)
     setPainelPgto(false)
+  }
+
+  async function salvarAnotacao() {
+    if (!novaAnotacao.trim()) { setErroAnot('Digite o texto da anotação.'); return }
+    setSalvandoAnot(true); setErroAnot('')
+    const cookieUser = document.cookie.split(';').map(s=>s.trim())
+      .find(s=>s.startsWith('locasystem_user='))
+    const usuario = cookieUser ? JSON.parse(decodeURIComponent(cookieUser.split('=')[1])) : null
+    const { error } = await supabase.from('contrato_timeline').insert({
+      contrato_id: Number(id),
+      usuario_id:  usuario?.id ?? null,
+      tipo:        'anotacao',
+      descricao:   novaAnotacao.trim(),
+      detalhes:    {},
+    })
+    if (error) { setErroAnot(error.message); setSalvandoAnot(false); return }
+    setNovaAnotacao('')
+    // Recarregar timeline
+    const { data: tl } = await supabase
+      .from('contrato_timeline')
+      .select('*, usuarios(nome)')
+      .eq('contrato_id', id)
+      .order('created_at', { ascending: false })
+    setTimeline(tl ?? [])
+    setSalvandoAnot(false)
+  }
+
+  async function excluirAnotacao(evId: number) {
+    if (!confirm('Excluir esta anotação?')) return
+    await supabase.from('contrato_timeline').delete().eq('id', evId)
+    setTimeline(prev => prev.filter((e:any) => e.id !== evId))
   }
 
   async function estornarPagamento(fatura: any) {
@@ -889,35 +928,6 @@ export default function VerContratoPage() {
               </div>
             </div>
 
-            <div className="panel-section">
-              <div style={{padding:'10px 14px',background:'var(--bg-header)',borderBottom:'1px solid var(--border)',fontWeight:700,fontSize:'var(--fs-md)',display:'flex',justifyContent:'space-between',alignItems:'center'}}>
-                <span>E-mails Enviados</span>
-                <span style={{fontWeight:400,fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>{emailLog.length} registro(s)</span>
-              </div>
-              {emailLog.length === 0
-                ? <div style={{padding:'20px',textAlign:'center',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Nenhum e-mail enviado ainda.</div>
-                : <table className="ds-table">
-                    <thead><tr style={{background:'var(--bg-header)'}}>
-                      {['Data','Para','Assunto','Usuario','Status'].map(h=>(
-                        <th key={h} style={{padding:'6px 12px',textAlign:'left',fontWeight:600,color:'var(--t-muted)',fontSize:'var(--fs-sm)',borderBottom:'1px solid var(--border)'}}>{h}</th>
-                      ))}
-                    </tr></thead>
-                    <tbody>
-                      {emailLog.map((log:any,ix:number)=>(
-                        <tr key={log.id} style={{borderBottom:'1px solid var(--border)',background:ix%2===0?'transparent':'var(--bg-header)'}}>
-                          <td style={{padding:'7px 12px',color:'var(--t-muted)',fontSize:'var(--fs-sm)'}}>{new Date(log.created_at).toLocaleDateString('pt-BR')}</td>
-                          <td style={{padding:'7px 12px',fontWeight:500}}>{log.para}</td>
-                          <td style={{padding:'7px 12px',color:'var(--t-secondary)'}}>{log.assunto}</td>
-                          <td style={{padding:'7px 12px',color:'var(--t-muted)',fontSize:'var(--fs-sm)'}}>{log.usuarios?.nome??'---'}</td>
-                          <td style={{padding:'7px 12px',fontWeight:600,fontSize:'var(--fs-sm)',color:log.status==='enviado'?'var(--c-success,#16a34a)':'var(--c-danger)'}}>
-                            {log.status==='enviado'?'Enviado':'Erro'}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-              }
-            </div>
             </div>
 
           )}
@@ -930,56 +940,112 @@ export default function VerContratoPage() {
 
 
           {aba==='timeline'&&(
-            <div style={{display:'flex',flexDirection:'column',gap:0}}>
-              <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:16}}>
-                <div className="ds-section-title" style={{marginBottom:0}}>Histórico do Contrato</div>
-                <button onClick={()=>registrarTimeline('sistema','Entrada manual na timeline',{})}
-                  style={{display:'none'}} />
+            <div style={{display:'flex',flexDirection:'column',gap:20}}>
+
+              {/* ── Formulário nova anotação ── */}
+              <div className="ds-card" style={{padding:'16px 20px'}}>
+                <div className="ds-section-title">Nova Anotação de Acompanhamento</div>
+                {erroAnot && <div className="ds-alert-error" style={{marginBottom:10}}>{erroAnot}</div>}
+                <textarea
+                  value={novaAnotacao}
+                  onChange={e=>{setNovaAnotacao(e.target.value);setErroAnot('')}}
+                  rows={3}
+                  placeholder="Digite o acompanhamento, observação ou ocorrência..."
+                  className={textareaCls}
+                  style={{marginBottom:10}}
+                />
+                <div style={{display:'flex',justifyContent:'flex-end'}}>
+                  <Btn loading={salvandoAnot} onClick={salvarAnotacao}
+                    disabled={!novaAnotacao.trim()}>
+                    💬 Registrar Anotação
+                  </Btn>
+                </div>
               </div>
-              {timeline.length === 0
-                ? <div style={{textAlign:'center',padding:'32px',color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>
-                    Nenhum evento registrado ainda.
+
+              {/* ── Timeline de eventos ── */}
+              <div>
+                <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:14}}>
+                  <div className="ds-section-title" style={{marginBottom:0}}>
+                    Histórico ({timeline.length} evento{timeline.length!==1?'s':''})
                   </div>
-                : <div style={{position:'relative',paddingLeft:28}}>
-                    {/* Linha vertical */}
-                    <div style={{position:'absolute',left:10,top:0,bottom:0,width:2,background:'var(--border)'}} />
-                    {timeline.map((ev:any,i:number)=>{
-                      const icone:Record<string,string>={
+                </div>
+
+                {timeline.length === 0 ? (
+                  <div className="ds-card" style={{padding:'40px 24px',textAlign:'center',color:'var(--t-muted)'}}>
+                    <div style={{fontSize:32,marginBottom:8}}>📋</div>
+                    <div style={{fontWeight:600}}>Nenhum evento registrado ainda.</div>
+                  </div>
+                ) : (
+                  <div style={{position:'relative',paddingLeft:32}}>
+                    <div style={{position:'absolute',left:11,top:0,bottom:0,width:2,background:'var(--border)'}}/>
+                    {timeline.map((ev:any)=>{
+                      const icones:Record<string,string>={
                         criacao:'📄',ativacao:'✅',alteracao:'✏️',pagamento:'💰',
                         devolucao:'↩️',manutencao:'🔧',documento:'📋',email:'📧',
-                        encerramento:'🏁',sistema:'⚙️'
+                        encerramento:'🏁',sistema:'⚙️',anotacao:'💬'
                       }
+                      const isAnot = ev.tipo === 'anotacao'
                       return (
-                        <div key={ev.id} style={{position:'relative',paddingBottom:20}}>
-                          {/* Ícone no círculo */}
-                          <div style={{position:'absolute',left:-28,top:0,width:20,height:20,
-                            borderRadius:'50%',background:'var(--bg-card)',border:'2px solid var(--border)',
-                            display:'flex',alignItems:'center',justifyContent:'center',fontSize:10}}>
-                            {icone[ev.tipo]??'•'}
+                        <div key={ev.id} style={{position:'relative',paddingBottom:16}}>
+                          {/* Ícone */}
+                          <div style={{
+                            position:'absolute',left:-32,top:2,width:22,height:22,
+                            borderRadius:'50%',
+                            background: isAnot ? 'var(--c-primary)' : 'var(--bg-card)',
+                            border:`2px solid ${isAnot?'var(--c-primary)':'var(--border)'}`,
+                            display:'flex',alignItems:'center',justifyContent:'center',fontSize:11,
+                          }}>
+                            {icones[ev.tipo]??'•'}
                           </div>
-                          {/* Conteúdo */}
-                          <div style={{background:'var(--bg-header)',borderRadius:'var(--r-md)',
-                            padding:'10px 14px',border:'1px solid var(--border)'}}>
+                          {/* Card */}
+                          <div style={{
+                            background: isAnot ? 'var(--c-primary-light,#e0f2fe)' : 'var(--bg-header)',
+                            borderRadius:'var(--r-md)',
+                            border:`1px solid ${isAnot?'var(--c-primary)':'var(--border)'}`,
+                            padding:'10px 14px',
+                          }}>
                             <div style={{display:'flex',justifyContent:'space-between',alignItems:'flex-start',gap:8}}>
-                              <div style={{fontWeight:600,fontSize:'var(--fs-md)',color:'var(--t-primary)'}}>
-                                {ev.descricao}
+                              <div style={{flex:1}}>
+                                {isAnot && (
+                                  <div style={{fontSize:'var(--fs-xs)',fontWeight:700,color:'var(--c-primary)',
+                                    textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:4}}>
+                                    Anotação
+                                  </div>
+                                )}
+                                <div style={{fontSize:'var(--fs-md)',color:'var(--t-primary)',lineHeight:1.5}}>
+                                  {ev.descricao}
+                                </div>
+                                <div style={{display:'flex',alignItems:'center',gap:10,marginTop:5,flexWrap:'wrap'}}>
+                                  <span style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)'}}>
+                                    {new Date(ev.created_at).toLocaleDateString('pt-BR')}{' '}
+                                    {new Date(ev.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
+                                  </span>
+                                  {ev.usuarios?.nome && (
+                                    <span style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)'}}>
+                                      · {ev.usuarios.nome}
+                                    </span>
+                                  )}
+                                </div>
                               </div>
-                              <span style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',whiteSpace:'nowrap',flexShrink:0}}>
-                                {new Date(ev.created_at).toLocaleDateString('pt-BR')}{' '}
-                                {new Date(ev.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}
-                              </span>
+                              {isAnot && (
+                                <button onClick={()=>excluirAnotacao(ev.id)}
+                                  title="Excluir anotação"
+                                  style={{background:'none',border:'none',cursor:'pointer',
+                                    color:'var(--t-muted)',fontSize:14,lineHeight:1,padding:'2px 4px',
+                                    borderRadius:'var(--r-sm)',flexShrink:0}}
+                                  onMouseEnter={e=>(e.currentTarget.style.color='var(--c-danger)')}
+                                  onMouseLeave={e=>(e.currentTarget.style.color='var(--t-muted)')}>
+                                  🗑️
+                                </button>
+                              )}
                             </div>
-                            {ev.usuarios?.nome && (
-                              <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginTop:4}}>
-                                por {ev.usuarios.nome}
-                              </div>
-                            )}
                           </div>
                         </div>
                       )
                     })}
                   </div>
-              }
+                )}
+              </div>
             </div>
           )}
 

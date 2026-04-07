@@ -128,10 +128,27 @@ export default function ContratosPage() {
     }
 
     return (
-      <ActionButtons
-        onView={ir}
-        acoesSec={sec}
-      />
+      <div style={{ display:'flex', alignItems:'center', gap:6 }}>
+        <button
+          onClick={() => router.push(`/contratos/${row.id}?aba=timeline`)}
+          title="Anotações e Histórico"
+          style={{
+            padding:'5px 8px', borderRadius:'var(--r-sm)',
+            border:'1px solid var(--border)', background:'var(--bg-card)',
+            cursor:'pointer', fontSize:14, color:'var(--t-muted)',
+            display:'flex', alignItems:'center', justifyContent:'center',
+            transition:'all .15s',
+          }}
+          onMouseEnter={e=>{e.currentTarget.style.borderColor='var(--c-primary)';e.currentTarget.style.color='var(--c-primary)'}}
+          onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.color='var(--t-muted)'}}
+        >
+          💬
+        </button>
+        <ActionButtons
+          onView={ir}
+          acoesSec={sec}
+        />
+      </div>
     )
   }
 
