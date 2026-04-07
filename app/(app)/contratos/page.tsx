@@ -29,7 +29,7 @@ export default function ContratosPage() {
       total:  tots?.length ?? 0,
       ativos: tots?.filter(c => c.status === 'ativo').length ?? 0,
       valor:  tots?.filter(c => c.status === 'ativo').reduce((s,c) => s + Number(c.total), 0) ?? 0,
-      vencidos: tots?.filter(c => c.status === 'ativo' && c.data_fim && new Date(c.data_fim) < new Date()).length ?? 0,
+      vencidos: tots?.filter(c => c.status === 'ativo' && c.data_fim && Math.floor((new Date().getTime()-new Date(c.data_fim+'T23:59:59').getTime())/86400000) > 0).length ?? 0,
       pendente_manutencao: tots?.filter(c => c.status === 'pendente_manutencao').length ?? 0,
     })
     setLoading(false)
@@ -209,9 +209,9 @@ export default function ContratosPage() {
           { key:'status', label:'Status', render: r => (
             <div style={{display:'flex',flexDirection:'column',gap:2}}>
               <Badge value={r.status} dot />
-              {r.status==='ativo'&&r.data_fim&&new Date(r.data_fim)<new Date()&&(
+              {r.status==='ativo'&&r.data_fim&&Math.floor((new Date().getTime()-new Date(r.data_fim+'T23:59:59').getTime())/86400000)>0&&(
                 <span style={{fontSize:'var(--fs-sm)',fontWeight:700,color:'var(--c-danger)'}}>
-                  ⚠ Vencido {Math.floor((new Date().getTime()-new Date(r.data_fim).getTime())/86400000)}d
+                  ⚠ Vencido {Math.floor((new Date().getTime()-new Date(r.data_fim+'T23:59:59').getTime())/86400000)}d
                 </span>
               )}
             </div>
