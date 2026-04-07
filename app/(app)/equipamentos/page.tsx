@@ -369,8 +369,7 @@ export default function EquipamentosPage() {
                   <th style={{ width:44 }}></th>
                   <th>Nome / Código</th>
                   <th style={{ width:140 }}>Categoria</th>
-                  <th style={{ width:120 }}>Marca / Modelo</th>
-                  <th style={{ width:110 }}>Controle</th>
+
                   <th style={{ width:90, textAlign:'center' }}>Disponível</th>
                   <th style={{ width:80,  textAlign:'center' }}>Locado</th>
                   <th style={{ width:110, textAlign:'right'  }}>Preço/Dia</th>
@@ -412,19 +411,7 @@ export default function EquipamentosPage() {
                       {p.categorias?.nome ?? <span style={{ color:'var(--t-muted)' }}>—</span>}
                     </td>
 
-                    {/* Marca / Modelo */}
-                    <td style={{ fontSize:'var(--fs-sm)', color:'var(--t-secondary)' }}>
-                      {[p.marca, p.modelo].filter(Boolean).join(' · ') || <span style={{ color:'var(--t-muted)' }}>—</span>}
-                    </td>
 
-                    {/* Controle */}
-                    <td>
-                      <span style={{ fontSize:'var(--fs-xs)', fontWeight:600, padding:'3px 8px',
-                        borderRadius:99, border:'1px solid var(--border)',
-                        color:'var(--t-secondary)', background:'var(--bg-header)' }}>
-                        {p.controla_patrimonio ? '🏷️ Patrimônio' : '📊 Quantidade'}
-                      </span>
-                    </td>
 
                     {/* Disponível */}
                     <td style={{ textAlign:'center' }}>
