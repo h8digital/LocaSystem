@@ -178,6 +178,7 @@ export default function EquipamentosPage() {
     if (p) {
       setForm({ ...emptyForm(), ...p })
       setEditId(p.id)
+      setPatsPanel([])  // limpar antes de carregar para evitar dados do produto anterior
       const cat = p.categorias?.nome ?? ''
       setCatNome(cat)
       if (!cat && p.categoria_id) {
@@ -263,6 +264,7 @@ export default function EquipamentosPage() {
       const { error } = await supabase.from('patrimonios').update(payload).eq('id', editPat.id)
       if (error) { setPatErro(error.message); setPatSaving(false); return }
     } else {
+      if (!editId) { setPatErro('Erro: produto não identificado. Feche e abra novamente.'); setPatSaving(false); return }
       const { error } = await supabase.from('patrimonios').insert({ ...payload, produto_id: editId })
       if (error) { setPatErro(error.message); setPatSaving(false); return }
     }
@@ -702,7 +704,7 @@ export default function EquipamentosPage() {
           ] as ['info'|'precos'|'inventario',string][]).map(([k,l]) => (
             <button key={k} onClick={() => {
               setAba(k)
-              if (k==='inventario' && editId && patsPanel.length===0) carregarPatsPanel(editId)
+              if (k==='inventario' && editId) carregarPatsPanel(editId)
             }}
               style={{ padding:'9px 22px', border:'none', background:'none', cursor:'pointer',
                 fontWeight:aba===k?700:500, fontSize:'var(--fs-base)',
