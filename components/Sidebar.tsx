@@ -8,7 +8,6 @@ const nav = [
   {href:'/cotacoes',     icon:'📋', label:'Cotações',      section:'COMERCIAL'},
   {href:'/contratos',    icon:'📄', label:'Contratos',     section:null},
   {href:'/financeiro',   icon:'💰', label:'Financeiro',    section:null},
-  {href:'/emails',       icon:'📨', label:'E-mails',       section:null},
   {href:'/clientes',     icon:'👥', label:'Clientes',      section:null},
   {href:'/equipamentos', icon:'🔧', label:'Equipamentos',  section:'ESTOQUE'},
   {href:'/manutencoes',  icon:'🔩', label:'Manutenções',   section:null},

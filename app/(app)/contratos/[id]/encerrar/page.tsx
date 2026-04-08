@@ -12,7 +12,8 @@ type Fatura = {
 }
 type ItemWizard = {
   id: number; produto_id: number; patrimonio_id?: number
-  quantidade: number; preco_unitario: number; total_item: number
+  quantidade: number; qtd_devolvida?: number; qtd_pendente: number
+  preco_unitario: number; total_item: number
   produtos: { nome: string }; patrimonios?: { numero_patrimonio: string }
   condicao: 'bom' | 'avariado' | 'extraviado'
   quantidade_devolvida: number
@@ -61,6 +62,7 @@ export default function EncerrarContratoPage() {
   const [caucaoDevolvido, setCaucaoDevolvido] = useState(0)
   const [observacoes,     setObservacoes]     = useState('')
   const [multaParam,      setMultaParam]      = useState(2)
+  const [tipoDevolucao,   setTipoDevolucao]   = useState<'total'|'parcial'>('total')
 
   // ── Carregamento inicial ───────────────────────────────────────────────────
   useEffect(() => {
@@ -70,7 +72,8 @@ export default function EncerrarContratoPage() {
         supabase.from('faturas').select('*').eq('contrato_id', id).order('data_vencimento'),
         supabase.from('contrato_itens')
           .select('*, produtos(nome), patrimonios(numero_patrimonio)')
-          .eq('contrato_id', id),
+          .eq('contrato_id', id)
+          .order('id'),
         supabase.from('parametros').select('valor').eq('chave', 'multa_atraso_percentual').single(),
       ])
 
@@ -89,17 +92,17 @@ export default function EncerrarContratoPage() {
         if (diff > 0) setDiasAtraso(diff)
       }
 
-      // Muda status para EM_DEVOLUCAO quando o check-in começa
-      if (c.status === 'ativo') {
-        await supabase.from('contratos').update({ status: 'em_devolucao' }).eq('id', c.id)
-      }
+      // Muda status para EM_DEVOLUCAO apenas quando devolução total inicia
+      // Para devolução parcial, o status ativo é mantido
+      // (atualizado ao confirmar)
 
       setItens((i ?? []).map((item: any) => ({
         ...item,
-        condicao: 'bom',
-        quantidade_devolvida: item.quantidade,
-        custo_avaria: 0,
-      })))
+        condicao:             'bom',
+        quantidade_devolvida: Number(item.quantidade) - Number(item.qtd_devolvida ?? 0),
+        qtd_pendente:         Number(item.quantidade) - Number(item.qtd_devolvida ?? 0),
+        custo_avaria:         0,
+      })).filter((item: any) => item.qtd_pendente > 0))
 
       const pendentes = (f ?? []).filter((fat: Fatura) => fat.status !== 'pago')
       setPagamentos(pendentes.map((fat: Fatura) => ({
@@ -156,22 +159,27 @@ export default function EncerrarContratoPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           contrato_id:      Number(id),
+          tipo:             tipoDevolucao,
           dias_atraso:      diasAtraso,
           valor_avarias:    valorAvarias + valorExtravios,
-          caucao_devolvido: caucaoDevolvido,
+          caucao_devolvido: tipoDevolucao === 'total' ? caucaoDevolvido : 0,
           observacoes,
-          itens: itens.map(item => ({
-            contrato_item_id: item.id,
-            patrimonio_id:    item.patrimonio_id ?? null,
-            quantidade:       item.quantidade_devolvida,
-            condicao:         item.condicao === 'extraviado' ? 'avariado' : item.condicao,
-            custo_avaria:     item.custo_avaria,
-          })),
+          itens: itens
+            .filter(item => item.quantidade_devolvida > 0)
+            .map(item => ({
+              contrato_item_id:     item.id,
+              patrimonio_id:        item.patrimonio_id ?? null,
+              produto_id:           item.produto_id,
+              quantidade_devolvida: item.quantidade_devolvida,
+              quantidade_total:     item.quantidade,
+              condicao:             item.condicao,
+              custo_avaria:         item.custo_avaria,
+            })),
         }),
       })
       const result = await res.json()
-      if (!result.ok) { setErro('Erro ao encerrar: ' + result.error); setSaving(false); return }
-      router.push(`/contratos/${id}`)
+      if (!result.ok) { setErro('Erro: ' + result.error); setSaving(false); return }
+      router.push(`/contratos/${id}?aba=devolucoes`)
     } catch (e: any) { setErro('Erro: ' + e.message); setSaving(false) }
   }
 
@@ -248,8 +256,31 @@ export default function EncerrarContratoPage() {
       {/* ══════════════════════════════════════════════════════════════════
           PASSO 1 — FINANCEIRO
       ══════════════════════════════════════════════════════════════════ */}
+      {/* ── Seletor de tipo de devolução (sempre visível no passo 1) ── */}
       {passo === 1 && (
         <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+
+          {/* Tipo de devolução */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+            {([
+              { v:'total',   l:'Devolução Total',   desc:'Todos os equipamentos estão sendo devolvidos agora. O contrato será encerrado.', icon:'📦' },
+              { v:'parcial', l:'Devolução Parcial',  desc:'Apenas parte dos equipamentos retorna. O contrato permanece ativo com os itens restantes.', icon:'📤' },
+            ] as const).map(opt => (
+              <button key={opt.v} onClick={() => setTipoDevolucao(opt.v)}
+                style={{
+                  padding:'16px 20px', borderRadius:'var(--r-md)', cursor:'pointer', textAlign:'left',
+                  background: tipoDevolucao===opt.v ? 'var(--c-primary-light,#e0f2fe)' : 'var(--bg-header)',
+                  border: `2px solid ${tipoDevolucao===opt.v ? 'var(--c-primary)' : 'var(--border)'}`,
+                  transition:'all .15s',
+                }}>
+                <div style={{ fontSize:24, marginBottom:8 }}>{opt.icon}</div>
+                <div style={{ fontWeight:700, fontSize:'var(--fs-base)', color: tipoDevolucao===opt.v ? 'var(--c-primary)' : 'var(--t-primary)', marginBottom:4 }}>
+                  {opt.l}
+                </div>
+                <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', lineHeight:1.4 }}>{opt.desc}</div>
+              </button>
+            ))}
+          </div>
 
           {/* KPIs do contrato */}
           <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:10 }}>
@@ -378,7 +409,9 @@ export default function EncerrarContratoPage() {
       {passo === 2 && (
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <div style={{ ...card, padding:'12px 16px', background:'var(--c-info-light)', borderColor:'var(--c-info)', fontSize:'var(--fs-md)', color:'var(--c-info-text)' }}>
-            Registre a condição de cada item na devolução. Para itens avariados ou extraviados, informe o custo correspondente.
+            {tipoDevolucao === 'parcial'
+              ? '📤 Devolução Parcial — ajuste a quantidade de cada item a ser devolvida agora. O restante permanece no contrato.'
+              : '📦 Devolução Total — registre a condição de cada item. Para avariados ou extraviados, informe o custo.'}
           </div>
 
           {itens.map((item, idx) => {
@@ -423,15 +456,20 @@ export default function EncerrarContratoPage() {
                   </div>
                 </div>
 
-                {/* Quantidade devolvida — apenas sem patrimônio */}
-                {!item.patrimonio_id && (
+                {/* Quantidade devolvida */}
+                {(tipoDevolucao === 'parcial' || !item.patrimonio_id) && (
                   <div style={{ marginBottom: (item.condicao !== 'bom') ? 12 : 0 }}>
-                    <FormField label="Quantidade Devolvida" style={{ maxWidth:160 }}>
-                      <input type="number" min="0" max={item.quantidade}
+                    <FormField label={tipoDevolucao==='parcial' ? `Qtd a Devolver Agora (máx: ${item.qtd_pendente})` : 'Quantidade Devolvida'} style={{ maxWidth:200 }}>
+                      <input type="number" min="0" max={item.qtd_pendente ?? item.quantidade}
                         value={item.quantidade_devolvida}
-                        onChange={e => updItem(idx, 'quantidade_devolvida', Number(e.target.value))}
+                        onChange={e => updItem(idx, 'quantidade_devolvida', Math.min(Number(e.target.value), item.qtd_pendente ?? item.quantidade))}
                         className={inputCls} />
                     </FormField>
+                    {tipoDevolucao==='parcial' && item.qtd_pendente > item.quantidade_devolvida && (
+                      <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginTop:3}}>
+                        {item.qtd_pendente - item.quantidade_devolvida} unidade(s) permanecerão no contrato
+                      </div>
+                    )}
                   </div>
                 )}
 

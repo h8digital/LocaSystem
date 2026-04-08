@@ -39,15 +39,10 @@ export default function VerContratoPage() {
   const [templateSel,setTemplateSel]= useState('')
   const [gerando,    setGerando]    = useState(false)
   const [docLink,    setDocLink]    = useState('')
-  // E-mail
-  const [emailLog,      setEmailLog]      = useState<any[]>([])
   const [timeline,      setTimeline]      = useState<any[]>([])
   const [novaAnotacao,  setNovaAnotacao]  = useState('')
   const [salvandoAnot,  setSalvandoAnot]  = useState(false)
   const [erroAnot,      setErroAnot]      = useState('')
-  const [enviandoEmail, setEnviandoEmail] = useState(false)
-  const [erroEmail,     setErroEmail]     = useState('')
-  const [okEmail,       setOkEmail]       = useState('')
   const [aba,        setAba]        = useState('dados')
   const searchParams = useSearchParams()
   useEffect(() => {
@@ -88,7 +83,7 @@ export default function VerContratoPage() {
 
   useEffect(() => {
     async function load() {
-      const [{ data:c },{ data:i },{ data:f }, s,{ data:t },{ data:per },{ data:d },{ data:el }] = await Promise.all([
+      const [{ data:c },{ data:i },{ data:f }, s,{ data:t },{ data:per },{ data:d }] = await Promise.all([
         supabase.from('contratos').select('*, clientes(*), usuarios(nome), periodos_locacao(nome, dias)').eq('id', id).single(),
         supabase.from('contrato_itens').select('*, produtos(nome), patrimonios(numero_patrimonio)').eq('contrato_id', id),
         supabase.from('faturas').select('*').eq('contrato_id', id).order('data_vencimento'),
@@ -96,9 +91,8 @@ export default function VerContratoPage() {
         supabase.from('doc_templates').select('id,nome,tipo').eq('ativo',1).order('tipo').order('nome'),
         supabase.from('periodos_locacao').select('*').eq('ativo',1).order('dias'),
         supabase.from('devolucoes').select('*, usuarios(nome)').eq('contrato_id', id).order('created_at',{ascending:false}),
-        supabase.from('email_log').select('*, usuarios(nome)').eq('contrato_id', id).order('created_at',{ascending:false}).limit(20),
       ])
-      setContrato(c); setItens(i??[]); setFaturas(f??[]); setSaldoInfo(s?.data ?? s ?? null); setEmailLog(el??[]); setPeriodos(per??[])
+      setContrato(c); setItens(i??[]); setFaturas(f??[]); setSaldoInfo(s?.data ?? s ?? null); setPeriodos(per??[])
       // Carregar timeline
       const tlRes = await fetch('/api/contrato-timeline?contrato_id=' + id)
       const tlData = await tlRes.json()
