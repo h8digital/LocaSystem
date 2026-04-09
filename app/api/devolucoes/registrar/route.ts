@@ -15,25 +15,13 @@ function fmtMoney(v: number) {
 // ─────────────────────────────────────────────────────────────────────────────
 // POST /api/devolucoes/registrar
 //
-// Suporta devolução PARCIAL e TOTAL.
+// A API detecta automaticamente se é parcial ou total comparando
+// qtd_devolvida acumulada com a quantidade contratada de cada item.
 //
-// body: {
-//   contrato_id: number
-//   tipo: 'parcial' | 'total'          — obrigatório
-//   dias_atraso: number
-//   valor_avarias: number
-//   caucao_devolvido: number
-//   observacoes: string
-//   itens: [{
-//     contrato_item_id: number
-//     patrimonio_id: number | null
-//     produto_id: number
-//     quantidade_devolvida: number      — quantos estão sendo devolvidos AGORA
-//     quantidade_total: number          — total do item no contrato
-//     condicao: 'bom' | 'avariado' | 'extraviado'
-//     custo_avaria: number
-//   }]
-// }
+// Devolução PARCIAL: contrato permanece ativo, patrimônios devolvidos liberados
+// Devolução TOTAL:   contrato encerrado (ou pendente_manutencao se há avaria)
+//
+// Fatura extra apenas para multa/avaria — nunca proporcional por item.
 // ─────────────────────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
   try {
@@ -43,45 +31,27 @@ export async function POST(req: NextRequest) {
 
     const {
       contrato_id,
-      tipo = 'total',
       itens,
-      dias_atraso = 0,
-      valor_avarias = 0,
+      dias_atraso      = 0,
+      valor_avarias    = 0,
       caucao_devolvido = 0,
       observacoes,
     } = await req.json()
 
     if (!contrato_id || !itens?.length) {
-      return NextResponse.json({ ok: false, error: 'Parâmetros inválidos' })
-    }
-    if (!['parcial','total'].includes(tipo)) {
-      return NextResponse.json({ ok: false, error: 'Tipo de devolução inválido' })
+      return NextResponse.json({ ok: false, error: 'Parâmetros inválidos.' })
     }
 
     // ── Carregar contrato ─────────────────────────────────────────────────────
     const { data: contrato } = await sb.from('contratos')
       .select('*, clientes(nome)')
       .eq('id', contrato_id).single()
-    if (!contrato) return NextResponse.json({ ok: false, error: 'Contrato não encontrado' })
+    if (!contrato) return NextResponse.json({ ok: false, error: 'Contrato não encontrado.' })
     if (!['ativo','em_devolucao'].includes(contrato.status)) {
-      return NextResponse.json({ ok: false, error: `Contrato em status "${contrato.status}" não pode registrar devolução.` })
+      return NextResponse.json({ ok: false, error: `Contrato em status "${contrato.status}" não permite devolução.` })
     }
 
-    // ── Para devolução TOTAL: verificar saldo devedor ─────────────────────────
-    if (tipo === 'total') {
-      const { data: saldo } = await sb.from('contrato_saldo')
-        .select('saldo_devedor')
-        .eq('contrato_id', contrato_id)
-        .single()
-      if (saldo && Number(saldo.saldo_devedor) > 0.01) {
-        return NextResponse.json({
-          ok: false,
-          error: `Existe saldo devedor de ${fmtMoney(Number(saldo.saldo_devedor))} pendente. Quite todas as faturas antes de encerrar o contrato.`
-        })
-      }
-    }
-
-    // ── Validar quantidades ───────────────────────────────────────────────────
+    // ── Validar quantidades antes de processar ────────────────────────────────
     for (const item of itens) {
       const { data: ci } = await sb.from('contrato_itens')
         .select('quantidade, qtd_devolvida')
@@ -89,49 +59,36 @@ export async function POST(req: NextRequest) {
       if (!ci) return NextResponse.json({ ok: false, error: `Item ${item.contrato_item_id} não encontrado.` })
       const pendente = Number(ci.quantidade) - Number(ci.qtd_devolvida ?? 0)
       if (Number(item.quantidade_devolvida) > pendente) {
-        return NextResponse.json({ ok: false, error: `Quantidade a devolver (${item.quantidade_devolvida}) maior que pendente (${pendente}) para o item ${item.contrato_item_id}.` })
-      }
-    }
+        return NextResponse.json({
+          ok: false,
+          error: `Quantidade a devolver (${item.quantidade_devolvida}) maior que pendente (${pendente}) para o item ${item.contrato_item_id}.`
+        })
+    }}
 
-    // ── Multa por atraso (apenas na devolução total ou se informado) ──────────
-    let multa_atraso = 0
-    if (dias_atraso > 0) {
-      const { data: itensContrato } = await sb.from('contrato_itens')
-        .select('preco_diario, quantidade, produtos(preco_locacao_diario)')
-        .eq('contrato_id', contrato_id)
-      // Multa proporcional aos itens devolvidos agora
-      const idsDevolvidos = itens.map((i: any) => i.contrato_item_id)
-      const itensMulta = (itensContrato ?? []).filter((i: any) => idsDevolvidos.includes(i.id))
-      const valorDiario = itensMulta.reduce((s: number, i: any) => {
-        return s + Number(i.preco_diario ?? (i.produtos as any)?.preco_locacao_diario ?? 0) * Number(i.quantidade ?? 1)
-      }, 0) || (itensContrato ?? []).reduce((s: number, i: any) => {
-        return s + Number(i.preco_diario ?? (i.produtos as any)?.preco_locacao_diario ?? 0) * Number(i.quantidade ?? 1)
-      }, 0)
-      multa_atraso = valorDiario * dias_atraso
-    }
+    // ── Processar cada item e acumular qtd_devolvida ──────────────────────────
+    const osGeradas: number[] = []
+    let qtdTotalContrato = 0
+    let qtdTotalDevolvida = 0
 
+    // Registrar devolução principal
     const statusDev = dias_atraso > 0 ? 'com_atraso' : valor_avarias > 0 ? 'com_avaria' : 'completa'
-
-    // ── Registrar devolução ───────────────────────────────────────────────────
     const { data: dev, error: devErr } = await sb.from('devolucoes').insert({
       contrato_id,
-      usuario_id:      user.id,
-      data_devolucao:  new Date().toISOString(),
-      tipo,
-      status:          statusDev,
+      usuario_id:       user.id,
+      data_devolucao:   new Date().toISOString(),
+      tipo:             'parcial',  // será atualizado para 'total' se encerrar
+      status:           statusDev,
       dias_atraso,
-      multa_atraso,
+      multa_atraso:     0,          // calculado abaixo
       valor_avarias,
-      caucao_devolvido: tipo === 'total' ? caucao_devolvido : 0,
+      caucao_devolvido: 0,          // preenchido só se encerrar total
       observacoes,
     }).select().single()
     if (devErr) return NextResponse.json({ ok: false, error: devErr.message })
 
-    const osGeradas: number[] = []
-
-    // ── Processar cada item devolvido ─────────────────────────────────────────
     for (const item of itens) {
       const qtdDev = Number(item.quantidade_devolvida)
+      if (qtdDev <= 0) continue
 
       // Registrar item da devolução
       await sb.from('devolucao_itens').insert({
@@ -143,16 +100,22 @@ export async function POST(req: NextRequest) {
         custo_avaria:         item.custo_avaria ?? 0,
       })
 
-      // Atualizar qtd_devolvida no contrato_item
+      // Atualizar qtd_devolvida acumulada no item do contrato
       const { data: ci } = await sb.from('contrato_itens')
         .select('quantidade, qtd_devolvida')
         .eq('id', item.contrato_item_id).single()
-      const novaQtdDev = Number(ci?.qtd_devolvida ?? 0) + qtdDev
-      const devTotal = novaQtdDev >= Number(ci?.quantidade ?? 0)
+
+      const novaQtdDev  = Number(ci?.qtd_devolvida ?? 0) + qtdDev
+      const itemCompleto = novaQtdDev >= Number(ci?.quantidade ?? 0)
+
       await sb.from('contrato_itens').update({
         qtd_devolvida:  novaQtdDev,
-        data_devolucao: devTotal ? new Date().toISOString() : null,
+        data_devolucao: itemCompleto ? new Date().toISOString() : null,
       }).eq('id', item.contrato_item_id)
+
+      // Controle para verificar se todo o contrato foi devolvido
+      qtdTotalContrato  += Number(ci?.quantidade ?? 0)
+      qtdTotalDevolvida += novaQtdDev
 
       // Atualizar status do patrimônio rastreável
       if (item.patrimonio_id) {
@@ -161,58 +124,91 @@ export async function POST(req: NextRequest) {
           item.condicao === 'extraviado' ? 'descartado'  : 'disponivel'
         await sb.from('patrimonios').update({ status: novoStatusPat }).eq('id', item.patrimonio_id)
 
-        // Criar OS automática para avariados
+        // OS automática para avariados
         if (item.condicao === 'avariado') {
           const { data: os } = await sb.from('manutencoes').insert({
             contrato_id,
-            devolucao_id:            dev.id,
-            produto_id:              item.produto_id,
-            patrimonio_id:           item.patrimonio_id,
-            tipo:                    'corretiva',
-            status:                  'aberto',
-            descricao:               `Avaria registrada na devolução ${tipo} do contrato ${contrato.numero}`,
-            custo:                   item.custo_avaria ?? 0,
-            custo_cobrado_cliente:   item.custo_avaria ?? 0,
-            cobrado_em_fatura:       false,
-            data_abertura:           new Date().toISOString().split('T')[0],
-            usuario_id:              user.id,
+            devolucao_id:          dev.id,
+            produto_id:            item.produto_id,
+            patrimonio_id:         item.patrimonio_id,
+            tipo:                  'corretiva',
+            status:                'aberto',
+            descricao:             `Avaria registrada na devolução do contrato ${contrato.numero}`,
+            custo:                 item.custo_avaria ?? 0,
+            custo_cobrado_cliente: item.custo_avaria ?? 0,
+            cobrado_em_fatura:     false,
+            data_abertura:         new Date().toISOString().split('T')[0],
+            usuario_id:            user.id,
           }).select('id').single()
           if (os) osGeradas.push(os.id)
         }
       }
     }
 
-    // ── Verificar se TODOS os itens foram devolvidos ──────────────────────────
+    // ── Buscar totais reais do contrato para detectar parcial vs total ─────────
     const { data: todosItens } = await sb.from('contrato_itens')
       .select('quantidade, qtd_devolvida')
       .eq('contrato_id', contrato_id)
+
     const tudoDevolvido = (todosItens ?? []).every(
       (i: any) => Number(i.qtd_devolvida ?? 0) >= Number(i.quantidade)
     )
+    const qtdTotal    = (todosItens ?? []).reduce((s: number, i: any) => s + Number(i.quantidade), 0)
+    const qtdDevTotal = (todosItens ?? []).reduce((s: number, i: any) => s + Number(i.qtd_devolvida ?? 0), 0)
+    const pct = qtdTotal > 0 ? Math.round(100 * qtdDevTotal / qtdTotal) : 100
 
-    // ── Determinar novo status do contrato ────────────────────────────────────
-    let novoStatusContrato = contrato.status // mantém ativo por padrão
-    let dataEncerramento: string | null = null
-
-    if (tipo === 'total' || tudoDevolvido) {
-      // Devolução total ou parcial que completou tudo
-      novoStatusContrato = osGeradas.length > 0 ? 'pendente_manutencao' : 'encerrado'
-      dataEncerramento = new Date().toISOString()
-    } else {
-      // Devolução parcial — contrato continua ativo
-      novoStatusContrato = 'ativo'
+    // ── Verificar saldo devedor SOMENTE se encerrar total ─────────────────────
+    if (tudoDevolvido) {
+      const { data: saldo } = await sb.from('contrato_saldo')
+        .select('saldo_devedor')
+        .eq('contrato_id', contrato_id).single()
+      if (saldo && Number(saldo.saldo_devedor) > 0.01) {
+        // Rollback: desfazer o que foi processado
+        await sb.from('devolucoes').delete().eq('id', dev.id)
+        return NextResponse.json({
+          ok: false,
+          error: `Existe saldo devedor de ${fmtMoney(Number(saldo.saldo_devedor))} pendente. Quite todas as faturas antes de encerrar o contrato.`
+        })
+      }
     }
 
+    // ── Multa por atraso (só na devolução total ou se explicitamente informado) ─
+    let multa_atraso = 0
+    if (dias_atraso > 0) {
+      const { data: itensContrato } = await sb.from('contrato_itens')
+        .select('preco_diario, quantidade, produtos(preco_locacao_diario)')
+        .eq('contrato_id', contrato_id)
+      const valorDiario = (itensContrato ?? []).reduce((s: number, i: any) =>
+        s + Number(i.preco_diario ?? (i.produtos as any)?.preco_locacao_diario ?? 0) * Number(i.quantidade ?? 1), 0)
+      multa_atraso = valorDiario * dias_atraso
+    }
+
+    // ── Determinar novo status do contrato ────────────────────────────────────
+    let novoStatus = contrato.status  // mantém ativo por padrão
+    let dataEncerramento: string | null = null
+
+    if (tudoDevolvido) {
+      novoStatus       = osGeradas.length > 0 ? 'pendente_manutencao' : 'encerrado'
+      dataEncerramento = new Date().toISOString()
+    }
+
+    // Atualizar a devolução com tipo correto, multa e caução
+    await sb.from('devolucoes').update({
+      tipo:             tudoDevolvido ? 'total' : 'parcial',
+      multa_atraso,
+      caucao_devolvido: tudoDevolvido ? caucao_devolvido : 0,
+    }).eq('id', dev.id)
+
+    // Atualizar contrato
     await sb.from('contratos').update({
-      status:              novoStatusContrato,
+      status: novoStatus,
       ...(dataEncerramento ? { data_devolucao_real: dataEncerramento } : {}),
     }).eq('id', contrato_id)
 
     // ── Fatura extra para multa/avaria ────────────────────────────────────────
     if (multa_atraso > 0 || valor_avarias > 0) {
       const extra = multa_atraso + valor_avarias
-      const { count } = await sb.from('faturas')
-        .select('*', { count: 'exact', head: true })
+      const { count } = await sb.from('faturas').select('*', { count:'exact', head:true })
       const ano = new Date().getFullYear()
       const numFat = `FAT${ano}${String((count ?? 0) + 1).padStart(6,'0')}`
       await sb.from('faturas').insert({
@@ -232,34 +228,31 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // ── Registrar na timeline ─────────────────────────────────────────────────
-    const pctDevolvido = todosItens
-      ? Math.round(100 * (todosItens.reduce((s:any,i:any)=>s+Number(i.qtd_devolvida??0),0)) /
-          (todosItens.reduce((s:any,i:any)=>s+Number(i.quantidade),0)))
-      : 100
+    // ── Timeline ──────────────────────────────────────────────────────────────
     await sb.from('contrato_timeline').insert({
       contrato_id,
-      usuario_id:  user.id,
-      tipo:        'devolucao',
-      descricao:   tipo === 'parcial'
-        ? `Devolução parcial registrada — ${itens.length} item(ns), ${pctDevolvido}% do contrato devolvido`
-        : `Devolução total registrada — contrato ${novoStatusContrato === 'encerrado' ? 'encerrado' : 'pendente de manutenção'}`,
-      detalhes: { tipo, itens_devolvidos: itens.length, os_geradas: osGeradas.length, pct_devolvido: pctDevolvido },
+      usuario_id: user.id,
+      tipo:       'devolucao',
+      descricao:  tudoDevolvido
+        ? `Devolução total registrada — contrato ${novoStatus === 'encerrado' ? 'encerrado' : 'pendente de manutenção'}`
+        : `Devolução parcial registrada — ${pct}% do contrato devolvido`,
+      detalhes: { tudoDevolvido, pct, os_geradas: osGeradas.length },
     })
 
-    const msg = tipo === 'parcial' && !tudoDevolvido
-      ? `Devolução parcial registrada (${pctDevolvido}% do contrato). O contrato permanece ativo com os itens restantes.`
+    // ── Mensagem de retorno ───────────────────────────────────────────────────
+    const msg = !tudoDevolvido
+      ? `Devolução parcial registrada (${pct}% do contrato). O contrato permanece ativo com os itens restantes.`
       : osGeradas.length > 0
         ? `Devolução total registrada. ${osGeradas.length} OS criada(s). Contrato em "Pendente de Manutenção".`
         : 'Devolução total registrada. Contrato encerrado com sucesso.'
 
     return NextResponse.json({
-      ok: true,
-      tipo,
-      status_contrato:     novoStatusContrato,
-      tudo_devolvido:      tudoDevolvido,
-      os_geradas:          osGeradas,
-      percentual_devolvido: pctDevolvido,
+      ok:              true,
+      tudo_devolvido:  tudoDevolvido,
+      tipo:            tudoDevolvido ? 'total' : 'parcial',
+      status_contrato: novoStatus,
+      os_geradas:      osGeradas,
+      pct_devolvido:   pct,
       msg,
     })
 
