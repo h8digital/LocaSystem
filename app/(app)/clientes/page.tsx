@@ -7,7 +7,7 @@ import { SlidePanel, PageHeader, DataTable, Filters, Badge, ActionButtons, Btn, 
 
 function toTitle(s:string){if(!s)return'';const m=new Set(['de','da','do','das','dos','e','a','o','em','com','por','para']);return s.toLowerCase().split(' ').map((w,i)=>(!m.has(w)||i===0)?w.charAt(0).toUpperCase()+w.slice(1):w).join(' ')}
 
-const emptyForm=()=>({tipo:'PF',nome:'',cpf_cnpj:'',rg_ie:'',email:'',telefone:'',celular:'',limite_credito:0,observacoes:'',endereco:'',numero:'',complemento:'',bairro:'',cidade:'',estado:'',cep:'',papeis:['cliente'] as string[]})
+const emptyForm=()=>({tipo:'PF',nome:'',cpf_cnpj:'',rg_ie:'',email:'',telefone:'',celular:'',limite_credito:0,observacoes:'',papeis:['cliente'] as string[]})
 const emptyEnd =()=>({tipo:'Residencial',cep:'',logradouro:'',numero:'',complemento:'',bairro:'',cidade:'',estado:'',ibge:'',principal:false,referencia:'',observacoes:''})
 const emptyCt  =()=>({nome:'',cargo:'',telefone:'',celular:'',email:'',autorizado_retirada:false,principal:false,observacoes:''})
 
@@ -50,8 +50,10 @@ export default function ClientesPage() {
 
   async function abrir(c?:any){
     setErro('');setTab('dados')
-    if(c){setForm({tipo:c.tipo??'PF',nome:c.nome??'',cpf_cnpj:c.cpf_cnpj??'',rg_ie:c.rg_ie??'',email:c.email??'',telefone:c.telefone??'',celular:c.celular??'',limite_credito:c.limite_credito??0,observacoes:c.observacoes??'',endereco:c.endereco??'',numero:c.numero??'',complemento:c.complemento??'',bairro:c.bairro??'',cidade:c.cidade??'',estado:c.estado??'',cep:c.cep??'',papeis:c.papeis??['cliente']});setEditId(c.id);const[{data:ends},{data:cts},{data:spcs}]=await Promise.all([supabase.from('cliente_enderecos').select('*').eq('cliente_id',c.id).eq('ativo',1).order('principal',{ascending:false}),supabase.from('cliente_contatos').select('*').eq('cliente_id',c.id).eq('ativo',1).order('principal',{ascending:false}),supabase.from('cliente_spc').select('*').eq('cliente_id',c.id).order('data_consulta',{ascending:false})]);setEnderecos(ends?.length?ends:[emptyEnd()]);setContatos(cts?.length?cts:[emptyCt()]);setSpcData(spcs??[])}
-    else{setForm(emptyForm());setEditId(null);setEnderecos([emptyEnd()]);setContatos([emptyCt()]);setSpcData([])}
+    if(c){setForm({tipo:c.tipo??'PF',nome:c.nome??'',cpf_cnpj:c.cpf_cnpj??'',rg_ie:c.rg_ie??'',email:c.email??'',telefone:c.telefone??'',celular:c.celular??'',limite_credito:c.limite_credito??0,observacoes:c.observacoes??'',endereco:c.endereco??'',numero:c.numero??'',complemento:c.complemento??'',bairro:c.bairro??'',cidade:c.cidade??'',estado:c.estado??'',cep:c.cep??'',papeis:c.papeis??['cliente']});setEditId(c.id);const[{data:ends},{data:cts},{data:spcs}]=await Promise.all([supabase.from('cliente_enderecos').select('*').eq('cliente_id',c.id).eq('ativo',1).order('principal',{ascending:false}),supabase.from('cliente_contatos').select('*').eq('cliente_id',c.id).eq('ativo',1).order('principal',{ascending:false}),supabase.from('cliente_spc').select('*').eq('cliente_id',c.id).order('data_consulta',{ascending:false})]);setEnderecos(ends?.length
+          ? (ends.some((e:any)=>e.principal) ? ends : ends.map((e:any,i:number)=>({...e,principal:i===0})))
+          : [{...emptyEnd(),principal:true}]);setContatos(cts?.length?cts:[emptyCt()]);setSpcData(spcs??[])}
+    else{setForm(emptyForm());setEditId(null);setEnderecos([{...emptyEnd(),principal:true}]);setContatos([emptyCt()]);setSpcData([])}
     setPanel(true)
   }
 
@@ -64,9 +66,18 @@ export default function ClientesPage() {
         return
       }
     }
+    // Validar: ao menos 1 endereço principal obrigatório
+    const endValidos = enderecos.filter(e => e.logradouro?.trim() || e.cep?.trim())
+    if (endValidos.length === 0) {
+      setErro('Informe ao menos um endereço para o cliente.'); setTab('enderecos'); return
+    }
+    const temPrincipal = endValidos.some(e => e.principal)
+    if (!temPrincipal) {
+      setErro('Marque um dos endereços como Principal.'); setTab('enderecos'); return
+    }
     setSaving(true);setErro('')
     try{
-      const payload={tipo:form.tipo,nome:form.nome.trim(),cpf_cnpj:form.cpf_cnpj||null,rg_ie:form.rg_ie||null,email:form.email||null,telefone:form.telefone||null,celular:form.celular||null,limite_credito:Number(form.limite_credito)||0,observacoes:form.observacoes||null,endereco:form.endereco||null,numero:form.numero||null,complemento:form.complemento||null,bairro:form.bairro||null,cidade:form.cidade||null,estado:form.estado||null,cep:form.cep||null,ativo:1,updated_at:new Date().toISOString(),papeis:(form.papeis??[]).length>0?form.papeis:['cliente']}
+      const payload={tipo:form.tipo,nome:form.nome.trim(),cpf_cnpj:form.cpf_cnpj||null,rg_ie:form.rg_ie||null,email:form.email||null,telefone:form.telefone||null,celular:form.celular||null,limite_credito:Number(form.limite_credito)||0,observacoes:form.observacoes||null,ativo:1,updated_at:new Date().toISOString(),papeis:(form.papeis??[]).length>0?form.papeis:['cliente']}
       let id=editId
       if(editId){const{error}=await supabase.from('clientes').update(payload).eq('id',editId);if(error)throw new Error(error.message)}
       else{const{data,error}=await supabase.from('clientes').insert(payload).select('id').single();if(error)throw new Error(error.message);id=data.id}
@@ -239,32 +250,57 @@ export default function ClientesPage() {
                 <FormField label="Celular"><input value={form.celular||''} onChange={e=>setForm({...form,celular:formatarPhone(e.target.value)})} className={inputCls} placeholder="(00) 00000-0000" /></FormField>
                 <FormField label="Limite de Crédito (R$)" style={{gridColumn:"span 2"}}><input type="number" step="0.01" min="0" {...F('limite_credito')} className={inputCls} /></FormField>
               </div>
-              <div className="ds-inset">
-                <div style={{fontSize:'var(--fs-md)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em',color:'var(--t-muted)',marginBottom:12}}>📍 Endereço Principal</div>
-                <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:10}}>
-                  <FormField label="CEP"><input value={form.cep||''} onChange={e=>setForm({...form,cep:formatarCEP(e.target.value)})} onBlur={e=>buscarCEP(e.target.value,'main')} className={inputCls} placeholder="00000-000" />{loadingCEP==='main'&&<div style={{fontSize:'var(--fs-sm)',color:'var(--c-primary)',marginTop:3}}>🔍 Buscando...</div>}</FormField>
-                  <FormField label="Endereço"><input {...F('endereco')} className={inputCls} /></FormField>
-                  <FormField label="Número"><input {...F('numero')} className={inputCls} /></FormField>
-                  <FormField label="Complemento"><input {...F('complemento')} className={inputCls} /></FormField>
-                  <FormField label="Bairro"><input {...F('bairro')} className={inputCls} /></FormField>
-                  <FormField label="Cidade"><input {...F('cidade')} className={inputCls} /></FormField>
-                  <FormField label="UF"><input {...F('estado')} onChange={e=>setForm({...form,estado:e.target.value.toUpperCase().slice(0,2)})} className={inputCls} maxLength={2} placeholder="SP" /></FormField>
-                </div>
-              </div>
+              
               <FormField label="Observações"><textarea {...F('observacoes')} rows={2} className={textareaCls} /></FormField>
             </div>
           )}
           {tab==='enderecos'&&(
             <div style={{display:'flex', flexDirection:'column', gap:14}}>
+
+              {/* Aviso de validação */}
+              {(() => {
+                const validos = enderecos.filter(e => e.logradouro?.trim() || e.cep?.trim())
+                const temPrincipal = validos.some(e => e.principal)
+                if (validos.length === 0) return (
+                  <div style={{background:'var(--c-warning-light)',border:'1px solid var(--c-warning)',borderRadius:'var(--r-md)',padding:'10px 14px',fontSize:'var(--fs-md)',color:'var(--c-warning-text)',display:'flex',alignItems:'center',gap:8}}>
+                    <span>⚠️</span>
+                    <span><strong>Endereço obrigatório.</strong> Adicione ao menos um endereço e marque-o como Principal para salvar.</span>
+                  </div>
+                )
+                if (!temPrincipal) return (
+                  <div style={{background:'var(--c-warning-light)',border:'1px solid var(--c-warning)',borderRadius:'var(--r-md)',padding:'10px 14px',fontSize:'var(--fs-md)',color:'var(--c-warning-text)',display:'flex',alignItems:'center',gap:8}}>
+                    <span>⚠️</span>
+                    <span><strong>Nenhum endereço marcado como Principal.</strong> Marque um endereço como Principal para salvar.</span>
+                  </div>
+                )
+                return (
+                  <div style={{background:'var(--c-success-light)',border:'1px solid var(--c-success)',borderRadius:'var(--r-md)',padding:'8px 14px',fontSize:'var(--fs-md)',color:'var(--c-success-text)',display:'flex',alignItems:'center',gap:8}}>
+                    <span>✅</span>
+                    <span>Endereço principal definido.</span>
+                  </div>
+                )
+              })()}
+
               {enderecos.map((end,i)=>(
-                <div key={i} style={{border:'1px solid var(--border)',borderRadius:'var(--r-lg)',padding:'14px'}}>
+                <div key={i} style={{border:`2px solid ${end.principal?'var(--c-primary)':'var(--border)'}`,borderRadius:'var(--r-lg)',padding:'14px',background:end.principal?'var(--c-primary-light,#e0f2fe)':'var(--bg-card)',transition:'all .15s'}}>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
                     <div style={{display:'flex',alignItems:'center',gap:10}}>
                       <select value={end.tipo} onChange={e=>{const a=[...enderecos];a[i].tipo=e.target.value;setEnderecos(a)}} className={selectCls} style={{width:'auto'}}>
                         {tiposEnd.map(t=><option key={t} value={t}>{t}</option>)}
                       </select>
                       <label style={{display:'flex',alignItems:'center',gap:6,fontSize:'var(--fs-base)',cursor:'pointer'}}>
-                        <input type="checkbox" checked={!!end.principal} onChange={e=>{const a=enderecos.map((x,j)=>({...x,principal:j===i?e.target.checked:false}));setEnderecos(a)}} style={{accentColor:'var(--c-primary)'}} /> Principal
+                        <input type="checkbox" checked={!!end.principal} onChange={e=>{
+                          // Se estiver marcando, desmarcar todos os outros
+                          const novoValor = e.target.checked
+                          if (!novoValor) {
+                            // Não permite desmarcar o único principal
+                            const outros = enderecos.filter((_,j)=>j!==i&&(_.logradouro?.trim()||_.cep?.trim()))
+                            if (outros.length === 0 || !outros.some(x=>x.principal)) {
+                              alert('O endereço principal não pode ser desmarcado. Marque outro endereço como principal primeiro.'); return
+                            }
+                          }
+                          const a=enderecos.map((x,j)=>({...x,principal:j===i?novoValor:novoValor?false:x.principal}));setEnderecos(a)
+                        }} style={{accentColor:'var(--c-primary)',width:16,height:16,cursor:'pointer'}} /> Principal
                       </label>
                     </div>
                     {enderecos.length>1&&<button onClick={()=>setEnderecos(prev=>prev.filter((_,j)=>j!==i))} style={{background:'none',border:'none',color:'var(--c-danger)',cursor:'pointer',fontSize:'var(--fs-base)'}}>× Remover</button>}
@@ -295,7 +331,7 @@ export default function ClientesPage() {
           {tab==='contatos'&&(
             <div style={{display:'flex', flexDirection:'column', gap:14}}>
               {contatos.map((ct,i)=>(
-                <div key={i} style={{border:'1px solid var(--border)',borderRadius:'var(--r-lg)',padding:'14px'}}>
+                <div key={i} style={{border:`2px solid ${ct.principal?'var(--c-primary)':'var(--border)'}`,borderRadius:'var(--r-lg)',padding:'14px',background:ct.principal?'var(--c-primary-light,#e0f2fe)':'var(--bg-card)',transition:'all .15s'}}>
                   <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:12}}>
                     <div style={{display:'flex',alignItems:'center',gap:10}}>
                       <label style={{display:'flex',alignItems:'center',gap:6,fontSize:'var(--fs-base)',cursor:'pointer'}}><input type="checkbox" checked={!!ct.principal} onChange={e=>{const a=contatos.map((x,j)=>({...x,principal:j===i?e.target.checked:false}));setContatos(a)}} style={{accentColor:'var(--c-primary)'}} />Principal</label>
