@@ -25,6 +25,13 @@ export default function ClientesPage() {
   const [form,setForm]           = useState<any>(emptyForm())
   const [enderecos,setEnderecos] = useState<any[]>([emptyEnd()])
   const [contatos,setContatos]   = useState<any[]>([emptyCt()])
+  const [docs,        setDocs]        = useState<any[]>([])
+  const [loadingDocs, setLoadingDocs] = useState(false)
+  const [uploadando,  setUploadando]  = useState(false)
+  const [errDoc,      setErrDoc]      = useState('')
+  const [editDoc,     setEditDoc]     = useState<any>(null)
+  const [formDoc,     setFormDoc]     = useState({ tipo_documento:'', descricao:'' })
+  const [fileInput,   setFileInput]   = useState<File|null>(null)
   const [spcData,setSpcData]     = useState<any[]>([])
   const [novaSpc,setNovaSpc]     = useState({resultado:'limpo',observacoes:''})
   const [spcIntervalo,setSpcIntervalo]=useState(30)
@@ -52,8 +59,13 @@ export default function ClientesPage() {
     setErro('');setTab('dados')
     if(c){setForm({tipo:c.tipo??'PF',nome:c.nome??'',cpf_cnpj:c.cpf_cnpj??'',rg_ie:c.rg_ie??'',email:c.email??'',telefone:c.telefone??'',celular:c.celular??'',limite_credito:c.limite_credito??0,observacoes:c.observacoes??'',endereco:c.endereco??'',numero:c.numero??'',complemento:c.complemento??'',bairro:c.bairro??'',cidade:c.cidade??'',estado:c.estado??'',cep:c.cep??'',papeis:c.papeis??['cliente']});setEditId(c.id);const[{data:ends},{data:cts},{data:spcs}]=await Promise.all([supabase.from('cliente_enderecos').select('*').eq('cliente_id',c.id).eq('ativo',1).order('principal',{ascending:false}),supabase.from('cliente_contatos').select('*').eq('cliente_id',c.id).eq('ativo',1).order('principal',{ascending:false}),supabase.from('cliente_spc').select('*').eq('cliente_id',c.id).order('data_consulta',{ascending:false})]);setEnderecos(ends?.length
           ? (ends.some((e:any)=>e.principal) ? ends : ends.map((e:any,i:number)=>({...e,principal:i===0})))
-          : [{...emptyEnd(),principal:true}]);setContatos(cts?.length?cts:[emptyCt()]);setSpcData(spcs??[])}
-    else{setForm(emptyForm());setEditId(null);setEnderecos([{...emptyEnd(),principal:true}]);setContatos([emptyCt()]);setSpcData([])}
+          : [{...emptyEnd(),principal:true}]);setContatos(cts?.length?cts:[emptyCt()]);setSpcData(spcs??[])
+      // Carregar documentos de crédito
+      const { data: docsData } = await supabase.from('cliente_documentos')
+        .select('*, usuarios(nome)').eq('cliente_id',c.id).order('created_at',{ascending:false})
+      setDocs(docsData??[])
+    }
+    else{setForm(emptyForm());setEditId(null);setEnderecos([{...emptyEnd(),principal:true}]);setContatos([emptyCt()]);setSpcData([]);setDocs([]);setFormDoc({tipo_documento:'',descricao:''});setFileInput(null);setErrDoc('')}
     setPanel(true)
   }
 
@@ -104,7 +116,80 @@ export default function ClientesPage() {
 
   const hasFilter = Object.values(filters).some(Boolean)
 
-  return (
+    // ── Tipos de documento disponíveis ─────────────────────────────────────────
+  const TIPOS_DOC = [
+    'CNH','RG','CPF','Comprovante de Residência','Comprovante de Renda',
+    'Contrato Social','Procuração','CNPJ / Cartão CNPJ','Certidão Negativa',
+    'Balanço Patrimonial','Nota Promissória','Outro',
+  ]
+
+  // ── Upload de novo documento ───────────────────────────────────────────────
+  async function uploadDoc() {
+    if (!formDoc.tipo_documento) { setErrDoc('Selecione o tipo do documento.'); return }
+    if (!fileInput)              { setErrDoc('Selecione um arquivo.'); return }
+    if (fileInput.size > 10 * 1024 * 1024) {
+      setErrDoc(`Arquivo muito grande (${(fileInput.size/1024/1024).toFixed(1)}MB). Limite: 10MB.`); return
+    }
+    setUploadando(true); setErrDoc('')
+    try {
+      const fd = new FormData()
+      fd.append('cliente_id',     String(editId))
+      fd.append('tipo_documento', formDoc.tipo_documento)
+      fd.append('descricao',      formDoc.descricao)
+      fd.append('arquivo',        fileInput)
+      const res  = await fetch('/api/clientes/documentos', { method:'POST', body: fd })
+      const data = await res.json()
+      if (!data.ok) { setErrDoc(data.error); setUploadando(false); return }
+      setDocs(prev => [data.data, ...prev])
+      setFormDoc({ tipo_documento:'', descricao:'' })
+      setFileInput(null)
+      // Limpar input file
+      const inp = document.getElementById('file-doc-input') as HTMLInputElement
+      if (inp) inp.value = ''
+    } catch(e:any) { setErrDoc(e.message) }
+    setUploadando(false)
+  }
+
+  // ── Salvar edição (tipo e descrição) ──────────────────────────────────────
+  async function salvarEdicaoDoc() {
+    if (!editDoc || !formDoc.tipo_documento) { setErrDoc('Tipo obrigatório.'); return }
+    setUploadando(true); setErrDoc('')
+    try {
+      const res  = await fetch('/api/clientes/documentos', {
+        method:'PATCH', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ id: editDoc.id, tipo_documento: formDoc.tipo_documento, descricao: formDoc.descricao }),
+      })
+      const data = await res.json()
+      if (!data.ok) { setErrDoc(data.error); setUploadando(false); return }
+      setDocs(prev => prev.map(d => d.id === editDoc.id ? data.data : d))
+      setEditDoc(null); setFormDoc({ tipo_documento:'', descricao:'' })
+    } catch(e:any) { setErrDoc(e.message) }
+    setUploadando(false)
+  }
+
+  // ── Alterar status (aprovar / rejeitar) ──────────────────────────────────
+  async function alterarStatusDoc(doc: any, novoStatus: string) {
+    const res  = await fetch('/api/clientes/documentos', {
+      method:'PATCH', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ id: doc.id, status: novoStatus }),
+    })
+    const data = await res.json()
+    if (data.ok) setDocs(prev => prev.map(d => d.id === doc.id ? { ...d, status: novoStatus } : d))
+  }
+
+  // ── Excluir documento ────────────────────────────────────────────────────
+  async function excluirDoc(doc: any) {
+    if (!confirm(`Excluir o documento "${doc.tipo_documento} — ${doc.nome_arquivo}"?\n\nEsta ação é irreversível.`)) return
+    const res  = await fetch(`/api/clientes/documentos?id=${doc.id}`, { method:'DELETE' })
+    const data = await res.json()
+    if (data.ok) setDocs(prev => prev.filter(d => d.id !== doc.id))
+    else alert('Erro ao excluir: ' + data.error)
+  }
+
+
+
+
+return (
     <div>
 
       <PageHeader
@@ -195,7 +280,7 @@ export default function ClientesPage() {
 
       <SlidePanel open={panel} onClose={()=>setPanel(false)} title={editId?'Editar Cliente':'Novo Cliente'} subtitle={editId?form.nome:'Preencha os dados do cliente'} width="lg"
         footer={<div style={{display:'flex',gap:10}}><Btn variant="secondary" style={{flex:1}} onClick={()=>setPanel(false)}>Cancelar</Btn><Btn style={{flex:1}} loading={saving} onClick={salvar}>{editId?'Atualizar':'Salvar'} Cliente</Btn></div>}>
-        <Tabs tabs={[{key:'dados',label:'Dados',icon:'👤'},{key:'enderecos',label:'Endereços',icon:'📍'},{key:'contatos',label:'Contatos',icon:'📞'},{key:'spc',label:'SPC',icon:'🔍'}]} active={tab} onChange={setTab} />
+        <Tabs tabs={[{key:'dados',label:'Dados',icon:'👤'},{key:'enderecos',label:'Endereços',icon:'📍'},{key:'contatos',label:'Contatos',icon:'📞'},{key:'spc',label:'SPC',icon:'🔍'},{key:'documentos',label:'Documentos',icon:'📎'}]} active={tab} onChange={setTab} />
         {erro&&<div className="ds-alert-error" style={{marginTop:12}}>{erro}</div>}
         <div style={{marginTop:16}}>
           {tab==='dados'&&(
@@ -388,6 +473,167 @@ export default function ClientesPage() {
                   </div>
                 </>
               ):<div style={{textAlign:'center',padding:'32px',color:'var(--t-muted)',fontSize:'var(--fs-base)'}}>Salve o cliente primeiro para registrar consultas SPC.</div>}
+            </div>
+          )}
+          {tab==='documentos'&&(
+            <div style={{display:'flex',flexDirection:'column',gap:16}}>
+
+              {/* ── Formulário de upload ─────────────────────────────── */}
+              <div className="ds-card" style={{padding:'16px 20px'}}>
+                <div className="ds-section-title">
+                  {editDoc ? '✏️ Editar Documento' : '📎 Enviar Novo Documento'}
+                </div>
+                {errDoc && <div className="ds-alert-error" style={{marginBottom:12}}>{errDoc}</div>}
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
+                  <FormField label="Tipo de Documento *">
+                    <select value={formDoc.tipo_documento}
+                      onChange={e=>setFormDoc({...formDoc,tipo_documento:e.target.value})}
+                      className={selectCls}>
+                      <option value="">Selecione...</option>
+                      {TIPOS_DOC.map(t=><option key={t} value={t}>{t}</option>)}
+                    </select>
+                  </FormField>
+                  <FormField label="Descrição / Observação">
+                    <input value={formDoc.descricao}
+                      onChange={e=>setFormDoc({...formDoc,descricao:e.target.value})}
+                      className={inputCls} placeholder="Ex: RG frente e verso, CNH vencida..." />
+                  </FormField>
+                </div>
+                {!editDoc && (
+                  <FormField label="Arquivo (máx. 10MB — PDF, imagem, Word, etc.)">
+                    <input id="file-doc-input" type="file"
+                      onChange={e=>setFileInput(e.target.files?.[0]??null)}
+                      className={inputCls} style={{paddingTop:6}} />
+                    {fileInput && (
+                      <div style={{marginTop:6,fontSize:'var(--fs-xs)',color:'var(--t-muted)'}}>
+                        {fileInput.name} — {(fileInput.size/1024/1024).toFixed(2)}MB
+                        {fileInput.size > 10*1024*1024 && (
+                          <span style={{color:'var(--c-danger)',marginLeft:8}}>⚠ Excede o limite de 10MB</span>
+                        )}
+                      </div>
+                    )}
+                  </FormField>
+                )}
+                <div style={{display:'flex',gap:8,marginTop:4}}>
+                  <Btn loading={uploadando}
+                    onClick={editDoc ? salvarEdicaoDoc : uploadDoc}
+                    disabled={!formDoc.tipo_documento || (!editDoc && !fileInput)}>
+                    {editDoc ? '💾 Salvar Alteração' : '📤 Enviar Documento'}
+                  </Btn>
+                  {editDoc && (
+                    <Btn variant="secondary" onClick={()=>{setEditDoc(null);setFormDoc({tipo_documento:'',descricao:''});setErrDoc('')}}>
+                      Cancelar
+                    </Btn>
+                  )}
+                </div>
+              </div>
+
+              {/* ── Tabela de documentos ─────────────────────────────── */}
+              {docs.length === 0 ? (
+                <div className="ds-card" style={{padding:'32px',textAlign:'center',color:'var(--t-muted)'}}>
+                  <div style={{fontSize:36,marginBottom:8}}>📂</div>
+                  <div style={{fontWeight:600}}>Nenhum documento enviado ainda.</div>
+                  <div style={{fontSize:'var(--fs-sm)',marginTop:4}}>Use o formulário acima para enviar documentos de análise de crédito.</div>
+                </div>
+              ) : (
+                <div className="ds-card" style={{overflow:'hidden'}}>
+                  <table style={{width:'100%',borderCollapse:'collapse'}}>
+                    <thead>
+                      <tr style={{background:'var(--bg-header)'}}>
+                        {['Tipo','Descrição','Arquivo','Tamanho','Status','Enviado por','Data','Ações'].map(h=>(
+                          <th key={h} style={{padding:'10px 14px',textAlign:'left',fontSize:'var(--fs-xs)',
+                            fontWeight:700,color:'var(--t-muted)',textTransform:'uppercase',
+                            letterSpacing:'0.05em',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap'}}>
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {docs.map(doc=>{
+                        const statusCor: Record<string,string> = {
+                          pendente:'var(--c-warning-text)', aprovado:'var(--c-success-text)', rejeitado:'var(--c-danger)'
+                        }
+                        const statusBg: Record<string,string> = {
+                          pendente:'var(--c-warning-light)', aprovado:'var(--c-success-light)', rejeitado:'var(--c-danger-light)'
+                        }
+                        const statusLabel: Record<string,string> = {
+                          pendente:'⏳ Pendente', aprovado:'✅ Aprovado', rejeitado:'❌ Rejeitado'
+                        }
+                        return (
+                          <tr key={doc.id} style={{borderBottom:'1px solid var(--border)'}}>
+                            <td style={{padding:'10px 14px',fontWeight:600,fontSize:'var(--fs-md)'}}>
+                              {doc.tipo_documento}
+                            </td>
+                            <td style={{padding:'10px 14px',color:'var(--t-secondary)',fontSize:'var(--fs-md)'}}>
+                              {doc.descricao || '—'}
+                            </td>
+                            <td style={{padding:'10px 14px',maxWidth:180}}>
+                              <a href={doc.url} target="_blank" rel="noopener"
+                                style={{color:'var(--c-primary)',fontSize:'var(--fs-sm)',
+                                  textDecoration:'none',display:'flex',alignItems:'center',gap:4,fontWeight:500}}
+                                title={doc.nome_arquivo}>
+                                📄 <span style={{overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap',maxWidth:130,display:'inline-block'}}>
+                                  {doc.nome_arquivo}
+                                </span>
+                              </a>
+                            </td>
+                            <td style={{padding:'10px 14px',color:'var(--t-muted)',fontSize:'var(--fs-sm)',whiteSpace:'nowrap'}}>
+                              {doc.tamanho_bytes ? (doc.tamanho_bytes/1024/1024).toFixed(2)+'MB' : '—'}
+                            </td>
+                            <td style={{padding:'10px 14px'}}>
+                              <span style={{fontSize:'var(--fs-xs)',fontWeight:700,padding:'3px 10px',
+                                borderRadius:99,color:statusCor[doc.status],background:statusBg[doc.status]}}>
+                                {statusLabel[doc.status]??doc.status}
+                              </span>
+                            </td>
+                            <td style={{padding:'10px 14px',color:'var(--t-muted)',fontSize:'var(--fs-sm)'}}>
+                              {doc.usuarios?.nome??'—'}
+                            </td>
+                            <td style={{padding:'10px 14px',color:'var(--t-muted)',fontSize:'var(--fs-sm)',whiteSpace:'nowrap'}}>
+                              {new Date(doc.created_at).toLocaleDateString('pt-BR')}
+                            </td>
+                            <td style={{padding:'8px 10px',whiteSpace:'nowrap'}}>
+                              <div style={{display:'flex',gap:4,alignItems:'center'}}>
+                                {/* Visualizar */}
+                                <a href={doc.url} target="_blank" rel="noopener"
+                                  style={{padding:'4px 8px',borderRadius:'var(--r-sm)',border:'1px solid var(--border)',
+                                    background:'var(--bg-card)',color:'var(--t-secondary)',fontSize:13,
+                                    textDecoration:'none',lineHeight:1,display:'flex',alignItems:'center'}}
+                                  title="Visualizar">👁️</a>
+                                {/* Aprovar */}
+                                {doc.status!=='aprovado'&&(
+                                  <button onClick={()=>alterarStatusDoc(doc,'aprovado')}
+                                    title="Aprovar" style={{padding:'4px 8px',borderRadius:'var(--r-sm)',
+                                      border:'1px solid var(--c-success)',background:'var(--c-success-light)',
+                                      color:'var(--c-success-text)',fontSize:13,cursor:'pointer',lineHeight:1}}>✅</button>
+                                )}
+                                {/* Rejeitar */}
+                                {doc.status!=='rejeitado'&&(
+                                  <button onClick={()=>alterarStatusDoc(doc,'rejeitado')}
+                                    title="Rejeitar" style={{padding:'4px 8px',borderRadius:'var(--r-sm)',
+                                      border:'1px solid var(--c-danger)',background:'var(--c-danger-light)',
+                                      color:'var(--c-danger)',fontSize:13,cursor:'pointer',lineHeight:1}}>❌</button>
+                                )}
+                                {/* Editar */}
+                                <button onClick={()=>{setEditDoc(doc);setFormDoc({tipo_documento:doc.tipo_documento,descricao:doc.descricao??''});setErrDoc('')}}
+                                  title="Editar tipo/descrição" style={{padding:'4px 8px',borderRadius:'var(--r-sm)',
+                                    border:'1px solid var(--border)',background:'var(--bg-card)',
+                                    color:'var(--c-primary)',fontSize:13,cursor:'pointer',lineHeight:1}}>✏️</button>
+                                {/* Excluir */}
+                                <button onClick={()=>excluirDoc(doc)}
+                                  title="Excluir" style={{padding:'4px 8px',borderRadius:'var(--r-sm)',
+                                    border:'1px solid var(--c-danger)',background:'var(--c-danger-light)',
+                                    color:'var(--c-danger)',fontSize:13,cursor:'pointer',lineHeight:1}}>🗑️</button>
+                              </div>
+                            </td>
+                          </tr>
+                        )
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              )}
             </div>
           )}
         </div>
