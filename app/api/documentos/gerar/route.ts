@@ -250,9 +250,11 @@ export async function POST(req: NextRequest) {
 
   // 2. Processar blocos condicionais
   html = processarBlocos(html, {
-    tem_acessorios: temAcessorios,
-    tem_desconto:   Number(contrato.desconto) > 0,
-    tem_frete:      Number(contrato.frete ?? 0) > 0,
+    tem_acessorios:        temAcessorios,
+    tem_desconto:          Number(contrato.desconto) > 0,
+    tem_frete:             Number(contrato.frete ?? 0) > 0,
+    contrato_observacoes:  !!(contrato.observacoes?.trim()),
+    contrato_observacoes2: !!(contrato.observacoes2?.trim()),
   })
 
   // 3. Substituir tags simples

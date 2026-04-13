@@ -71,12 +71,15 @@ export default function ClientesPage() {
 
   async function salvar(){
     if(!form.nome?.trim()){setErro('Nome é obrigatório!');return}
-    if(form.cpf_cnpj){
-      const docSemMask=form.cpf_cnpj.replace(/\D/g,'')
-      if(docSemMask.length>0&&!validarDoc(form.cpf_cnpj,form.tipo)){
-        setErro(form.tipo==='PJ'?'CNPJ inválido! Verifique o número informado.':'CPF inválido! Verifique o número informado.')
-        return
-      }
+    // CPF obrigatório para PF, CNPJ obrigatório para PJ
+    if(!form.cpf_cnpj?.trim()){
+      setErro(form.tipo==='PJ'?'CNPJ é obrigatório para Pessoa Jurídica!':'CPF é obrigatório para Pessoa Física!')
+      return
+    }
+    const docSemMask=form.cpf_cnpj.replace(/\D/g,'')
+    if(!validarDoc(form.cpf_cnpj,form.tipo)){
+      setErro(form.tipo==='PJ'?'CNPJ inválido! Verifique o número informado.':'CPF inválido! Verifique o número informado.')
+      return
     }
     // Validar: ao menos 1 endereço principal obrigatório
     const endValidos = enderecos.filter(e => e.logradouro?.trim() || e.cep?.trim())
@@ -287,7 +290,7 @@ return (
             <div style={{display:"flex",flexDirection:"column",gap:16}}>
               <div style={{display:'grid',gridTemplateColumns:'1fr 2fr',gap:12}}>
                 <FormField label="Tipo"><select value={form.tipo} onChange={e=>setForm({...form,tipo:e.target.value,cpf_cnpj:''})} className={selectCls}><option value="PF">Pessoa Física</option><option value="PJ">Pessoa Jurídica</option></select></FormField>
-                <FormField label={form.tipo==='PJ'?'CNPJ':'CPF'}>
+                <FormField label={form.tipo==='PJ'?'CNPJ *':'CPF *'}>
                   <div style={{display:'flex',gap:8}}><input value={form.cpf_cnpj||''} onChange={e=>setForm({...form,cpf_cnpj:formatarDoc(e.target.value,form.tipo)})} onBlur={e=>{if(form.tipo==='PJ')buscarCNPJ(e.target.value)}} className={`${inputCls} flex-1`} style={{fontFamily:'var(--font-mono)'}} placeholder={form.tipo==='PJ'?'00.000.000/0001-00':'000.000.000-00'}/>{form.tipo==='PJ'&&<Btn size="sm" variant="secondary" onClick={()=>buscarCNPJ(form.cpf_cnpj)} loading={loadingCNPJ}>🔍</Btn>}</div>
                 </FormField>
               </div>
