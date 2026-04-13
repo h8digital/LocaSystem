@@ -105,6 +105,17 @@ export async function POST(req: NextRequest) {
     sb.from('periodos_locacao').select('*').eq('ativo',1).order('dias'),
   ])
 
+  // Buscar endereço principal do cliente (separado pois precisa do cliente_id do contrato)
+  const clienteId = (contrato as any)?.cliente_id ?? (contrato as any)?.clientes?.id
+  const { data: endPrincipal } = clienteId
+    ? await sb.from('cliente_enderecos')
+        .select('logradouro,numero,complemento,bairro,cidade,estado,cep')
+        .eq('cliente_id', clienteId)
+        .eq('principal', true)
+        .eq('ativo', 1)
+        .maybeSingle()
+    : { data: null }
+
   if (!contrato) return NextResponse.json({ ok:false, error:'Contrato não encontrado' })
 
   // ── Template ──────────────────────────────────────────────────────────────
@@ -118,10 +129,13 @@ export async function POST(req: NextRequest) {
 
   // ── Dados do cliente ──────────────────────────────────────────────────────
   const cliente = contrato.clientes ?? {}
+  // Endereço do cliente: prioriza cliente_enderecos principal, fallback nos campos legados
+  const endSrc = endPrincipal ?? cliente
   const endCliente = [
-    cliente.logradouro, cliente.numero, cliente.complemento,
-    cliente.bairro, cliente.cidade, cliente.estado
+    endSrc?.logradouro, endSrc?.numero, endSrc?.complemento,
+    endSrc?.bairro, endSrc?.cidade, endSrc?.estado,
   ].filter(Boolean).join(', ')
+  const endClienteCompleto = endCliente + (endSrc?.cep ? ` — CEP ${endSrc.cep}` : '')
 
   // ── Período ───────────────────────────────────────────────────────────────
   const di   = contrato.data_inicio ? new Date(contrato.data_inicio + 'T12:00:00') : null
@@ -209,7 +223,12 @@ export async function POST(req: NextRequest) {
     '{{cliente_email}}':                   cliente.email ?? '',
     '{{cliente_telefone}}':               cliente.celular || cliente.telefone || '',
     '{{cliente_contato}}':                 cliente.contato ?? '',
-    '{{cliente_endereco_completo}}':       endCliente,
+    '{{cliente_endereco_completo}}':       endClienteCompleto,
+    '{{cliente_endereco}}':                endCliente,
+    '{{cliente_cep}}':                     endSrc?.cep ?? '',
+    '{{cliente_bairro}}':                  endSrc?.bairro ?? '',
+    '{{cliente_cidade}}':                  endSrc?.cidade ?? '',
+    '{{cliente_estado}}':                  endSrc?.estado ?? '',
     '{{contrato_numero}}':                 String(contrato.numero ?? ''),
     '{{data_emissao}}':                    new Date().toLocaleDateString('pt-BR'),
     '{{data_inicio}}':                     fmt_date(contrato.data_inicio),
