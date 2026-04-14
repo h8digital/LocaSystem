@@ -215,7 +215,9 @@ export default function EquipamentosPage() {
       estoque_venda:         Number(form.estoque_venda) || 0,
       permite_venda:         Number(form.permite_venda) || 0,
       preco_venda:           Number(form.preco_venda) || 0,
-      custo_reposicao:       Number(form.custo_reposicao) || 0,
+      custo_reposicao:           Number(form.custo_reposicao) || 0,
+      taxa_limpeza_contratada:   Number(form.taxa_limpeza_contratada) || 0,
+      taxa_limpeza_avulsa:       Number(form.taxa_limpeza_avulsa) || 0,
       prazo_entrega_dias:    Number(form.prazo_entrega_dias) || 0,
       preco_locacao_diario:  Number(form.preco_locacao_diario) || 0,
       preco_fds:             Number(form.preco_fds) || 0,
@@ -997,6 +999,45 @@ export default function EquipamentosPage() {
                   </FormField>
                 )}
               </div>
+
+              {/* ── Taxa de Limpeza ─────────────────────────────────── */}
+              <div className="ds-card" style={{ padding:'14px 16px' }}>
+                <div style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--t-muted)',
+                  textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:12 }}>
+                  🧹 Taxa de Limpeza
+                </div>
+                <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginBottom:12,
+                  padding:'8px 12px', background:'var(--bg-header)', borderRadius:'var(--r-sm)',
+                  border:'1px solid var(--border)' }}>
+                  Valor cobrado <strong>por equipamento</strong>. Se o cliente contratar a limpeza na locação,
+                  usa a taxa contratada. Se devolver sujo sem ter contratado, usa a taxa avulsa.
+                </div>
+                <div className="form-grid-2">
+                  <FormField label="Limpeza Contratada (R$)" hint="Cliente opta pela limpeza ao fechar o contrato">
+                    <div style={{ position:'relative' }}>
+                      <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)',
+                        color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
+                      <input type="number" step="0.01" min="0"
+                        value={form.taxa_limpeza_contratada ?? 0}
+                        onChange={e=>setForm((f:any)=>({...f, taxa_limpeza_contratada: e.target.value}))}
+                        className={inputCls} style={{ paddingLeft:30 }}
+                        placeholder="0,00" />
+                    </div>
+                  </FormField>
+                  <FormField label="Limpeza Avulsa (R$)" hint="Cobrada na devolução se devolver sujo sem ter contratado">
+                    <div style={{ position:'relative' }}>
+                      <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)',
+                        color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
+                      <input type="number" step="0.01" min="0"
+                        value={form.taxa_limpeza_avulsa ?? 0}
+                        onChange={e=>setForm((f:any)=>({...f, taxa_limpeza_avulsa: e.target.value}))}
+                        className={inputCls} style={{ paddingLeft:30 }}
+                        placeholder="0,00" />
+                    </div>
+                  </FormField>
+                </div>
+              </div>
+
             </div>
           </div>
         )}

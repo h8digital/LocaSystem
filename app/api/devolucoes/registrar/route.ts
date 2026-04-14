@@ -98,6 +98,8 @@ export async function POST(req: NextRequest) {
         quantidade_devolvida: qtdDev,
         condicao:             item.condicao === 'extraviado' ? 'perdido' : item.condicao,
         custo_avaria:         item.custo_avaria ?? 0,
+        limpeza_cobrada:      !!item.limpeza_cobrada,
+        valor_limpeza:        Number(item.valor_limpeza_avulsa ?? 0),
       })
 
       // Atualizar qtd_devolvida acumulada no item do contrato
@@ -144,6 +146,10 @@ export async function POST(req: NextRequest) {
         }
       }
     }
+
+    // ── Calcular limpeza avulsa total cobrada nos itens devolvidos ──────────────
+    const totalLimpezaAvulsa = itens.reduce((s: number, i: any) =>
+      s + Number(i.valor_limpeza_avulsa ?? 0), 0)
 
     // ── Buscar totais reais do contrato para detectar parcial vs total ─────────
     const { data: todosItens } = await sb.from('contrato_itens')
@@ -206,15 +212,15 @@ export async function POST(req: NextRequest) {
     }).eq('id', contrato_id)
 
     // ── Fatura extra para multa/avaria ────────────────────────────────────────
-    if (multa_atraso > 0 || valor_avarias > 0) {
-      const extra = multa_atraso + valor_avarias
+    if (multa_atraso > 0 || valor_avarias > 0 || totalLimpezaAvulsa > 0) {
+      const extra = multa_atraso + valor_avarias + totalLimpezaAvulsa
       const { count } = await sb.from('faturas').select('*', { count:'exact', head:true })
       const ano = new Date().getFullYear()
       const numFat = `FAT${ano}${String((count ?? 0) + 1).padStart(6,'0')}`
       await sb.from('faturas').insert({
         contrato_id,
         numero:          numFat,
-        tipo:            multa_atraso > 0 ? 'multa' : 'avaria',
+        tipo:            multa_atraso > 0 ? 'multa' : totalLimpezaAvulsa > 0 ? 'limpeza' : 'avaria',
         status:          'pendente',
         valor:           extra,
         valor_recebido:  0,
@@ -224,6 +230,7 @@ export async function POST(req: NextRequest) {
         descricao:       [
           multa_atraso > 0 ? `Multa por atraso (${dias_atraso}d)` : '',
           valor_avarias > 0 ? 'Cobrança de avaria/extravio' : '',
+          totalLimpezaAvulsa > 0 ? `Taxa de limpeza avulsa (${itens.filter((i:any)=>i.limpeza_cobrada).length} item(ns))` : '',
         ].filter(Boolean).join(' + ') + ` — Contrato ${contrato.numero}`,
       })
     }

@@ -103,8 +103,9 @@ export default function CriarContratoPage() {
   const dias = form.data_inicio && form.data_fim
     ? Math.max(1, Math.ceil((new Date(form.data_fim).getTime()-new Date(form.data_inicio).getTime())/86400000))
     : 1
-  const subtotal       = itens.reduce((s,i)=>s+Number(i.total),0)
-  const total          = subtotal - Number(form.desconto) + Number(form.acrescimo) + Number(form.frete)
+  const subtotal       = itens.filter(i=>i.tipo_item!=='acessorio').reduce((s,i)=>s+Number(i.total),0)
+  const totalLimpeza   = itens.reduce((s,i)=>s+Number(i.valor_limpeza||0),0)
+  const total          = subtotal - Number(form.desconto) + Number(form.acrescimo) + Number(form.frete) + totalLimpeza
   const comissaoVal    = total * Number(form.comissao_percentual) / 100
   const totalReposicao = itens.reduce((s,i)=>s+Number(i.custo_reposicao||0)*Number(i.quantidade||1),0)
   const multaDiaria    = itens.reduce((s,i)=>s+Number(i.preco_diario||0),0)
@@ -191,6 +192,10 @@ export default function CriarContratoPage() {
       preco_diario: Number(itemProduto.preco_locacao_diario??0),
       custo_reposicao: Number(itemProduto.custo_reposicao??0),
       prazo_entrega_dias: Number(itemProduto.prazo_entrega_dias??0),
+      limpeza_contratada: false,
+      taxa_limpeza_contratada: Number(itemProduto.taxa_limpeza_contratada??0),
+      taxa_limpeza_avulsa: Number(itemProduto.taxa_limpeza_avulsa??0),
+      valor_limpeza: 0,
       total:itemPreco*(itemProduto.controla_patrimonio?1:itemQtd),
       _produto: itemProduto,
     }])
@@ -259,7 +264,7 @@ export default function CriarContratoPage() {
     } : { local_uso_referencia:localReferencia||null }
 
     const res=await fetch('/api/contratos/criar',{method:'POST',headers:{'Content-Type':'application/json'},
-      body:JSON.stringify({...form,...localUso,cliente_id:clienteId,itens,subtotal,total,comissao_valor:comissaoVal})})
+      body:JSON.stringify({...form,...localUso,cliente_id:clienteId,itens,subtotal,total,totalLimpeza,comissao_valor:comissaoVal})})
     const result=await res.json()
     if(result.ok) router.push(`/contratos/${result.id}`)
     else { setErro('Erro: '+result.error); setSaving(false) }
@@ -618,6 +623,25 @@ export default function CriarContratoPage() {
                             <div style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)' }}>
                               {item._descricaoCobranca}
                             </div>
+                            {/* Checkbox de limpeza — só aparece se o produto tem taxa configurada */}
+                            {Number(item.taxa_limpeza_contratada) > 0 && (
+                              <label style={{ display:'flex', alignItems:'center', gap:6, marginTop:5,
+                                fontSize:'var(--fs-xs)', color:'var(--t-secondary)', cursor:'pointer',
+                                padding:'3px 6px', borderRadius:'var(--r-sm)',
+                                background: item.limpeza_contratada ? 'var(--c-success-light)' : 'var(--bg-header)',
+                                border: `1px solid ${item.limpeza_contratada ? 'var(--c-success)' : 'var(--border)'}`,
+                                width:'fit-content', transition:'all .15s' }}>
+                                <input type="checkbox"
+                                  checked={!!item.limpeza_contratada}
+                                  onChange={e => setItens(prev => prev.map((it,j) => j!==i ? it : {
+                                    ...it,
+                                    limpeza_contratada: e.target.checked,
+                                    valor_limpeza: e.target.checked ? Number(it.taxa_limpeza_contratada) * Number(it.quantidade) : 0,
+                                  }))}
+                                  style={{ accentColor:'var(--c-success)', cursor:'pointer' }} />
+                                🧹 Limpeza {item.limpeza_contratada ? `incluída — ${fmt.money(Number(item.taxa_limpeza_contratada) * Number(item.quantidade))}` : `(+ ${fmt.money(Number(item.taxa_limpeza_contratada))}/un.)`}
+                              </label>
+                            )}
                           </td>
                           <td style={{ padding:'9px 12px', color:'var(--t-muted)', fontFamily:'monospace', fontSize:'var(--fs-md)', borderBottom:'1px solid var(--border)' }}>{item.patrimonio_num??'—'}</td>
                           <td style={{ padding:'9px 12px', textAlign:'right', borderBottom:'1px solid var(--border)' }}>{item.quantidade}</td>
@@ -722,10 +746,11 @@ export default function CriarContratoPage() {
             {/* Totalizador */}
             <div style={{ marginTop:16, borderTop:'2px solid var(--border)', paddingTop:14, display:'flex', flexDirection:'column', gap:6 }}>
               {[
-                { l:'Subtotal',   v:fmt.money(subtotal),    c:'var(--t-primary)' },
+                { l:'Subtotal',        v:fmt.money(subtotal),      c:'var(--t-primary)' },
                 Number(form.desconto)>0&&{ l:'Desconto',    v:`− ${fmt.money(form.desconto)}`, c:'var(--c-success-text)' },
                 Number(form.acrescimo)>0&&{ l:'Acréscimo',  v:`+ ${fmt.money(form.acrescimo)}`, c:'var(--c-danger)' },
-                Number(form.frete)>0&&{ l:'Frete',        v:`+ ${fmt.money(form.frete)}`, c:'var(--c-warning-text)' },
+                Number(form.frete)>0&&{ l:'Frete',          v:`+ ${fmt.money(form.frete)}`, c:'var(--c-warning-text)' },
+                totalLimpeza>0&&{ l:'🧹 Taxa de Limpeza',   v:`+ ${fmt.money(totalLimpeza)}`, c:'var(--c-info-text,#0369a1)' },
               ].filter(Boolean).map((row:any)=>(
                 <div key={row.l} style={{ display:'flex', justifyContent:'space-between', fontSize:'var(--fs-md)' }}>
                   <span style={{ color:'var(--t-secondary)' }}>{row.l}</span>

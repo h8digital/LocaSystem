@@ -73,6 +73,13 @@ function processarLoops(html: string, loops: Record<string, Record<string,string
     if (!arr) return match
     return arr.map(item => {
       let row = template
+      // Processar sub-blocos condicionais dentro do item (ex: {{#tem_limpeza_item}})
+      row = row.replace(/\{\{#(\w+)\}\}([\s\S]*?)\{\{\/\1\}\}/g, (_: string, subTag: string, subContent: string) => {
+        // Verificar se a chave existe e é truthy no item
+        const val = item[subTag]
+        return (val && val !== '0' && val !== 'false') ? subContent : ''
+      })
+      // Substituir tags simples
       for (const [k, v] of Object.entries(item)) {
         row = row.split(`{{${k}}}`).join(v)
       }
@@ -168,11 +175,14 @@ export async function POST(req: NextRequest) {
   const subtotal        = itensLocacao.reduce((s: number, i: any) => s + Number(i.total_item), 0)
   const totalAcessorios = itensAcessorios.reduce((s: number, i: any) => s + Number(i.total_item), 0)
   const totalGeral      = Number(contrato.total ?? 0)
+  const totalLimpeza     = itensLocacao.reduce((s: number, i: any) => s + Number(i.valor_limpeza ?? 0), 0)
   const totalReposicao  = itensLocacao.reduce((s: number, i: any) => s + Number(i.custo_reposicao ?? 0) * Number(i.quantidade), 0)
   const multaDiaria     = itensLocacao.reduce((s: number, i: any) => s + Number(i.preco_diario ?? i.produtos?.preco_locacao_diario ?? 0), 0)
 
   // ── Nota promissória: valor = maior entre total do contrato e custo reposição
-  const valorNP = Math.max(totalGeral, totalReposicao)
+  // valorNP: total SEM taxa de limpeza (limpeza é serviço acessório, não entra na promissória)
+  const totalSemLimpeza = totalGeral - totalLimpeza
+  const valorNP = Math.max(totalSemLimpeza, totalReposicao)
 
   // ── Lista resumida de equipamentos para nota promissória ──────────────────
   const listaResumida = itensLocacao
@@ -193,13 +203,19 @@ export async function POST(req: NextRequest) {
 
   // ── Loops de itens ────────────────────────────────────────────────────────
   const rowsLocacao: Record<string,string>[] = itensLocacao.map((i: any) => ({
-    nome:             i.descricao_livre ?? i.produtos?.nome ?? '—',
-    patrimonio_num:   i.patrimonios?.numero_patrimonio ?? '—',
-    numero_serie:     i.patrimonios?.numero_serie ?? '—',
-    quantidade:       String(i.quantidade),
-    preco_unitario:   fmt_money(i.preco_unitario),
+    nome:              i.descricao_livre ?? i.produtos?.nome ?? '—',
+    patrimonio_num:    i.patrimonios?.numero_patrimonio ?? '—',
+    numero_serie:      i.patrimonios?.numero_serie ?? '—',
+    quantidade:        String(i.quantidade),
+    preco_unitario:    fmt_money(i.preco_unitario),
     periodo_descricao: periodoNome,
-    total_item:       fmt_money(i.total_item),
+    total_item:        fmt_money(i.total_item),
+    // Tags de limpeza por item (usadas no template)
+    tem_limpeza_item:   i.limpeza_contratada ? '1' : '0',
+    taxa_limpeza_unit:  i.limpeza_contratada && Number(i.quantidade) > 0
+      ? fmt_money(Number(i.valor_limpeza ?? 0) / Number(i.quantidade))
+      : 'R$ 0,00',
+    valor_limpeza_item: fmt_money(Number(i.valor_limpeza ?? 0)),
   }))
 
   const rowsAcessorios: Record<string,string>[] = itensAcessorios.map((i: any) => ({
@@ -236,6 +252,9 @@ export async function POST(req: NextRequest) {
     '{{dias_totais}}':                     String(dias),
     '{{local_uso}}':                       localUso,
     '{{subtotal}}':                        fmt_money(subtotal + totalAcessorios),
+    '{{total_limpeza}}':                   fmt_money(totalLimpeza),
+    '{{subtotal_sem_limpeza}}':            fmt_money(subtotal + totalAcessorios),
+    '{{tem_limpeza}}':                     totalLimpeza > 0 ? '1' : '0',
     '{{desconto}}':                        fmt_money(contrato.desconto),
     '{{frete}}':                           fmt_money(contrato.frete ?? 0),
     '{{total_geral}}':                     fmt_money(totalGeral),
@@ -274,6 +293,7 @@ export async function POST(req: NextRequest) {
     tem_frete:             Number(contrato.frete ?? 0) > 0,
     contrato_observacoes:  !!(contrato.observacoes?.trim()),
     contrato_observacoes2: !!(contrato.observacoes2?.trim()),
+    tem_limpeza:           totalLimpeza > 0,
   })
 
   // 3. Substituir tags simples

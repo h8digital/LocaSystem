@@ -18,6 +18,10 @@ type ItemWizard = {
   condicao: 'bom' | 'avariado' | 'extraviado'
   quantidade_devolvida: number
   custo_avaria: number
+  limpeza_contratada?: boolean
+  valor_limpeza?: number
+  limpeza_cobrada?: boolean   // operador marcou como sujo na devolução
+  taxa_limpeza_avulsa?: number
 }
 type PagFatura = {
   fatura_id: number; pagar: boolean
@@ -70,7 +74,7 @@ export default function EncerrarContratoPage() {
         supabase.from('contratos').select('*, clientes(nome)').eq('id', id).single(),
         supabase.from('faturas').select('*').eq('contrato_id', id).order('data_vencimento'),
         supabase.from('contrato_itens')
-          .select('*, produtos(nome), patrimonios(numero_patrimonio)')
+          .select('*, produtos(nome, taxa_limpeza_avulsa), patrimonios(numero_patrimonio)')
           .eq('contrato_id', id)
           .order('id'),
         supabase.from('parametros').select('valor').eq('chave', 'multa_atraso_percentual').single(),
@@ -101,6 +105,8 @@ export default function EncerrarContratoPage() {
         quantidade_devolvida: Number(item.quantidade) - Number(item.qtd_devolvida ?? 0),
         qtd_pendente:         Number(item.quantidade) - Number(item.qtd_devolvida ?? 0),
         custo_avaria:         0,
+        limpeza_cobrada:      false,
+        taxa_limpeza_avulsa:  Number((item.produtos as any)?.taxa_limpeza_avulsa ?? 0),
       })).filter((item: any) => item.qtd_pendente > 0))
 
       const pendentes = (f ?? []).filter((fat: Fatura) => fat.status !== 'pago')
@@ -172,6 +178,10 @@ export default function EncerrarContratoPage() {
               quantidade_total:     item.quantidade,
               condicao:             item.condicao,
               custo_avaria:         item.custo_avaria,
+              limpeza_cobrada:      !!item.limpeza_cobrada,
+              valor_limpeza_avulsa: item.limpeza_cobrada
+                ? Number(item.taxa_limpeza_avulsa) * Number(item.quantidade_devolvida)
+                : 0,
             })),
         }),
       })
@@ -471,6 +481,31 @@ export default function EncerrarContratoPage() {
                     </div>
                   </div>
                 )}
+
+                {/* ── Limpeza por item ─────────────────────────────────── */}
+                {item.limpeza_contratada ? (
+                  <div style={{ marginTop:10, display:'flex', alignItems:'center', gap:6,
+                    padding:'5px 10px', borderRadius:'var(--r-sm)', width:'fit-content',
+                    background:'var(--c-success-light)', border:'1px solid var(--c-success)',
+                    fontSize:'var(--fs-xs)', color:'var(--c-success-text)', fontWeight:600 }}>
+                    🧹 Limpeza incluída na locação — {fmt.money(Number(item.valor_limpeza ?? 0))}
+                  </div>
+                ) : Number(item.taxa_limpeza_avulsa) > 0 ? (
+                  <label style={{ marginTop:10, display:'flex', alignItems:'center', gap:8,
+                    padding:'6px 10px', borderRadius:'var(--r-sm)', width:'fit-content', cursor:'pointer',
+                    background: item.limpeza_cobrada ? 'var(--c-warning-light)' : 'var(--bg-header)',
+                    border: `1px solid ${item.limpeza_cobrada ? 'var(--c-warning)' : 'var(--border)'}`,
+                    fontSize:'var(--fs-xs)', fontWeight:600,
+                    color: item.limpeza_cobrada ? 'var(--c-warning-text)' : 'var(--t-muted)',
+                    transition:'all .15s' }}>
+                    <input type="checkbox" checked={!!item.limpeza_cobrada}
+                      onChange={e => updItem(idx, 'limpeza_cobrada', e.target.checked)}
+                      style={{ accentColor:'var(--c-warning)', cursor:'pointer' }} />
+                    🧹 Devolveu sujo?{item.limpeza_cobrada
+                      ? ` — cobrar ${fmt.money(Number(item.taxa_limpeza_avulsa) * Number(item.quantidade_devolvida))} (${item.quantidade_devolvida} un × ${fmt.money(Number(item.taxa_limpeza_avulsa))})`
+                      : ` (taxa avulsa: ${fmt.money(Number(item.taxa_limpeza_avulsa))}/un.)`}
+                  </label>
+                ) : null}
               </div>
             )
           })}

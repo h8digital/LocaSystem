@@ -61,17 +61,19 @@ export async function POST(req: NextRequest) {
     // ── Criar itens
     for (const item of itens) {
       await sb.from('contrato_itens').insert({
-        contrato_id:       c.id,
-        produto_id:        item.produto_id || null,
-        patrimonio_id:     item.patrimonio_id || null,
-        quantidade:        item.quantidade || 1,
-        preco_unitario:    Number(item.preco_unitario) || 0,
-        total_item:        Number(item.total) || 0,
-        preco_diario:      Number(item.preco_diario)      || 0,
-        custo_reposicao:   Number(item.custo_reposicao)   || 0,
-        prazo_entrega_dias: Number(item.prazo_entrega_dias) || 0,
-        tipo_item:         item.tipo_item || 'locacao',
-        descricao_livre:   item.descricao_livre || null,
+        contrato_id:         c.id,
+        produto_id:          item.produto_id || null,
+        patrimonio_id:       item.patrimonio_id || null,
+        quantidade:          item.quantidade || 1,
+        preco_unitario:      Number(item.preco_unitario) || 0,
+        total_item:          Number(item.total) || 0,
+        preco_diario:        Number(item.preco_diario)      || 0,
+        custo_reposicao:     Number(item.custo_reposicao)   || 0,
+        prazo_entrega_dias:  Number(item.prazo_entrega_dias) || 0,
+        tipo_item:           item.tipo_item || 'locacao',
+        descricao_livre:     item.descricao_livre || null,
+        limpeza_contratada:  !!item.limpeza_contratada,
+        valor_limpeza:       Number(item.valor_limpeza) || 0,
       })
       if (item.patrimonio_id) {
         // NÃO marcar como locado aqui — só na ativação do contrato
