@@ -458,7 +458,7 @@ export default function CriarContratoPage() {
                   value={itemProdutoId} displayValue={itemProdutoNome}
                   onChange={(id,row)=>selecionarProduto(id as number,row)}
                   table="produtos" searchColumn="nome"
-                  extraColumns="controla_patrimonio,preco_locacao_diario,preco_fds,preco_locacao_semanal,preco_quinzenal,preco_locacao_mensal,preco_trimestral,preco_semestral,marca,custo_reposicao,prazo_entrega_dias"
+                  extraColumns="controla_patrimonio,preco_locacao_diario,preco_fds,preco_locacao_semanal,preco_quinzenal,preco_locacao_mensal,preco_trimestral,preco_semestral,marca,custo_reposicao,prazo_entrega_dias,taxa_limpeza_contratada,taxa_limpeza_avulsa"
                   filter={{ativo:1}}
                   renderOption={row=>(
                     <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', gap:12 }}>
