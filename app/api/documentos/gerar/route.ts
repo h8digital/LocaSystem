@@ -227,6 +227,7 @@ export async function POST(req: NextRequest) {
 
   // ── Tags simples ──────────────────────────────────────────────────────────
   const tags: Record<string,string> = {
+    '{{mensagem_limpeza}}':                p['mensagem_limpeza_contrato'] ?? '',
     '{{empresa_nome}}':                    p['empresa_nome'] ?? '',
     '{{empresa_cnpj}}':                    p['empresa_cnpj'] ?? '',
     '{{empresa_telefone}}':                p['empresa_telefone'] ?? '',
@@ -294,6 +295,7 @@ export async function POST(req: NextRequest) {
     contrato_observacoes:  !!(contrato.observacoes?.trim()),
     contrato_observacoes2: !!(contrato.observacoes2?.trim()),
     tem_limpeza:           totalLimpeza > 0,
+    mensagem_limpeza:      !!(p['mensagem_limpeza_contrato']?.trim()),
   })
 
   // 3. Substituir tags simples

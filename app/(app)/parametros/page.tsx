@@ -1,7 +1,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Btn, PageHeader, Tabs, FormField, inputCls, Badge, SlidePanel } from '@/components/ui'
+import { Btn, PageHeader, Tabs, FormField, inputCls, textareaCls, Badge, SlidePanel } from '@/components/ui'
 
 const inpSm = inputCls
 
@@ -67,6 +67,7 @@ export default function ParametrosPage() {
     { key:'enderecos',  label:'Tipos de Endereço'    },
     { key:'tabelas',    label:'Tabelas de Preço'       },
     { key:'locais',     label:'Locais de Armazenagem' },
+    { key:'contratos',  label:'Contratos' },
   ]
 
   const CAMPOS_EMPRESA = [
@@ -646,6 +647,34 @@ export default function ParametrosPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+
+          {aba === 'contratos' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+              <div className="ds-section-title">Textos e Mensagens do Contrato</div>
+
+              {/* Mensagem de limpeza */}
+              <div className="ds-card" style={{ padding:'16px 20px' }}>
+                <div style={{ fontWeight:700, fontSize:'var(--fs-base)', marginBottom:6 }}>
+                  🧹 Mensagem de Limpeza dos Equipamentos
+                </div>
+                <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginBottom:12 }}>
+                  Texto exibido no contrato de locação antes das assinaturas. Deixe em branco para não exibir.
+                </div>
+                <textarea
+                  value={params['mensagem_limpeza_contrato'] ?? ''}
+                  onChange={e => setParams(p => ({ ...p, mensagem_limpeza_contrato: e.target.value }))}
+                  rows={5}
+                  className={textareaCls}
+                  placeholder="Ex: Prezados clientes, solicitamos gentilmente que os equipamentos sejam devolvidos limpos..."
+                  style={{ resize:'vertical' }}
+                />
+                <div style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)', marginTop:6 }}>
+                  Este texto aparece em destaque no contrato impresso, logo antes do espaço de assinaturas.
+                </div>
+              </div>
+
             </div>
           )}
 
