@@ -13,14 +13,14 @@ type Fatura = {
 type ItemWizard = {
   id: number; produto_id: number; patrimonio_id?: number
   quantidade: number; qtd_devolvida?: number; qtd_pendente: number
-  preco_unitario: number; total_item: number
+  preco_unitario: number; preco_diario?: number; total_item: number
   produtos: { nome: string }; patrimonios?: { numero_patrimonio: string }
   condicao: 'bom' | 'avariado' | 'extraviado'
   quantidade_devolvida: number
   custo_avaria: number
   limpeza_contratada?: boolean
   valor_limpeza?: number
-  limpeza_cobrada?: boolean   // operador marcou como sujo na devolução
+  limpeza_cobrada?: boolean
   taxa_limpeza_avulsa?: number
 }
 type PagFatura = {
@@ -64,8 +64,8 @@ export default function EncerrarContratoPage() {
 
   const [diasAtraso,      setDiasAtraso]      = useState(0)
   const [caucaoDevolvido, setCaucaoDevolvido] = useState(0)
+  const [multaEntregaAtivo, setMultaEntregaAtivo] = useState(true)
   const [observacoes,     setObservacoes]     = useState('')
-  const [multaParam,      setMultaParam]      = useState(2)
 
   // ── Carregamento inicial ───────────────────────────────────────────────────
   useEffect(() => {
@@ -77,7 +77,7 @@ export default function EncerrarContratoPage() {
           .select('*, produtos(nome, taxa_limpeza_avulsa), patrimonios(numero_patrimonio)')
           .eq('contrato_id', id)
           .order('id'),
-        supabase.from('parametros').select('valor').eq('chave', 'multa_atraso_percentual').single(),
+        supabase.from('parametros').select('valor').eq('chave', 'multa_entrega_ativo').single(),
       ])
 
       if (!c || ['encerrado','cancelado','pendente_manutencao'].includes(c.status)) {
@@ -86,7 +86,7 @@ export default function EncerrarContratoPage() {
 
       setContrato(c)
       setFaturas(f ?? [])
-      setMultaParam(Number((mp as any)?.data?.valor ?? 2))
+      setMultaEntregaAtivo((mp as any)?.data?.valor === 'sim')
       setCaucaoDevolvido(Number(c.caucao ?? 0))
 
       // Atraso automático
@@ -129,7 +129,11 @@ export default function EncerrarContratoPage() {
   const totalPagarAgora = pagamentos.filter(p => p.pagar).reduce((s, p) => s + Number(p.valor_pago), 0)
   const valorAvarias   = itens.filter(i => i.condicao === 'avariado').reduce((s, i)   => s + Number(i.custo_avaria), 0)
   const valorExtravios = itens.filter(i => i.condicao === 'extraviado').reduce((s, i) => s + Number(i.custo_avaria), 0)
-  const multaAtraso    = diasAtraso > 0 ? Number(contrato?.total ?? 0) * (multaParam / 100) * diasAtraso : 0
+  // Multa de entrega: diária × quantidade devolvida × dias atraso
+  const multaAtraso = (multaEntregaAtivo && diasAtraso > 0)
+    ? itens.filter(i => i.quantidade_devolvida > 0).reduce((s, i) =>
+        s + Number(i.preco_diario ?? 0) * Number(i.quantidade_devolvida) * diasAtraso, 0)
+    : 0
   const totalExtras    = multaAtraso + valorAvarias + valorExtravios
 
   // ── Validação ─────────────────────────────────────────────────────────────
@@ -531,7 +535,7 @@ export default function EncerrarContratoPage() {
                 <div style={{ fontWeight:700 }}>{fmt.date(new Date().toISOString().split('T')[0])}</div>
               </div>
             </div>
-            <FormField label={`Dias de Atraso (multa de ${multaParam}% ao dia sobre ${fmt.money(contrato.total)})`}>
+            <FormField label="Dias de Atraso na Entrega" hint="Cobrado à razão da diária de cada equipamento devolvido">
               <div style={{ display:'flex', alignItems:'center', gap:12 }}>
                 <input type="number" min="0" value={diasAtraso}
                   onChange={e => setDiasAtraso(Number(e.target.value))}
@@ -548,6 +552,22 @@ export default function EncerrarContratoPage() {
                   </div>
                 )}
               </div>
+              {diasAtraso > 0 && itens.filter(i => i.quantidade_devolvida > 0 && Number(i.preco_diario ?? 0) > 0).length > 0 && (
+                <div style={{ marginTop:8, background:'var(--bg-header)', border:'1px solid var(--border)',
+                  borderRadius:'var(--r-sm)', padding:'8px 12px', fontSize:'var(--fs-xs)' }}>
+                  {itens.filter(i => i.quantidade_devolvida > 0).map((item, idx) => (
+                    <div key={idx} style={{ display:'flex', justifyContent:'space-between', padding:'2px 0',
+                      color: Number(item.preco_diario ?? 0) > 0 ? 'var(--t-primary)' : 'var(--t-muted)' }}>
+                      <span>{(item.produtos as any)?.nome ?? 'Item'} × {item.quantidade_devolvida} un.</span>
+                      <span style={{ fontFamily:'var(--font-mono)', fontWeight:600 }}>
+                        {Number(item.preco_diario ?? 0) > 0
+                          ? `${fmt.money(Number(item.preco_diario))} × ${item.quantidade_devolvida} × ${diasAtraso}d = ${fmt.money(Number(item.preco_diario) * Number(item.quantidade_devolvida) * diasAtraso)}`
+                          : 'sem diária'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </FormField>
           </div>
 

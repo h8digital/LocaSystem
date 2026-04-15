@@ -54,6 +54,7 @@ export default function VerContratoPage() {
   const [faturaAlvo,    setFaturaAlvo]    = useState<any>(null)
   const [salvandoPgto,  setSalvandoPgto]  = useState(false)
   const [erroPgto,      setErroPgto]      = useState('')
+  const [multaJurosInfo, setMultaJurosInfo] = useState<{multa:number,juros:number,dias:number}|null>(null)
   const [formPgto, setFormPgto] = useState<any>({
     valor_pago: 0, data_pagamento: new Date().toISOString().split('T')[0],
     forma_pagamento: 'pix', observacoes: ''
@@ -256,15 +257,47 @@ export default function VerContratoPage() {
   }
 
   // ── Funções de pagamento ─────────────────────────────────
-  function abrirPagamento(fatura: any) {
+  async function abrirPagamento(fatura: any) {
     setFaturaAlvo(fatura)
-    setFormPgto({
-      valor_pago:      fatura.valor_pago ?? fatura.valor,
-      data_pagamento:  new Date().toISOString().split('T')[0],
-      forma_pagamento: fatura.forma_pagamento ?? contrato.forma_pagamento ?? 'pix',
-      observacoes:     '',
-    })
     setErroPgto('')
+    setMultaJurosInfo(null)
+
+    // Calcular juros e multa se fatura estiver vencida
+    const hoje      = new Date().toISOString().split('T')[0]
+    const venc      = fatura.data_vencimento
+    const jaQuitada = ['pago'].includes(fatura.status)
+
+    if (!jaQuitada && venc && hoje > venc) {
+      const diasAtraso = Math.floor(
+        (new Date(hoje).getTime() - new Date(venc).getTime()) / 86400000
+      )
+      // Buscar parâmetros de multa/juros
+      const { data: params } = await supabase
+        .from('parametros')
+        .select('chave,valor')
+        .in('chave', ['multa_pagamento_percentual','juros_pagamento_mensal'])
+      const p: Record<string,number> = {}
+      ;(params ?? []).forEach((x: any) => { p[x.chave] = Number(x.valor) })
+
+      const valorBase  = Number(fatura.saldo_restante ?? fatura.valor)
+      const multa      = valorBase * (p['multa_pagamento_percentual'] ?? 2) / 100
+      const juros      = valorBase * ((p['juros_pagamento_mensal'] ?? 1) / 100 / 30) * diasAtraso
+      setMultaJurosInfo({ multa, juros, dias: diasAtraso })
+
+      setFormPgto({
+        valor_pago:      (valorBase + multa + juros).toFixed(2),
+        data_pagamento:  hoje,
+        forma_pagamento: fatura.forma_pagamento ?? contrato.forma_pagamento ?? 'pix',
+        observacoes:     `Multa: R$ ${multa.toFixed(2)} + Juros: R$ ${juros.toFixed(2)} (${diasAtraso}d de atraso)`,
+      })
+    } else {
+      setFormPgto({
+        valor_pago:      fatura.saldo_restante ?? fatura.valor,
+        data_pagamento:  hoje,
+        forma_pagamento: fatura.forma_pagamento ?? contrato.forma_pagamento ?? 'pix',
+        observacoes:     '',
+      })
+    }
     setPainelPgto(true)
   }
 
@@ -1042,6 +1075,125 @@ export default function VerContratoPage() {
               </div>
             </div>
           )}
+
+
+      {/* ── Modal de Pagamento ──────────────────────────────────────────── */}
+      {painelPgto && faturaAlvo && (
+        <div style={{
+          position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1000,
+          display:'flex', alignItems:'center', justifyContent:'center', padding:20,
+        }} onClick={e => { if (e.target === e.currentTarget) { setPainelPgto(false); setMultaJurosInfo(null) } }}>
+          <div style={{
+            background:'var(--bg-card)', borderRadius:'var(--r-lg)', width:'100%', maxWidth:500,
+            boxShadow:'0 20px 60px rgba(0,0,0,0.3)', overflow:'hidden',
+          }}>
+            {/* Header */}
+            <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)',
+              display:'flex', justifyContent:'space-between', alignItems:'center',
+              background:'var(--bg-header)' }}>
+              <div style={{ fontWeight:700, fontSize:'var(--fs-base)' }}>💰 Registrar Pagamento</div>
+              <button onClick={() => { setPainelPgto(false); setMultaJurosInfo(null) }}
+                style={{ background:'none', border:'none', cursor:'pointer', fontSize:18,
+                  color:'var(--t-muted)', lineHeight:1 }}>×</button>
+            </div>
+
+            <div style={{ padding:'20px' }}>
+              {/* Dados da fatura */}
+              <div style={{ background:'var(--bg-header)', borderRadius:'var(--r-md)',
+                padding:'10px 14px', marginBottom:16, fontSize:'var(--fs-md)' }}>
+                <div style={{ display:'flex', justifyContent:'space-between' }}>
+                  <span style={{ color:'var(--t-muted)' }}>Fatura</span>
+                  <span style={{ fontWeight:600, fontFamily:'monospace' }}>{faturaAlvo.numero}</span>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', marginTop:4 }}>
+                  <span style={{ color:'var(--t-muted)' }}>Valor original</span>
+                  <span style={{ fontWeight:600 }}>{fmt.money(faturaAlvo.valor)}</span>
+                </div>
+                <div style={{ display:'flex', justifyContent:'space-between', marginTop:4 }}>
+                  <span style={{ color:'var(--t-muted)' }}>Vencimento</span>
+                  <span style={{ fontWeight:600 }}>{fmt.date(faturaAlvo.data_vencimento)}</span>
+                </div>
+              </div>
+
+              {/* Aviso de multa/juros quando vencida */}
+              {multaJurosInfo && (
+                <div style={{ background:'var(--c-warning-light)', border:'1px solid var(--c-warning)',
+                  borderRadius:'var(--r-md)', padding:'12px 14px', marginBottom:16 }}>
+                  <div style={{ fontWeight:700, color:'var(--c-warning-text)', marginBottom:8, fontSize:'var(--fs-md)' }}>
+                    ⚠️ Fatura vencida há {multaJurosInfo.dias} dia(s)
+                  </div>
+                  <div style={{ display:'flex', flexDirection:'column', gap:4, fontSize:'var(--fs-md)' }}>
+                    <div style={{ display:'flex', justifyContent:'space-between' }}>
+                      <span style={{ color:'var(--t-secondary)' }}>Valor base (saldo)</span>
+                      <span>{fmt.money(Number(faturaAlvo.saldo_restante ?? faturaAlvo.valor))}</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between' }}>
+                      <span style={{ color:'var(--c-danger)' }}>+ Multa ({multaJurosInfo.dias > 0 ? '2%' : ''})</span>
+                      <span style={{ color:'var(--c-danger)', fontWeight:600 }}>{fmt.money(multaJurosInfo.multa)}</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between' }}>
+                      <span style={{ color:'var(--c-danger)' }}>+ Juros ({multaJurosInfo.dias}d × 1%/mês)</span>
+                      <span style={{ color:'var(--c-danger)', fontWeight:600 }}>{fmt.money(multaJurosInfo.juros)}</span>
+                    </div>
+                    <div style={{ display:'flex', justifyContent:'space-between', borderTop:'1px solid var(--c-warning)',
+                      paddingTop:6, marginTop:4, fontWeight:700 }}>
+                      <span>Total sugerido</span>
+                      <span style={{ color:'var(--c-warning-text)' }}>
+                        {fmt.money(Number(faturaAlvo.saldo_restante ?? faturaAlvo.valor) + multaJurosInfo.multa + multaJurosInfo.juros)}
+                      </span>
+                    </div>
+                  </div>
+                  <div style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)', marginTop:8 }}>
+                    Você pode ajustar o valor abaixo se negociar diferente com o cliente.
+                  </div>
+                </div>
+              )}
+
+              {erroPgto && <div className="ds-alert-error" style={{ marginBottom:12 }}>{erroPgto}</div>}
+
+              {/* Formulário */}
+              <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+                <FormField label="Valor Recebido (R$) *">
+                  <input type="number" step="0.01" min="0"
+                    value={formPgto.valor_pago}
+                    onChange={e => setFormPgto((p: any) => ({ ...p, valor_pago: e.target.value }))}
+                    className={inputCls} />
+                </FormField>
+                <FormField label="Data do Pagamento *">
+                  <input type="date"
+                    value={formPgto.data_pagamento}
+                    onChange={e => setFormPgto((p: any) => ({ ...p, data_pagamento: e.target.value }))}
+                    className={inputCls} />
+                </FormField>
+                <FormField label="Forma de Pagamento">
+                  <select value={formPgto.forma_pagamento}
+                    onChange={e => setFormPgto((p: any) => ({ ...p, forma_pagamento: e.target.value }))}
+                    className={selectCls}>
+                    {['pix','dinheiro','cartao_debito','cartao_credito','transferencia','boleto','cheque'].map(f => (
+                      <option key={f} value={f}>{f.replace(/_/g,' ').replace(/\b\w/g,(c:string)=>c.toUpperCase())}</option>
+                    ))}
+                  </select>
+                </FormField>
+                <FormField label="Observações">
+                  <input value={formPgto.observacoes}
+                    onChange={e => setFormPgto((p: any) => ({ ...p, observacoes: e.target.value }))}
+                    className={inputCls} placeholder="Multa, juros, desconto negociado..." />
+                </FormField>
+              </div>
+
+              {/* Ações */}
+              <div style={{ display:'flex', gap:8, marginTop:20 }}>
+                <Btn loading={salvandoPgto} onClick={confirmarPagamento} style={{ flex:1 }}>
+                  ✓ Confirmar Pagamento
+                </Btn>
+                <Btn variant="secondary" onClick={() => { setPainelPgto(false); setMultaJurosInfo(null) }}>
+                  Cancelar
+                </Btn>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   )

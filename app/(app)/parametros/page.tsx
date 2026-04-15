@@ -652,7 +652,60 @@ export default function ParametrosPage() {
 
           {aba === 'contratos' && (
             <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
-              <div className="ds-section-title">Textos e Mensagens do Contrato</div>
+              <div className="ds-section-title">Multas e Juros</div>
+
+              {/* Multa por atraso na entrega */}
+              <div className="ds-card" style={{ padding:'16px 20px' }}>
+                <div style={{ fontWeight:700, fontSize:'var(--fs-base)', marginBottom:6 }}>
+                  📦 Multa por Atraso na Entrega do Equipamento
+                </div>
+                <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginBottom:12 }}>
+                  Cobrada quando o cliente devolve após o prazo. Calculada como: <strong>preço diário × quantidade × dias de atraso</strong> — por equipamento.
+                </div>
+                <FormField label="Cobrar multa por atraso na entrega?">
+                  <select
+                    value={params['multa_entrega_ativo'] ?? 'sim'}
+                    onChange={e => setParams(p => ({ ...p, multa_entrega_ativo: e.target.value }))}
+                    className={inpSm} style={{ maxWidth:200 }}>
+                    <option value="sim">Sim — cobrar diária por dia de atraso</option>
+                    <option value="nao">Não — não cobrar multa de entrega</option>
+                  </select>
+                </FormField>
+              </div>
+
+              {/* Multa e juros por atraso no pagamento */}
+              <div className="ds-card" style={{ padding:'16px 20px' }}>
+                <div style={{ fontWeight:700, fontSize:'var(--fs-base)', marginBottom:6 }}>
+                  💳 Multa e Juros por Atraso no Pagamento de Fatura
+                </div>
+                <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginBottom:12 }}>
+                  Aplicados automaticamente ao registrar pagamento de fatura vencida. Padrão legal brasileiro: multa de 2% + juros de 1% ao mês.
+                </div>
+                <div className="form-grid-2">
+                  <FormField label="Multa por atraso (%)" hint="Percentual fixo cobrado uma única vez sobre o saldo devedor">
+                    <input type="number" step="0.01" min="0" max="100"
+                      value={params['multa_pagamento_percentual'] ?? '2.00'}
+                      onChange={e => setParams(p => ({ ...p, multa_pagamento_percentual: e.target.value }))}
+                      className={inpSm} />
+                  </FormField>
+                  <FormField label="Juros de mora (% ao mês)" hint="Aplicado proporcionalmente aos dias de atraso (ex: 1% ao mês = 0,033%/dia)">
+                    <input type="number" step="0.01" min="0" max="100"
+                      value={params['juros_pagamento_mensal'] ?? '1.00'}
+                      onChange={e => setParams(p => ({ ...p, juros_pagamento_mensal: e.target.value }))}
+                      className={inpSm} />
+                  </FormField>
+                </div>
+                <div style={{ background:'var(--c-info-light)', border:'1px solid var(--c-info)',
+                  borderRadius:'var(--r-sm)', padding:'10px 14px', fontSize:'var(--fs-sm)',
+                  color:'var(--c-info-text)', marginTop:12 }}>
+                  <strong>Exemplo:</strong> Fatura de R$ 1.000,00 vencida há 15 dias →
+                  Multa: R$ {((1000 * Number(params['multa_pagamento_percentual'] ?? 2)) / 100).toFixed(2)} +
+                  Juros: R$ {((1000 * Number(params['juros_pagamento_mensal'] ?? 1) / 100 / 30) * 15).toFixed(2)} =
+                  Total: R$ {(1000 + (1000 * Number(params['multa_pagamento_percentual'] ?? 2)) / 100 + (1000 * Number(params['juros_pagamento_mensal'] ?? 1) / 100 / 30) * 15).toFixed(2)}
+                </div>
+              </div>
+
+              <div className="ds-section-title" style={{ marginTop:8 }}>Textos e Mensagens do Contrato</div>
 
               {/* Mensagem de limpeza */}
               <div className="ds-card" style={{ padding:'16px 20px' }}>

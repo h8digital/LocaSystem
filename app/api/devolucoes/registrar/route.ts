@@ -178,15 +178,18 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── Multa por atraso (só na devolução total ou se explicitamente informado) ─
+    // ── Multa por atraso na ENTREGA: preco_diario × qtd_devolvida × dias ────
     let multa_atraso = 0
     if (dias_atraso > 0) {
-      const { data: itensContrato } = await sb.from('contrato_itens')
-        .select('preco_diario, quantidade, produtos(preco_locacao_diario)')
-        .eq('contrato_id', contrato_id)
-      const valorDiario = (itensContrato ?? []).reduce((s: number, i: any) =>
-        s + Number(i.preco_diario ?? (i.produtos as any)?.preco_locacao_diario ?? 0) * Number(i.quantidade ?? 1), 0)
-      multa_atraso = valorDiario * dias_atraso
+      const { data: paramMulta } = await sb.from('parametros')
+        .select('valor').eq('chave', 'multa_entrega_ativo').single()
+      if ((paramMulta as any)?.valor === 'sim') {
+        multa_atraso = itens.reduce((s: number, item: any) => {
+          const qtd    = Number(item.quantidade_devolvida ?? 0)
+          const diaria = Number(item.preco_diario ?? 0)
+          return s + diaria * qtd * dias_atraso
+        }, 0)
+      }
     }
 
     // ── Determinar novo status do contrato ────────────────────────────────────
