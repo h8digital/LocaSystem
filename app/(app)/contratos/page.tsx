@@ -15,12 +15,35 @@ export default function ContratosPage() {
 
   async function load() {
     setLoading(true)
+
+    // ── Busca: número OU nome do cliente ────────────────────────────────────
+    // O Supabase não suporta ilike em tabelas relacionadas via .or()
+    // Solução: buscar IDs de clientes que batem com a busca e filtrar por eles
+    let clienteIds: number[] = []
+    if (filters.busca) {
+      const { data: cls } = await supabase
+        .from('clientes')
+        .select('id')
+        .ilike('nome', `%${filters.busca}%`)
+        .limit(200)
+      clienteIds = (cls ?? []).map((c: any) => c.id)
+    }
+
     let q = supabase
       .from('contratos')
       .select('*, clientes(nome), usuarios(nome)')
       .order('created_at', { ascending:false })
-    if (filters.status)        q = q.eq('status', filters.status)
-    if (filters.busca)         q = q.or(`numero.ilike.%${filters.busca}%,clientes.nome.ilike.%${filters.busca}%`)
+
+    if (filters.status)          q = q.eq('status', filters.status)
+    if (filters.busca) {
+      if (clienteIds.length > 0) {
+        // Número bate OU cliente_id está na lista de clientes encontrados
+        q = q.or(`numero.ilike.%${filters.busca}%,cliente_id.in.(${clienteIds.join(',')})`)
+      } else {
+        // Nenhum cliente encontrado pelo nome — filtrar só pelo número
+        q = q.ilike('numero', `%${filters.busca}%`)
+      }
+    }
     if (filters.data_inicio_de)  q = q.gte('data_inicio', filters.data_inicio_de)
     if (filters.data_inicio_ate) q = q.lte('data_inicio', filters.data_inicio_ate)
     if (filters.data_fim_de)     q = q.gte('data_fim', filters.data_fim_de)
