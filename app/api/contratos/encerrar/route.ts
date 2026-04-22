@@ -173,12 +173,35 @@ export async function POST(req: NextRequest) {
       })
     }
 
-    // ── 6. Encerrar ───────────────────────────────────────────────────────────
-    await sb.from('contratos').update({ status: 'encerrado' }).eq('id', contrato_id)
+    // ── 6. Liberar patrimônios e encerrar ────────────────────────────────────
+    // Buscar todos os itens rastreáveis do contrato
+    const { data: itensContrato } = await sb.from('contrato_itens')
+      .select('patrimonio_id')
+      .eq('contrato_id', contrato_id)
+      .not('patrimonio_id', 'is', null)
+
+    // Liberar cada patrimônio (disponivel, salvo avariados que vão para manutencao)
+    // Avariados foram tratados na devolução — aqui liberamos os que estão locados
+    for (const item of itensContrato ?? []) {
+      if (!item.patrimonio_id) continue
+      const { data: pat } = await sb.from('patrimonios')
+        .select('status').eq('id', item.patrimonio_id).single()
+      // Só libera se ainda estiver locado (avariado/manutenção foram tratados antes)
+      if (pat?.status === 'locado') {
+        await sb.from('patrimonios')
+          .update({ status: 'disponivel' })
+          .eq('id', item.patrimonio_id)
+      }
+    }
+
+    await sb.from('contratos').update({
+      status:              'encerrado',
+      data_devolucao_real: new Date().toISOString(),
+    }).eq('id', contrato_id)
 
     return NextResponse.json({
       ok: true,
-      msg: `Contrato ${contrato.numero} encerrado com sucesso. Fatura de encerramento gerada.`,
+      msg: `Contrato ${contrato.numero} encerrado com sucesso. Patrimônios liberados. Fatura de encerramento gerada.`,
     })
 
   } catch (e: any) {
