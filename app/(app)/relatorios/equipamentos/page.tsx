@@ -115,12 +115,10 @@ export default function RelatorioEquipamentosPage() {
     <div>
       <PageHeader title="📦 Catálogo de Equipamentos"
         subtitle={`Relatório para envio a clientes · ${filtrados.length} equipamento(s)`}
-        action={
-          <div style={{display:'flex',gap:8}}>
-            <Btn variant="secondary" onClick={carregar}>↻ Atualizar</Btn>
-            <Btn loading={gerandoPDF} onClick={gerarPDF}>🖨 Gerar PDF / Imprimir</Btn>
-          </div>
-        }/>
+        actions={<div style={{display:'flex',gap:8}}>
+          <Btn variant="secondary" onClick={carregar}>↻ Atualizar</Btn>
+          <Btn loading={gerandoPDF} onClick={gerarPDF}>🖨 Gerar PDF / Imprimir</Btn>
+        </div>}/>
 
       <div style={{display:'flex',gap:10,marginBottom:20,flexWrap:'wrap'}}>
         <input value={busca} onChange={e=>setBusca(e.target.value)}
