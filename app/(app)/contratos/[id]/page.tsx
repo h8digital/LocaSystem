@@ -623,9 +623,9 @@ export default function VerContratoPage() {
                   {l:'Frete',    v:fmt.money(contrato.frete??0), c:Number(contrato.frete)>0?'var(--c-warning-text)':'var(--t-muted)', bold:false},
                   {l:'Caucao',   v:fmt.money(contrato.caucao),   c:'var(--t-secondary)', bold:false},
                 ].map(k=>(
-                  <div key={k.l} className="ds-card" style={{padding:'12px 14px'}}>
+                  <div key={k.l} className="ds-card" style={{padding:'12px 14px',borderTop: k.l==='Total'?'3px solid var(--c-primary)':undefined}}>
                     <div style={{fontSize:'var(--fs-xs)',fontWeight:700,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>{k.l==='Caucao'?'Caução':k.l}</div>
-                    <div style={{fontWeight:k.bold?800:700,fontSize:k.bold?'var(--fs-lg)':'var(--fs-base)',color:k.c}}>{k.v}</div>
+                    <div style={{fontWeight:700,fontSize:k.bold?'20px':'var(--fs-base)',color:k.c}}>{k.v}</div>
                   </div>
                 ))}
               </div>
@@ -633,12 +633,19 @@ export default function VerContratoPage() {
               {/* Informações Gerais */}
               <div className="ds-card" style={{padding:'16px 20px'}}>
                 <div className="ds-section-title">Informações Gerais</div>
-                <div className="form-grid-3" style={{gap:18}}>
+                <div className="form-grid-2" style={{gap:14}}>
                   <Campo label="Cliente"            value={contrato.clientes?.nome}/>
                   <Campo label="Vendedor"           value={(contrato.usuarios as any)?.nome}/>
                   <Campo label="Forma de Pagamento" value={(contrato.forma_pagamento??'').replace(/_/g,' ').replace(/\w/g,(ch:string)=>ch.toUpperCase())}/>
                   <Campo label="Início"             value={fmt.date(contrato.data_inicio)}/>
-                  <Campo label="Fim Previsto"       value={fmt.date(contrato.data_fim)}/>
+                  <div style={{display:'flex',flexDirection:'column',gap:3}}>
+                    <span style={{fontSize:'var(--fs-xs)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em',
+                      color: contrato.status==='ativo'&&contrato.data_fim<new Date().toISOString().split('T')[0] ? 'var(--c-danger)' : 'var(--t-muted)'
+                    }}>Fim Previsto {contrato.status==='ativo'&&contrato.data_fim<new Date().toISOString().split('T')[0]?'⚠':''}</span>
+                    <span style={{fontSize:'var(--fs-base)',fontWeight:600,
+                      color: contrato.status==='ativo'&&contrato.data_fim<new Date().toISOString().split('T')[0] ? 'var(--c-danger)' : 'var(--t-primary)'
+                    }}>{fmt.date(contrato.data_fim)}</span>
+                  </div>
                   <Campo label="Período de Locação" value={(contrato as any).periodos_locacao?.nome?`${(contrato as any).periodos_locacao.nome} (${(contrato as any).periodos_locacao.dias}d)`:'—'}/>
                   {contrato.data_devolucao_real&&<Campo label="Devolução Real" value={fmt.date(contrato.data_devolucao_real)}/>}
                   {Number(contrato.comissao_percentual)>0&&<Campo label={`Comissão (${contrato.comissao_percentual}%)`} value={fmt.money(contrato.comissao_valor)}/>}
@@ -647,7 +654,7 @@ export default function VerContratoPage() {
                 {contrato.observacoes&&(
                   <div style={{marginTop:16,paddingTop:14,borderTop:'1px solid var(--border)'}}>
                     <div style={{fontSize:'var(--fs-xs)',fontWeight:700,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:6}}>Observações</div>
-                    <div style={{fontSize:'var(--fs-base)',color:'var(--t-secondary)',lineHeight:1.6}}>{contrato.observacoes}</div>
+                    <div style={{fontSize:'var(--fs-md)',color:'var(--t-secondary)',lineHeight:1.6,background:'var(--bg-header)',padding:'8px 12px',borderRadius:'var(--r-sm)',borderLeft:'3px solid var(--c-primary)'}}>{contrato.observacoes}</div>
                   </div>
                 )}
               </div>
@@ -655,7 +662,7 @@ export default function VerContratoPage() {
               {/* Local de Uso */}
               {(enderecoUso||contrato.local_uso_referencia)&&(
                 <div className="ds-card" style={{padding:'16px 20px'}}>
-                  <div className="ds-section-title">Local de Uso dos Equipamentos</div>
+                  <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:12}}><span style={{fontSize:16}}>📍</span><span className="ds-section-title" style={{marginBottom:0}}>Local de Uso dos Equipamentos</span></div>
                   <div className="form-grid-2" style={{gap:14}}>
                     {enderecoUso&&(
                       <div style={{gridColumn:'span 2'}}>

@@ -12,6 +12,7 @@ const nav = [
   {href:'/equipamentos', icon:'🔧', label:'Equipamentos',  section:'ESTOQUE'},
   {href:'/manutencoes',  icon:'🔩', label:'Manutenções',   section:null},
   {href:'/relatorios',   icon:'📊', label:'Relatórios',    section:'RELATÓRIOS'},
+  {href:'/relatorios/equipamentos', icon:'📦', label:'Catálogo de Equipamentos', section:null},
   {href:'/templates',    icon:'📋', label:'Templates',     section:'DOCUMENTOS'},
   {href:'/usuarios',     icon:'👤', label:'Usuários',      section:'SISTEMA'},
   {href:'/parametros',   icon:'⚙️', label:'Parâmetros',    section:null},
