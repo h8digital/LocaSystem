@@ -387,6 +387,57 @@ export default function EquipamentosPage() {
   const pagLista  = lista.slice((pagina - 1) * PER, pagina * PER)
 
   // ─────────────────────────────────────────────────────────────────────────
+  // ── Upload de foto ─────────────────────────────────────────────────────────
+  async function uploadFoto(file: File) {
+    if (!editId) return
+    if (file.size > 5 * 1024 * 1024) { alert('Arquivo muito grande. Limite: 5MB.'); return }
+    setUploadando(true)
+    const ext  = file.name.split('.').pop() ?? 'jpg'
+    const path = `${editId}/${Date.now()}.${ext}`
+    const { error: upErr } = await supabase.storage
+      .from('produto-fotos').upload(path, file, { upsert: false })
+    if (upErr) { alert('Erro no upload: ' + upErr.message); setUploadando(false); return }
+    const { data: { publicUrl } } = supabase.storage.from('produto-fotos').getPublicUrl(path)
+    const isPrimeira = fotos.length === 0
+    const { error: dbErr } = await supabase.from('produto_fotos').insert({
+      produto_id:   editId,
+      storage_path: path,
+      url:          publicUrl,
+      principal:    isPrimeira,
+      ordem:        fotos.length,
+    })
+    if (dbErr) { alert('Erro ao salvar: ' + dbErr.message) }
+    else {
+      const { data: fs } = await supabase.from('produto_fotos').select('*')
+        .eq('produto_id', editId).order('created_at')
+      setFotos(fs ?? [])
+      load() // atualiza a thumbnail na listagem
+    }
+    setUploadando(false)
+  }
+
+  async function excluirFoto(foto: any) {
+    if (!confirm('Excluir esta foto?')) return
+    await supabase.storage.from('produto-fotos').remove([foto.storage_path])
+    await supabase.from('produto_fotos').delete().eq('id', foto.id)
+    const restantes = fotos.filter((f:any) => f.id !== foto.id)
+    // Se era a principal e há outras, marcar a primeira como principal
+    if (foto.principal && restantes.length > 0) {
+      await supabase.from('produto_fotos').update({ principal: true }).eq('id', restantes[0].id)
+      restantes[0].principal = true
+    }
+    setFotos(restantes)
+    load()
+  }
+
+  async function marcarPrincipal(foto: any) {
+    await supabase.from('produto_fotos').update({ principal: false }).eq('produto_id', editId)
+    await supabase.from('produto_fotos').update({ principal: true }).eq('id', foto.id)
+    setFotos(prev => prev.map((f:any) => ({ ...f, principal: f.id === foto.id })))
+    load()
+  }
+
+
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
 
@@ -1312,54 +1363,3 @@ export default function EquipamentosPage() {
     </div>
   )
 }
-  // ── Upload de foto ─────────────────────────────────────────────────────────
-  async function uploadFoto(file: File) {
-    if (!editId) return
-    if (file.size > 5 * 1024 * 1024) { alert('Arquivo muito grande. Limite: 5MB.'); return }
-    setUploadando(true)
-    const ext  = file.name.split('.').pop() ?? 'jpg'
-    const path = `${editId}/${Date.now()}.${ext}`
-    const { error: upErr } = await supabase.storage
-      .from('produto-fotos').upload(path, file, { upsert: false })
-    if (upErr) { alert('Erro no upload: ' + upErr.message); setUploadando(false); return }
-    const { data: { publicUrl } } = supabase.storage.from('produto-fotos').getPublicUrl(path)
-    const isPrimeira = fotos.length === 0
-    const { error: dbErr } = await supabase.from('produto_fotos').insert({
-      produto_id:   editId,
-      storage_path: path,
-      url:          publicUrl,
-      principal:    isPrimeira,
-      ordem:        fotos.length,
-    })
-    if (dbErr) { alert('Erro ao salvar: ' + dbErr.message) }
-    else {
-      const { data: fs } = await supabase.from('produto_fotos').select('*')
-        .eq('produto_id', editId).order('created_at')
-      setFotos(fs ?? [])
-      load() // atualiza a thumbnail na listagem
-    }
-    setUploadando(false)
-  }
-
-  async function excluirFoto(foto: any) {
-    if (!confirm('Excluir esta foto?')) return
-    await supabase.storage.from('produto-fotos').remove([foto.storage_path])
-    await supabase.from('produto_fotos').delete().eq('id', foto.id)
-    const restantes = fotos.filter((f:any) => f.id !== foto.id)
-    // Se era a principal e há outras, marcar a primeira como principal
-    if (foto.principal && restantes.length > 0) {
-      await supabase.from('produto_fotos').update({ principal: true }).eq('id', restantes[0].id)
-      restantes[0].principal = true
-    }
-    setFotos(restantes)
-    load()
-  }
-
-  async function marcarPrincipal(foto: any) {
-    await supabase.from('produto_fotos').update({ principal: false }).eq('produto_id', editId)
-    await supabase.from('produto_fotos').update({ principal: true }).eq('id', foto.id)
-    setFotos(prev => prev.map((f:any) => ({ ...f, principal: f.id === foto.id })))
-    load()
-  }
-
-
