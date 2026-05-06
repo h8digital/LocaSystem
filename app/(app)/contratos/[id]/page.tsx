@@ -1077,6 +1077,167 @@ export default function VerContratoPage() {
           )}
 
 
+      {/* ── Modal de Edição do Contrato (Aditivo) ───────────────────────── */}
+      {painelEditar && (
+        <div style={{
+          position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1000,
+          display:'flex', alignItems:'center', justifyContent:'center', padding:20,
+        }} onClick={e => { if (e.target === e.currentTarget) setPainelEditar(false) }}>
+          <div style={{
+            background:'var(--bg-card)', borderRadius:'var(--r-lg)', width:'100%', maxWidth:580,
+            boxShadow:'0 20px 60px rgba(0,0,0,0.3)', overflow:'hidden', maxHeight:'90vh', overflowY:'auto',
+          }}>
+            {/* Header */}
+            <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)',
+              display:'flex', justifyContent:'space-between', alignItems:'center',
+              background:'var(--bg-header)', position:'sticky', top:0, zIndex:1 }}>
+              <div>
+                <div style={{ fontWeight:700, fontSize:'var(--fs-base)' }}>✏️ Alterar Contrato</div>
+                <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginTop:2 }}>
+                  As alterações serão registradas como aditivo na timeline.
+                </div>
+              </div>
+              <button onClick={() => setPainelEditar(false)}
+                style={{ background:'none', border:'none', cursor:'pointer', fontSize:20,
+                  color:'var(--t-muted)', lineHeight:1 }}>×</button>
+            </div>
+
+            <div style={{ padding:'20px', display:'flex', flexDirection:'column', gap:16 }}>
+              {erroEdicao && <div className="ds-alert-error">{erroEdicao}</div>}
+
+              {/* Período e datas */}
+              <div className="ds-card" style={{ padding:'14px 16px' }}>
+                <div style={{ fontWeight:700, fontSize:'var(--fs-sm)', color:'var(--t-muted)',
+                  textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:12 }}>
+                  📅 Período e Datas
+                </div>
+
+                <FormField label="Período de Locação"
+                  hint={formEdicao.periodo_id !== contrato?.periodo_id ? '⚠️ Mudança de período recalcula os preços de todos os itens.' : ''}>
+                  <select value={formEdicao.periodo_id ?? ''}
+                    onChange={e => setFormEdicao((f:any) => ({ ...f, periodo_id: e.target.value }))}
+                    className={selectCls}>
+                    <option value="">Sem período definido</option>
+                    {periodos.map((p:any) => (
+                      <option key={p.id} value={p.id}>{p.nome} ({p.dias}d)</option>
+                    ))}
+                  </select>
+                </FormField>
+
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginTop:12 }}>
+                  <FormField label="Data de Início">
+                    <input type="date" value={formEdicao.data_inicio ?? ''}
+                      onChange={e => setFormEdicao((f:any) => ({ ...f, data_inicio: e.target.value }))}
+                      className={inputCls} />
+                  </FormField>
+                  <FormField label="Previsão de Devolução">
+                    <input type="date" value={formEdicao.data_fim ?? ''}
+                      onChange={e => setFormEdicao((f:any) => ({ ...f, data_fim: e.target.value }))}
+                      className={inputCls} />
+                  </FormField>
+                </div>
+
+                {/* Preview do novo total quando período muda */}
+                {formEdicao.periodo_id && String(formEdicao.periodo_id) !== String(contrato?.periodo_id) && (
+                  <div style={{ marginTop:10, padding:'8px 12px', background:'var(--c-warning-light)',
+                    border:'1px solid var(--c-warning)', borderRadius:'var(--r-sm)',
+                    fontSize:'var(--fs-sm)', color:'var(--c-warning-text)' }}>
+                    ⚠️ O período foi alterado de <strong>{periodos.find((p:any)=>String(p.id)===String(contrato?.periodo_id))?.nome ?? 'sem período'}</strong> para <strong>{periodos.find((p:any)=>String(p.id)===String(formEdicao.periodo_id))?.nome}</strong>.
+                    Os preços de todos os itens serão recalculados ao salvar.
+                  </div>
+                )}
+              </div>
+
+              {/* Financeiro */}
+              <div className="ds-card" style={{ padding:'14px 16px' }}>
+                <div style={{ fontWeight:700, fontSize:'var(--fs-sm)', color:'var(--t-muted)',
+                  textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:12 }}>
+                  💰 Ajustes Financeiros
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                  <FormField label="Desconto (R$)">
+                    <input type="number" step="0.01" min="0"
+                      value={formEdicao.desconto ?? 0}
+                      onChange={e => setFormEdicao((f:any) => ({ ...f, desconto: e.target.value }))}
+                      className={inputCls} />
+                  </FormField>
+                  <FormField label="Acréscimo (R$)">
+                    <input type="number" step="0.01" min="0"
+                      value={formEdicao.acrescimo ?? 0}
+                      onChange={e => setFormEdicao((f:any) => ({ ...f, acrescimo: e.target.value }))}
+                      className={inputCls} />
+                  </FormField>
+                  <FormField label="Frete (R$)">
+                    <input type="number" step="0.01" min="0"
+                      value={formEdicao.frete ?? 0}
+                      onChange={e => setFormEdicao((f:any) => ({ ...f, frete: e.target.value }))}
+                      className={inputCls} />
+                  </FormField>
+                  <FormField label="Caução (R$)">
+                    <input type="number" step="0.01" min="0"
+                      value={formEdicao.caucao ?? 0}
+                      onChange={e => setFormEdicao((f:any) => ({ ...f, caucao: e.target.value }))}
+                      className={inputCls} />
+                  </FormField>
+                </div>
+              </div>
+
+              {/* Pagamento */}
+              <div className="ds-card" style={{ padding:'14px 16px' }}>
+                <div style={{ fontWeight:700, fontSize:'var(--fs-sm)', color:'var(--t-muted)',
+                  textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:12 }}>
+                  🏦 Pagamento
+                </div>
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                  <FormField label="Forma de Pagamento">
+                    <select value={formEdicao.forma_pagamento ?? 'pix'}
+                      onChange={e => setFormEdicao((f:any) => ({ ...f, forma_pagamento: e.target.value }))}
+                      className={selectCls}>
+                      {['pix','dinheiro','cartao_debito','cartao_credito','transferencia','boleto','cheque'].map(fp => (
+                        <option key={fp} value={fp}>{fp.replace(/_/g,' ').replace(/\b\w/g,(ch:string)=>ch.toUpperCase())}</option>
+                      ))}
+                    </select>
+                  </FormField>
+                  <FormField label="Condição de Pagamento">
+                    <input value={formEdicao.condicao_pagamento ?? ''}
+                      onChange={e => setFormEdicao((f:any) => ({ ...f, condicao_pagamento: e.target.value }))}
+                      className={inputCls} placeholder="Ex: 30/60 dias" />
+                  </FormField>
+                </div>
+              </div>
+
+              {/* Observações */}
+              <div className="ds-card" style={{ padding:'14px 16px' }}>
+                <div style={{ fontWeight:700, fontSize:'var(--fs-sm)', color:'var(--t-muted)',
+                  textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:12 }}>
+                  📝 Observações
+                </div>
+                <FormField label="Observações (visível no contrato)">
+                  <textarea value={formEdicao.observacoes ?? ''}
+                    onChange={e => setFormEdicao((f:any) => ({ ...f, observacoes: e.target.value }))}
+                    rows={3} className={textareaCls} />
+                </FormField>
+                <FormField label="Observações Internas" style={{ marginTop:10 }}>
+                  <textarea value={formEdicao.observacoes_internas ?? ''}
+                    onChange={e => setFormEdicao((f:any) => ({ ...f, observacoes_internas: e.target.value }))}
+                    rows={2} className={textareaCls} placeholder="Visível apenas internamente" />
+                </FormField>
+              </div>
+
+              {/* Ações */}
+              <div style={{ display:'flex', gap:8 }}>
+                <Btn loading={salvandoEdicao} onClick={salvarEdicao} style={{ flex:1 }}>
+                  💾 Salvar Alterações
+                </Btn>
+                <Btn variant="secondary" onClick={() => setPainelEditar(false)}>
+                  Cancelar
+                </Btn>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* ── Modal de Pagamento ──────────────────────────────────────────── */}
       {painelPgto && faturaAlvo && (
         <div style={{
