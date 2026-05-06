@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 type Equip = {
   id:number; nome:string; descricao?:string; marca?:string; modelo?:string
   controla_patrimonio:number; ativo:number
-  categorias?:{id:number;nome:string}
+  categorias?:{id:number;nome:string} | {id:number;nome:string}[] | null
   produto_fotos?:{url:string;principal:boolean}[]
 }
 
@@ -30,7 +30,7 @@ export default function RelatorioEquipamentosPage() {
       .select('id,nome,descricao,marca,modelo,controla_patrimonio,ativo,categorias(id,nome),produto_fotos(url,principal)')
       .eq('ativo', 1)
       .order('nome')
-    setEquips(data ?? [])
+    setEquips((data ?? []) as any as Equip[])
 
     // Parâmetros da empresa
     const { data: params } = await supabase.from('parametros').select('chave,valor')
@@ -46,11 +46,23 @@ export default function RelatorioEquipamentosPage() {
   }
 
   const filtrados = equips.filter(e => {
-    const okCat   = !catFiltro || String(e.categorias?.id) === catFiltro
+    const okCat   = !catFiltro || catId(e) === catFiltro
     const okBusca = !busca || e.nome.toLowerCase().includes(busca.toLowerCase()) ||
                     (e.marca??'').toLowerCase().includes(busca.toLowerCase())
     return okCat && okBusca
   })
+
+  function catNome(e: Equip): string {
+    if (!e.categorias) return '—'
+    if (Array.isArray(e.categorias)) return (e.categorias[0] as any)?.nome ?? '—'
+    return (e.categorias as any).nome ?? '—'
+  }
+
+  function catId(e: Equip): string {
+    if (!e.categorias) return ''
+    if (Array.isArray(e.categorias)) return String((e.categorias[0] as any)?.id ?? '')
+    return String((e.categorias as any).id ?? '')
+  }
 
   function fotoUrl(e: Equip) {
     const fotos = e.produto_fotos ?? []
@@ -76,7 +88,7 @@ export default function RelatorioEquipamentosPage() {
       return `<tr>
         <td style="padding:6px 8px;border-bottom:1px solid #eee;vertical-align:middle">${imgTag}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #eee;font-weight:600;vertical-align:middle">${e.nome}</td>
-        <td style="padding:6px 8px;border-bottom:1px solid #eee;color:#666;vertical-align:middle">${e.categorias?.nome??'—'}</td>
+        <td style="padding:6px 8px;border-bottom:1px solid #eee;color:#666;vertical-align:middle">${catNome(e)}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #eee;color:#666;vertical-align:middle">${e.marca??'—'}</td>
         <td style="padding:6px 8px;border-bottom:1px solid #eee;color:#444;font-size:8pt;vertical-align:middle;max-width:180px">${e.descricao??''}</td>
       </tr>`
@@ -174,7 +186,7 @@ export default function RelatorioEquipamentosPage() {
                       }
                     </td>
                     <td style={{padding:'10px 14px',fontWeight:600,fontSize:'var(--fs-md)'}}>{e.nome}</td>
-                    <td style={{padding:'10px 14px',color:'var(--t-muted)',fontSize:'var(--fs-sm)'}}>{e.categorias?.nome??'—'}</td>
+                    <td style={{padding:'10px 14px',color:'var(--t-muted)',fontSize:'var(--fs-sm)'}}>{catNome(e)}</td>
                     <td style={{padding:'10px 14px',color:'var(--t-muted)',fontSize:'var(--fs-sm)'}}>{e.marca??'—'}</td>
                     <td style={{padding:'10px 14px',color:'var(--t-secondary)',fontSize:'var(--fs-sm)',maxWidth:200}}>
                       {e.descricao ? <span style={{display:'-webkit-box',WebkitLineClamp:2,WebkitBoxOrient:'vertical',overflow:'hidden'}}>{e.descricao}</span> : '—'}
