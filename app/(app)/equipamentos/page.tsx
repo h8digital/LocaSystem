@@ -789,10 +789,11 @@ export default function EquipamentosPage() {
           {([
             ['info',      '📋 Informações'],
             ['precos',    '💰 Preços'],
+            ...(editId ? [['fotos', `🖼️ Fotos${fotos.length>0?' ('+fotos.length+')':''}`]] : []),
             ...(editId && Number(form.controla_patrimonio)===1
               ? [['inventario', `🏷️ Inventário${patsPanel.length>0?' ('+patsPanel.length+')':''}`]]
               : []),
-          ] as ['info'|'precos'|'inventario',string][]).map(([k,l]) => (
+          ] as ['info'|'precos'|'fotos'|'inventario',string][]).map(([k,l]) => (
             <button key={k} onClick={() => {
               setAba(k)
               if (k==='inventario' && editId) carregarPatsPanel(editId)
@@ -1042,6 +1043,73 @@ export default function EquipamentosPage() {
           </div>
         )}
 
+
+        {/* ── ABA: FOTOS ──────────────────────────────────────────────── */}
+        {aba === 'fotos' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+            {/* Upload */}
+            <div style={{ border:'2px dashed var(--border)', borderRadius:'var(--r-lg)',
+              padding:'24px', textAlign:'center', cursor:'pointer', transition:'all .15s',
+              background: uploadando ? 'var(--bg-header)' : 'var(--bg-card)' }}
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => { e.preventDefault(); const f=e.dataTransfer.files[0]; if(f) uploadFoto(f) }}
+              onClick={() => document.getElementById('foto-input')?.click()}>
+              <input id="foto-input" type="file" accept="image/*" style={{ display:'none' }}
+                onChange={e => { const f=e.target.files?.[0]; if(f) uploadFoto(f); e.target.value='' }} />
+              {uploadando
+                ? <div style={{ color:'var(--t-muted)' }}><div className="ds-dots"><span/><span/><span/></div>Enviando...</div>
+                : <div>
+                    <div style={{ fontSize:32, marginBottom:8 }}>🖼️</div>
+                    <div style={{ fontWeight:600, fontSize:'var(--fs-base)', color:'var(--t-primary)', marginBottom:4 }}>
+                      Clique ou arraste uma imagem aqui
+                    </div>
+                    <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)' }}>
+                      JPG, PNG, WEBP — máximo 5MB
+                    </div>
+                  </div>
+              }
+            </div>
+
+            {/* Galeria */}
+            {fotos.length === 0
+              ? <div style={{ textAlign:'center', padding:'20px', color:'var(--t-muted)', fontSize:'var(--fs-md)' }}>
+                  Nenhuma foto cadastrada. Clique acima para adicionar.
+                </div>
+              : <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12 }}>
+                  {fotos.map((foto:any) => (
+                    <div key={foto.id} style={{ position:'relative', borderRadius:'var(--r-md)',
+                      overflow:'hidden', border: foto.principal ? '2px solid var(--c-primary)' : '1px solid var(--border)',
+                      aspectRatio:'4/3', background:'var(--bg-header)' }}>
+                      <img src={foto.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                      {foto.principal && (
+                        <div style={{ position:'absolute', top:6, left:6, padding:'2px 7px',
+                          background:'var(--c-primary)', color:'#fff', borderRadius:99,
+                          fontSize:'var(--fs-xs)', fontWeight:700 }}>★ Principal</div>
+                      )}
+                      <div style={{ position:'absolute', bottom:0, left:0, right:0,
+                        background:'rgba(0,0,0,0.55)', display:'flex', gap:6, padding:'6px 8px' }}>
+                        {!foto.principal && (
+                          <button onClick={() => marcarPrincipal(foto)}
+                            style={{ flex:1, padding:'4px', borderRadius:'var(--r-sm)', border:'none',
+                              background:'rgba(255,255,255,0.15)', color:'#fff', fontSize:'var(--fs-xs)',
+                              cursor:'pointer', fontWeight:600 }}>
+                            ★ Principal
+                          </button>
+                        )}
+                        <button onClick={() => excluirFoto(foto)}
+                          style={{ padding:'4px 8px', borderRadius:'var(--r-sm)', border:'none',
+                            background:'rgba(220,38,38,0.7)', color:'#fff', fontSize:'var(--fs-xs)',
+                            cursor:'pointer' }}>
+                          🗑
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+            }
+          </div>
+        )}
         {/* ── ABA: INVENTÁRIO ─────────────────────────────────────────── */}
         {aba === 'inventario' && editId && (
           <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
@@ -1244,3 +1312,54 @@ export default function EquipamentosPage() {
     </div>
   )
 }
+  // ── Upload de foto ─────────────────────────────────────────────────────────
+  async function uploadFoto(file: File) {
+    if (!editId) return
+    if (file.size > 5 * 1024 * 1024) { alert('Arquivo muito grande. Limite: 5MB.'); return }
+    setUploadando(true)
+    const ext  = file.name.split('.').pop() ?? 'jpg'
+    const path = `${editId}/${Date.now()}.${ext}`
+    const { error: upErr } = await supabase.storage
+      .from('produto-fotos').upload(path, file, { upsert: false })
+    if (upErr) { alert('Erro no upload: ' + upErr.message); setUploadando(false); return }
+    const { data: { publicUrl } } = supabase.storage.from('produto-fotos').getPublicUrl(path)
+    const isPrimeira = fotos.length === 0
+    const { error: dbErr } = await supabase.from('produto_fotos').insert({
+      produto_id:   editId,
+      storage_path: path,
+      url:          publicUrl,
+      principal:    isPrimeira,
+      ordem:        fotos.length,
+    })
+    if (dbErr) { alert('Erro ao salvar: ' + dbErr.message) }
+    else {
+      const { data: fs } = await supabase.from('produto_fotos').select('*')
+        .eq('produto_id', editId).order('created_at')
+      setFotos(fs ?? [])
+      load() // atualiza a thumbnail na listagem
+    }
+    setUploadando(false)
+  }
+
+  async function excluirFoto(foto: any) {
+    if (!confirm('Excluir esta foto?')) return
+    await supabase.storage.from('produto-fotos').remove([foto.storage_path])
+    await supabase.from('produto_fotos').delete().eq('id', foto.id)
+    const restantes = fotos.filter((f:any) => f.id !== foto.id)
+    // Se era a principal e há outras, marcar a primeira como principal
+    if (foto.principal && restantes.length > 0) {
+      await supabase.from('produto_fotos').update({ principal: true }).eq('id', restantes[0].id)
+      restantes[0].principal = true
+    }
+    setFotos(restantes)
+    load()
+  }
+
+  async function marcarPrincipal(foto: any) {
+    await supabase.from('produto_fotos').update({ principal: false }).eq('produto_id', editId)
+    await supabase.from('produto_fotos').update({ principal: true }).eq('id', foto.id)
+    setFotos(prev => prev.map((f:any) => ({ ...f, principal: f.id === foto.id })))
+    load()
+  }
+
+
