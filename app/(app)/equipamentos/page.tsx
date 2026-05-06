@@ -83,7 +83,7 @@ export default function EquipamentosPage() {
   const [saving,     setSaving]     = useState(false)
   const [erro,       setErro]       = useState('')
   const [catNome,    setCatNome]    = useState('')
-  const [aba,        setAba]        = useState<'info'|'precos'|'inventario'>('info')
+  const [aba,        setAba]        = useState<'info'|'precos'|'fotos'|'inventario'>('info')
   // ── Inventário no painel ──────────────────────────────────────────────────
   const [patsPanel,     setPatsPanel]     = useState<any[]>([])
   const [patsLoading,   setPatsLoading]   = useState(false)
