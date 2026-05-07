@@ -140,8 +140,7 @@ export async function GET(req: NextRequest) {
     })
     if (saveErr) return NextResponse.json({ ok:false, error:'Erro ao salvar: '+saveErr.message })
 
-    const appUrl = process.env.NEXTAUTH_URL??process.env.NEXT_PUBLIC_APP_URL??''
-    return NextResponse.json({ ok:true, url:`${appUrl}/doc/${token}`, token })
+    return NextResponse.json({ ok:true, token })
 
   } catch(e:any) {
     return NextResponse.json({ ok:false, error:e.message })

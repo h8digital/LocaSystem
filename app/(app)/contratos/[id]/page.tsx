@@ -978,7 +978,7 @@ export default function VerContratoPage() {
                             try {
                               const res = await fetch(`/api/documentos/recibo-devolucao?devolucao_id=${dev.id}`)
                               const data = await res.json()
-                              if (data.ok && data.url) window.open(data.url,'_blank')
+                              if (data.ok && data.token) window.open(`${window.location.origin}/doc/${data.token}`,'_blank')
                               else alert('Erro ao gerar recibo: '+(data.error??'Tente novamente'))
                             } finally {
                               btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>'
