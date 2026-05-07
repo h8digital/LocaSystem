@@ -7,181 +7,253 @@ const sb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-function fmt_money(v: number) {
-  return 'R$ ' + Number(v).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+function fmtMoney(v: number) {
+  return 'R$ ' + Number(v||0).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.')
 }
-
-function fmt_date(s: string) {
+function fmtDate(s: string) {
   if (!s) return '—'
-  const d = new Date(s.includes('T') ? s : s + 'T12:00:00')
-  return d.toLocaleDateString('pt-BR')
+  return new Date(s.includes('T') ? s : s + 'T12:00:00').toLocaleDateString('pt-BR')
 }
-
-function fmt_datetime(s: string) {
+function fmtDatetime(s: string) {
   if (!s) return '—'
-  return new Date(s).toLocaleString('pt-BR', { dateStyle:'short', timeStyle:'short' })
+  return new Date(s).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
 }
 
 // GET /api/documentos/recibo-devolucao?devolucao_id=X
 export async function GET(req: NextRequest) {
   try {
     const devolucao_id = req.nextUrl.searchParams.get('devolucao_id')
-    if (!devolucao_id) return NextResponse.json({ ok:false, error:'devolucao_id obrigatório' })
+    if (!devolucao_id) return NextResponse.json({ ok: false, error: 'devolucao_id obrigatório' })
 
-    // Carregar devolução com itens e contrato
-    const { data: dev } = await sb.from('devolucoes')
-      .select(`*, usuarios(nome), contratos(
-        numero, data_inicio, data_fim, cliente_id,
-        clientes(nome, cpf_cnpj, email, celular, telefone),
-        usuarios(nome)
-      )`)
-      .eq('id', devolucao_id).single()
+    // ── Carregar devolução com contrato e cliente ────────────────────────────
+    const { data: dev, error: devErr } = await sb
+      .from('devolucoes')
+      .select(`
+        *,
+        usuarios(nome),
+        contratos(
+          id, numero, data_inicio, data_fim,
+          clientes(nome, cpf_cnpj, email, celular, telefone)
+        )
+      `)
+      .eq('id', devolucao_id)
+      .single()
 
-    if (!dev) return NextResponse.json({ ok:false, error:'Devolução não encontrada' })
+    if (devErr || !dev) return NextResponse.json({ ok: false, error: 'Devolução não encontrada.' })
 
-    const { data: itens } = await sb.from('devolucao_itens')
-      .select('*, patrimonios(numero_patrimonio), contrato_itens(produto_id, produtos(nome))')
+    // ── Carregar itens devolvidos nesta devolução ────────────────────────────
+    const { data: itens } = await sb
+      .from('devolucao_itens')
+      .select(`
+        *,
+        patrimonios(numero_patrimonio, numero_serie),
+        contrato_itens(
+          quantidade, preco_unitario,
+          produtos(nome, marca, modelo)
+        )
+      `)
       .eq('devolucao_id', devolucao_id)
 
+    // ── Parâmetros da empresa ────────────────────────────────────────────────
     const { data: params } = await sb.from('parametros').select('chave,valor')
-    const p: Record<string,string> = {}
-    ;(params ?? []).forEach((x:any) => { p[x.chave] = x.valor })
+    const p: Record<string, string> = {}
+    ;(params ?? []).forEach((x: any) => { p[x.chave] = x.valor })
 
     const contrato = (dev as any).contratos ?? {}
     const cliente  = contrato.clientes ?? {}
 
-    // Montar linhas de itens para o recibo
-    const linhasItens = (itens ?? []).map((i:any) => {
-      const nome = (i.contrato_itens as any)?.produtos?.nome ?? '—'
-      const pat  = (i.patrimonios as any)?.numero_patrimonio ?? '—'
-      const cond = i.condicao === 'perdido' ? 'Extraviado' : i.condicao === 'manutencao' ? 'Avariado' : 'Bom Estado'
-      const qtd  = Number(i.quantidade_devolvida ?? 1)
+    // ── Gerar linhas da tabela de itens ─────────────────────────────────────
+    const linhasItens = (itens ?? []).map((item: any) => {
+      const prod  = item.contrato_itens?.produtos ?? {}
+      const pat   = item.patrimonios
+      const nome  = prod.nome ?? '—'
+      const marca = prod.marca ? `${prod.marca}${prod.modelo ? ' ' + prod.modelo : ''}` : '—'
+      const numPat = pat?.numero_patrimonio ?? '—'
+      const numSerie = pat?.numero_serie ?? '—'
+      const qtd   = Number(item.quantidade_devolvida ?? 1)
+
+      const condMap: Record<string, { label: string; cor: string }> = {
+        bom:       { label: 'Bom Estado',  cor: '#166534' },
+        avariado:  { label: 'Avariado',    cor: '#92400e' },
+        perdido:   { label: 'Extraviado',  cor: '#991b1b' },
+        manutencao:{ label: 'Manutenção',  cor: '#92400e' },
+      }
+      const cond = condMap[item.condicao] ?? { label: item.condicao ?? '—', cor: '#555' }
+      const custoAvaria = Number(item.custo_avaria ?? 0)
+
       return `
         <tr>
-          <td style="padding:5px 8px;border-bottom:1px solid #eee">${nome}</td>
-          <td style="padding:5px 8px;border-bottom:1px solid #eee;font-family:monospace;text-align:center">${pat}</td>
+          <td style="padding:5px 8px;border-bottom:1px solid #eee;font-weight:600">${nome}</td>
+          <td style="padding:5px 8px;border-bottom:1px solid #eee;color:#555">${marca}</td>
+          <td style="padding:5px 8px;border-bottom:1px solid #eee;font-family:monospace;text-align:center">${numPat}</td>
+          <td style="padding:5px 8px;border-bottom:1px solid #eee;font-family:monospace;text-align:center;font-size:8pt;color:#666">${numSerie !== '—' ? numSerie : '—'}</td>
           <td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:center">${qtd}</td>
-          <td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:center;
-            color:${i.condicao==='bom'?'#166534':i.condicao==='perdido'?'#991b1b':'#92400e'};font-weight:600">
-            ${cond}
+          <td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:center;color:${cond.cor};font-weight:700">${cond.label}</td>
+          <td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:right;${custoAvaria > 0 ? 'color:#b45309;font-weight:700' : 'color:#999'}">
+            ${custoAvaria > 0 ? fmtMoney(custoAvaria) : '—'}
           </td>
-          ${i.custo_avaria>0?`<td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:right;color:#b45309;font-weight:600">${fmt_money(i.custo_avaria)}</td>`:'<td style="padding:5px 8px;border-bottom:1px solid #eee;text-align:right;color:#999">—</td>'}
         </tr>`
     }).join('')
 
-    const totalMulata = Number(dev.multa_atraso ?? 0)
-    const totalAvaria = Number(dev.valor_avarias ?? 0)
-    const totalExtras = totalMulata + totalAvaria
+    const multa   = Number(dev.multa_atraso ?? 0)
+    const avarias = Number(dev.valor_avarias ?? 0)
+    const caucao  = Number(dev.caucao_devolvido ?? 0)
+    const totalExtras = multa + avarias
 
+    // ── Montar HTML do documento ─────────────────────────────────────────────
     const html = `<!DOCTYPE html>
-<html><head><meta charset="utf-8">
-<title>Recibo de Devolução — ${contrato.numero}</title>
+<html lang="pt-BR"><head><meta charset="UTF-8"/>
 <style>
-  *{margin:0;padding:0;box-sizing:border-box}
-  body{font-family:Arial,sans-serif;font-size:9pt;color:#222;padding:15mm}
-  .hdr{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:8mm;padding-bottom:5mm;border-bottom:2px solid #1a56db}
-  h1{font-size:14pt;color:#1a56db;font-weight:700}
-  .sub{font-size:8pt;color:#888;margin-top:2px}
-  .info-box{background:#f5f7fb;border:1px solid #dde2ef;border-radius:4px;padding:4mm;margin-bottom:6mm}
-  .info-grid{display:grid;grid-template-columns:1fr 1fr;gap:4mm}
-  .field label{font-size:7pt;color:#888;text-transform:uppercase;letter-spacing:.04em;display:block}
-  .field span{font-size:9pt;color:#222;font-weight:600}
-  h3{font-size:9pt;color:#1a56db;font-weight:700;text-transform:uppercase;letter-spacing:.05em;margin-bottom:3mm}
-  table{width:100%;border-collapse:collapse;margin-bottom:6mm}
-  th{padding:5px 8px;background:#1a56db;color:#fff;font-size:7.5pt;font-weight:700;text-align:left}
-  th.c,td.c{text-align:center}th.r,td.r{text-align:right}
-  .totais{background:#f5f7fb;border-radius:4px;padding:4mm;margin-bottom:6mm}
-  .totais-row{display:flex;justify-content:space-between;padding:1.5mm 0;font-size:9pt}
-  .totais-row.destaque{font-weight:700;font-size:10pt;border-top:1px solid #dde2ef;margin-top:2mm;padding-top:2mm}
-  .assinaturas{display:grid;grid-template-columns:1fr 1fr;gap:20mm;margin-top:10mm}
-  .assin-box{border-top:1px solid #333;padding-top:3mm;text-align:center;font-size:8pt;color:#555}
-  .badge{display:inline-block;padding:1px 6px;border-radius:99px;font-size:7pt;font-weight:700}
-  .badge-total{background:#dbeafe;color:#1e40af}
-  .badge-parcial{background:#fef3c7;color:#92400e}
-  @media print{body{padding:10mm}}
-</style>
-</head><body>
+*{margin:0;padding:0;box-sizing:border-box}
+body{font-family:Arial,sans-serif;font-size:9pt;color:#111;background:#fff}
+.page{width:210mm;padding:10mm 12mm;display:flex;flex-direction:column;gap:5mm}
+.hdr{display:flex;justify-content:space-between;align-items:flex-start;border-bottom:2px solid #0ea5e9;padding-bottom:4mm}
+.logo{font-size:15pt;font-weight:900;color:#0ea5e9}
+.doc-title{font-size:12pt;font-weight:900;color:#0369a1;text-transform:uppercase;text-align:right}
+.doc-sub{font-size:8pt;color:#555;margin-top:1mm;text-align:right}
+.section{border:1px solid #dde;border-radius:3px;overflow:hidden}
+.section-title{background:#e0f2fe;padding:2mm 3mm;font-weight:700;font-size:8pt;text-transform:uppercase;color:#0369a1;border-bottom:1px solid #dde;letter-spacing:.04em}
+.section-body{padding:3mm 4mm}
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:2mm 6mm}
+.grid-3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:2mm 4mm}
+.fl{font-size:7pt;color:#666;font-weight:700;text-transform:uppercase;letter-spacing:.03em}
+.fv{font-size:9pt;font-weight:600;border-bottom:1px solid #eee;padding-bottom:1mm;margin-top:0.5mm;min-height:4mm}
+table{width:100%;border-collapse:collapse}
+thead th{padding:5px 8px;background:#0369a1;color:#fff;font-size:7.5pt;font-weight:700;text-align:left}
+thead th.c{text-align:center}thead th.r{text-align:right}
+.totais{background:#f0f9ff;border:1px solid #bae6fd;border-radius:3px;padding:3mm 4mm}
+.tot-row{display:flex;justify-content:space-between;font-size:9pt;padding:1mm 0}
+.tot-row.bold{font-weight:700;border-top:1px solid #bae6fd;margin-top:1mm;padding-top:1.5mm}
+.declaracao{font-size:8.5pt;line-height:1.7;text-align:justify;color:#333;background:#f8f9fa;border:1px solid #dee2e6;border-radius:3px;padding:3mm 4mm}
+.assin{display:grid;grid-template-columns:1fr 1fr;gap:16mm;margin-top:4mm}
+.ass-box{border-top:1.5px solid #333;padding-top:2mm;text-align:center}
+.ass-label{font-size:7pt;color:#666}
+.ass-space{height:14mm}
+.footer{padding-top:2mm;border-top:1px solid #ddd;font-size:7pt;color:#888;display:flex;justify-content:space-between}
+.badge{display:inline-block;padding:1px 7px;border-radius:99px;font-size:7.5pt;font-weight:700}
+.badge-total{background:#dbeafe;color:#1e40af}
+.badge-parcial{background:#fef3c7;color:#92400e}
+</style></head>
+<body><div class="page">
 
 <div class="hdr">
   <div>
-    <h1>${p.empresa_nome ?? 'Empresa'}</h1>
-    <div class="sub">Recibo de Devolução de Equipamentos</div>
+    <div class="logo">${p.empresa_nome ?? 'Locadora'}</div>
+    <div style="font-size:7.5pt;color:#555;margin-top:1mm">CNPJ: ${p.empresa_cnpj ?? '—'} &nbsp;|&nbsp; Tel: ${p.empresa_telefone ?? '—'}</div>
+    <div style="font-size:7.5pt;color:#555">${p.empresa_endereco ?? ''}</div>
   </div>
-  <div style="text-align:right;font-size:8pt;color:#555;line-height:1.7">
-    ${p.empresa_cnpj ? `CNPJ: ${p.empresa_cnpj}<br>` : ''}
-    ${p.empresa_telefone ? `Tel: ${p.empresa_telefone}<br>` : ''}
-    ${p.empresa_email ?? ''}
+  <div>
+    <div class="doc-title">✓ Recibo de Devolução</div>
+    <div class="doc-sub">de Equipamentos</div>
+    <div class="doc-sub">Devolução Nº <strong>${devolucao_id}</strong> &nbsp;|&nbsp; Emissão: ${fmtDate(new Date().toISOString())}</div>
   </div>
 </div>
 
-<div class="info-box">
-  <div class="info-grid">
-    <div class="field"><label>Contrato</label><span>${contrato.numero ?? '—'}</span></div>
-    <div class="field"><label>Data da Devolução</label><span>${fmt_datetime(dev.data_devolucao)}</span></div>
-    <div class="field"><label>Cliente</label><span>${cliente.nome ?? '—'}</span></div>
-    <div class="field"><label>CPF/CNPJ</label><span>${cliente.cpf_cnpj ?? '—'}</span></div>
-    <div class="field"><label>Tipo</label>
-      <span class="badge ${dev.tipo==='total'?'badge-total':'badge-parcial'}">
-        ${dev.tipo==='total'?'Devolução Total':'Devolução Parcial'}
-      </span>
+<div class="section">
+  <div class="section-title">Dados da Locação</div>
+  <div class="section-body">
+    <div class="grid-3">
+      <div><div class="fl">Contrato</div><div class="fv" style="font-family:monospace;color:#0369a1;font-weight:800">${contrato.numero ?? '—'}</div></div>
+      <div><div class="fl">Período Locado</div><div class="fv">${fmtDate(contrato.data_inicio)} a ${fmtDate(contrato.data_fim)}</div></div>
+      <div><div class="fl">Data / Hora da Devolução</div><div class="fv" style="font-weight:700">${fmtDatetime(dev.data_devolucao)}</div></div>
     </div>
-    <div class="field"><label>Operador</label><span>${(dev as any).usuarios?.nome ?? '—'}</span></div>
+    <div class="grid-2" style="margin-top:2mm">
+      <div><div class="fl">Cliente</div><div class="fv">${cliente.nome ?? '—'}</div></div>
+      <div><div class="fl">CPF / CNPJ</div><div class="fv">${cliente.cpf_cnpj ?? '—'}</div></div>
+    </div>
+    <div style="margin-top:2mm;display:flex;align-items:center;gap:4mm">
+      <div>
+        <div class="fl">Tipo de Devolução</div>
+        <span class="badge ${dev.tipo === 'total' ? 'badge-total' : 'badge-parcial'}">${dev.tipo === 'total' ? 'Devolução Total' : 'Devolução Parcial'}</span>
+      </div>
+      <div>
+        <div class="fl">Operador Responsável</div>
+        <div class="fv">${(dev as any).usuarios?.nome ?? '—'}</div>
+      </div>
+    </div>
   </div>
 </div>
 
-<h3>Equipamentos Devolvidos</h3>
-<table>
-  <thead><tr>
-    <th>Equipamento</th>
-    <th class="c">Patrimônio</th>
-    <th class="c">Qtd</th>
-    <th class="c">Condição</th>
-    <th class="r">Custo Avaria</th>
-  </tr></thead>
-  <tbody>${linhasItens}</tbody>
-</table>
+<div class="section">
+  <div class="section-title">Equipamentos Devolvidos (${(itens ?? []).length} item(ns))</div>
+  <table>
+    <thead><tr>
+      <th>Equipamento</th>
+      <th>Marca / Modelo</th>
+      <th class="c">Nº Patrimônio</th>
+      <th class="c">Nº Série</th>
+      <th class="c">Qtd</th>
+      <th class="c">Condição</th>
+      <th class="r">Custo Avaria</th>
+    </tr></thead>
+    <tbody>${linhasItens || '<tr><td colspan="7" style="padding:8px;color:#999;text-align:center">Nenhum item registrado</td></tr>'}</tbody>
+  </table>
+</div>
 
-${totalExtras > 0 ? `
+${(totalExtras > 0 || caucao > 0) ? `
 <div class="totais">
-  <h3 style="margin-bottom:4mm">Valores Adicionais</h3>
-  ${totalMulata > 0 ? `<div class="totais-row"><span>Multa por atraso (${dev.dias_atraso}d)</span><span style="color:#991b1b;font-weight:600">${fmt_money(totalMulata)}</span></div>` : ''}
-  ${totalAvaria > 0 ? `<div class="totais-row"><span>Avarias / Extravios</span><span style="color:#b45309;font-weight:600">${fmt_money(totalAvaria)}</span></div>` : ''}
-  <div class="totais-row destaque"><span>Total a Pagar</span><span style="color:#991b1b">${fmt_money(totalExtras)}</span></div>
+  <div style="font-size:8pt;font-weight:700;color:#0369a1;text-transform:uppercase;margin-bottom:2mm">Valores da Devolução</div>
+  ${dev.dias_atraso > 0 ? `<div class="tot-row"><span>Dias de atraso na entrega</span><span style="color:#991b1b">${dev.dias_atraso} dia(s)</span></div>` : ''}
+  ${multa > 0 ? `<div class="tot-row"><span>Multa por atraso</span><span style="color:#991b1b;font-weight:700">${fmtMoney(multa)}</span></div>` : ''}
+  ${avarias > 0 ? `<div class="tot-row"><span>Avarias / Extravios</span><span style="color:#b45309;font-weight:700">${fmtMoney(avarias)}</span></div>` : ''}
+  ${caucao > 0 ? `<div class="tot-row"><span>Caução devolvido ao cliente</span><span style="color:#166534;font-weight:700">${fmtMoney(caucao)}</span></div>` : ''}
+  ${totalExtras > 0 ? `<div class="tot-row bold"><span>Total a cobrar do cliente</span><span style="color:#991b1b">${fmtMoney(totalExtras)}</span></div>` : ''}
 </div>` : ''}
 
-${dev.observacoes ? `<div class="info-box"><label style="font-size:7pt;color:#888;display:block;margin-bottom:2mm">OBSERVAÇÕES</label><span style="font-size:9pt">${dev.observacoes}</span></div>` : ''}
+${dev.observacoes ? `<div class="declaracao"><strong>Observações:</strong> ${dev.observacoes}</div>` : ''}
 
-<div class="assinaturas">
-  <div class="assin-box">
-    ${p.empresa_nome ?? 'Empresa'}<br>Entregador / Responsável
+<div class="declaracao">
+  <strong>${cliente.nome ?? 'O cliente'}</strong>, CPF/CNPJ <strong>${cliente.cpf_cnpj ?? '—'}</strong>,
+  declara devolver à empresa <strong>${p.empresa_nome ?? ''}</strong> os equipamentos listados acima,
+  referentes ao Contrato de Locação Nº <strong>${contrato.numero ?? '—'}</strong>,
+  nas condições descritas neste documento, em ${fmtDatetime(dev.data_devolucao)}.
+</div>
+
+<div class="assin">
+  <div>
+    <div class="ass-space"></div>
+    <div class="ass-box">
+      <div style="font-size:8pt;font-weight:700">${p.empresa_nome ?? 'Empresa'}</div>
+      <div class="ass-label">Recebedor — CNPJ: ${p.empresa_cnpj ?? '—'}</div>
+    </div>
   </div>
-  <div class="assin-box">
-    ${cliente.nome ?? 'Cliente'}<br>Recebedor / Locatário
+  <div>
+    <div class="ass-space"></div>
+    <div class="ass-box">
+      <div style="font-size:8pt;font-weight:700">${cliente.nome ?? 'Cliente'}</div>
+      <div class="ass-label">Devolvedor — CPF/CNPJ: ${cliente.cpf_cnpj ?? '—'}</div>
+    </div>
   </div>
 </div>
 
-<div style="text-align:center;font-size:7pt;color:#aaa;margin-top:8mm">
-  Documento gerado em ${new Date().toLocaleString('pt-BR')} · ${contrato.numero}
+<div class="footer">
+  <span>${p.empresa_nome ?? ''} — CNPJ ${p.empresa_cnpj ?? ''}</span>
+  <span>Devolução Nº ${devolucao_id} — Contrato ${contrato.numero ?? ''}</span>
+  <span>Gerado em ${new Date().toLocaleString('pt-BR')}</span>
 </div>
 
-</body></html>`
+</div></body></html>`
 
-    // Salvar documento temporariamente e retornar
+    // ── Salvar na tabela correta: doc_gerados ────────────────────────────────
     const token = Math.random().toString(36).slice(2) + Date.now().toString(36)
-    await sb.from('documentos_gerados').insert({
-      contrato_id: (contrato as any).id,
-      template_id: 2,
-      titulo:      `Recibo de Devolução #${devolucao_id} — ${contrato.numero}`,
-      html_content: html,
+    const { error: saveErr } = await sb.from('doc_gerados').insert({
+      contrato_id:    Number(contrato.id),
+      template_id:    4,
+      titulo:         `Recibo de Devolução Nº ${devolucao_id} — ${contrato.numero}`,
+      conteudo_final: html,
       token,
-      expirado:    0,
-      expira_em:   new Date(Date.now() + 30 * 86400 * 1000).toISOString(),
+      expirado:       0,
+      expires_at:     new Date(Date.now() + 30 * 86400 * 1000).toISOString(),
     })
 
-    const url = `${process.env.NEXT_PUBLIC_APP_URL ?? ''}/doc/${token}`
-    return NextResponse.json({ ok:true, url, html })
+    if (saveErr) return NextResponse.json({ ok: false, error: 'Erro ao salvar documento: ' + saveErr.message })
 
-  } catch(e:any) {
-    return NextResponse.json({ ok:false, error: e.message })
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? process.env.NEXTAUTH_URL ?? ''
+    const url    = `${appUrl}/doc/${token}`
+
+    return NextResponse.json({ ok: true, url, token })
+
+  } catch (e: any) {
+    return NextResponse.json({ ok: false, error: e.message })
   }
 }
