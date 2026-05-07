@@ -568,11 +568,7 @@ export default function VerContratoPage() {
               Ativar Contrato
             </Btn>
           )}
-          {contrato.status==='ativo'&&(
-            <Btn onClick={iniciarCheckin}>
-              Iniciar Devolução
-            </Btn>
-          )}
+
           {contrato.status==='pendente_manutencao'&&(
             <Btn onClick={encerrarPendente} variant="secondary">
               Encerrar (Verificar OS)
@@ -589,7 +585,10 @@ export default function VerContratoPage() {
           {/* ── Menu de ações secundárias ── */}
           {(()=>{
             const sec: AcaoSecundaria[] = []
-            sec.push({ label:'Gerar Documento', onClick:()=>{setAba('documentos');setDocLink('')}, grupo:1 })
+            if(contrato.status==='ativo'||contrato.status==='em_devolucao'){
+              sec.push({ label:'📦 Iniciar Devolução', onClick:iniciarCheckin, grupo:1 })
+            }
+            sec.push({ label:'📄 Gerar Documento', onClick:()=>{setAba('documentos');setDocLink('')}, grupo:1 })
             if(contrato.status==='rascunho'||contrato.status==='ativo'){
               sec.push({ label:'Alterar Contrato', onClick:abrirEditar, grupo:1 })
             }
@@ -912,8 +911,27 @@ export default function VerContratoPage() {
                         <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
                           <span style={{fontFamily:'monospace',fontWeight:700}}>#{dev.id}</span>
                           <Badge value={dev.status} dot/>
+                          <span style={{fontSize:'var(--fs-xs)',padding:'2px 8px',borderRadius:99,
+                            background:dev.tipo==='total'?'var(--c-primary-light)':'var(--bg-header)',
+                            color:dev.tipo==='total'?'var(--c-primary)':'var(--t-muted)',fontWeight:600}}>
+                            {dev.tipo==='total'?'Total':'Parcial'}
+                          </span>
                         </div>
                         <div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)'}}>{fmt.datetime(dev.data_devolucao)} · {(dev.usuarios as any)?.nome}</div>
+                      </div>
+                      <div style={{display:'flex',gap:6,flexShrink:0}}>
+                        <button
+                          onClick={async()=>{
+                            const res = await fetch(`/api/documentos/fatura?contrato_id=${id}&devolucao_id=${dev.id}&tipo=recibo_devolucao`)
+                            const data = await res.json()
+                            if (data.ok && data.url) window.open(data.url,'_blank')
+                            else alert('Erro ao gerar recibo: '+(data.error??'Tente novamente'))
+                          }}
+                          style={{padding:'5px 10px',borderRadius:'var(--r-sm)',border:'1px solid var(--border)',
+                            background:'var(--bg-card)',color:'var(--c-primary)',fontSize:'var(--fs-xs)',
+                            cursor:'pointer',fontWeight:600,display:'flex',alignItems:'center',gap:4}}>
+                          📄 Recibo
+                        </button>
                       </div>
                       <div style={{display:'flex',gap:16,flexShrink:0}}>
                         {dev.dias_atraso>0&&<div style={{textAlign:'right'}}><div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)'}}>Atraso</div><div style={{fontWeight:700,color:'var(--c-danger)'}}>{dev.dias_atraso}d</div></div>}
@@ -1244,6 +1262,84 @@ export default function VerContratoPage() {
           </div>
         </div>
       )}
+
+      {/* ── Modal Nova Fatura / Antecipação ──────────────────────────────── */}
+      {painelFatura && (
+        <div style={{
+          position:'fixed', inset:0, background:'rgba(0,0,0,0.45)', zIndex:1000,
+          display:'flex', alignItems:'center', justifyContent:'center', padding:20,
+        }} onClick={e => { if (e.target === e.currentTarget) setPainelFatura(false) }}>
+          <div style={{
+            background:'var(--bg-card)', borderRadius:'var(--r-lg)', width:'100%', maxWidth:480,
+            boxShadow:'0 20px 60px rgba(0,0,0,0.3)', overflow:'hidden',
+          }}>
+            <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)',
+              display:'flex', justifyContent:'space-between', alignItems:'center',
+              background:'var(--bg-header)' }}>
+              <div style={{ fontWeight:700, fontSize:'var(--fs-base)' }}>+ Nova Fatura / Antecipação</div>
+              <button onClick={() => setPainelFatura(false)}
+                style={{ background:'none', border:'none', cursor:'pointer', fontSize:20, color:'var(--t-muted)' }}>×</button>
+            </div>
+            <div style={{ padding:'20px', display:'flex', flexDirection:'column', gap:14 }}>
+              {erroFatura && <div className="ds-alert-error">{erroFatura}</div>}
+
+              <FormField label="Tipo">
+                <select value={formNovaFatura.tipo}
+                  onChange={e => setFormNovaFatura((f:any) => ({ ...f, tipo: e.target.value }))}
+                  className={selectCls}>
+                  <option value="antecipacao">Antecipação</option>
+                  <option value="cobranca">Cobrança</option>
+                  <option value="avaria">Avaria / Dano</option>
+                  <option value="multa">Multa</option>
+                  <option value="limpeza">Limpeza</option>
+                  <option value="outros">Outros</option>
+                </select>
+              </FormField>
+
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <FormField label="Valor (R$) *">
+                  <input type="number" step="0.01" min="0.01"
+                    value={formNovaFatura.valor || ''}
+                    onChange={e => setFormNovaFatura((f:any) => ({ ...f, valor: e.target.value }))}
+                    className={inputCls} placeholder="0,00" />
+                </FormField>
+                <FormField label="Vencimento *">
+                  <input type="date"
+                    value={formNovaFatura.data_vencimento}
+                    onChange={e => setFormNovaFatura((f:any) => ({ ...f, data_vencimento: e.target.value }))}
+                    className={inputCls} />
+                </FormField>
+              </div>
+
+              <FormField label="Forma de Pagamento">
+                <select value={formNovaFatura.forma_pagamento}
+                  onChange={e => setFormNovaFatura((f:any) => ({ ...f, forma_pagamento: e.target.value }))}
+                  className={selectCls}>
+                  {['pix','dinheiro','cartao_debito','cartao_credito','transferencia','boleto','cheque'].map(fp => (
+                    <option key={fp} value={fp}>{fp.replace(/_/g,' ').replace(/\w/g,(x:string)=>x.toUpperCase())}</option>
+                  ))}
+                </select>
+              </FormField>
+
+              <FormField label="Descrição">
+                <input value={formNovaFatura.descricao}
+                  onChange={e => setFormNovaFatura((f:any) => ({ ...f, descricao: e.target.value }))}
+                  className={inputCls} placeholder="Ex: Antecipação referente a..." />
+              </FormField>
+
+              <div style={{ display:'flex', gap:8, marginTop:4 }}>
+                <Btn loading={salvandoFatura} onClick={criarFaturaAvulsa} style={{ flex:1 }}>
+                  ✓ Criar Fatura
+                </Btn>
+                <Btn variant="secondary" onClick={() => setPainelFatura(false)}>
+                  Cancelar
+                </Btn>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+
 
       {/* ── Modal de Pagamento ──────────────────────────────────────────── */}
       {painelPgto && faturaAlvo && (
