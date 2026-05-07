@@ -905,42 +905,100 @@ export default function VerContratoPage() {
               ?<div className="ds-empty"><div className="ds-empty-title">Nenhuma devolução registrada.</div></div>
               :<div style={{display:'flex',flexDirection:'column',gap:10}}>
                 {devolucoes.map(dev=>(
-                  <div key={dev.id} style={{background:'var(--bg-header)',border:'1px solid var(--border)',borderRadius:'var(--r-md)',padding:'14px 16px'}}>
-                    <div style={{display:'flex',alignItems:'flex-start',justifyContent:'space-between',gap:12,marginBottom:dev.observacoes?10:0}}>
-                      <div>
-                        <div style={{display:'flex',alignItems:'center',gap:8,marginBottom:4}}>
-                          <span style={{fontFamily:'monospace',fontWeight:700}}>#{dev.id}</span>
+                  <div key={dev.id} style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:'var(--r-md)',padding:'14px 16px'}}>
+                    {/* Layout: dados à esquerda | valores no centro | ações à direita */}
+                    <div style={{display:'flex',alignItems:'flex-start',gap:12}}>
+
+                      {/* Esquerda: identificação */}
+                      <div style={{flex:1,minWidth:0}}>
+                        <div style={{display:'flex',alignItems:'center',gap:6,marginBottom:5,flexWrap:'wrap'}}>
+                          <span style={{fontFamily:'monospace',fontWeight:700,fontSize:'var(--fs-md)'}}>#{dev.id}</span>
                           <Badge value={dev.status} dot/>
-                          <span style={{fontSize:'var(--fs-xs)',padding:'2px 8px',borderRadius:99,
-                            background:dev.tipo==='total'?'var(--c-primary-light)':'var(--bg-header)',
-                            color:dev.tipo==='total'?'var(--c-primary)':'var(--t-muted)',fontWeight:600}}>
+                          <span style={{fontSize:'var(--fs-xs)',padding:'2px 8px',borderRadius:99,fontWeight:600,
+                            background:dev.tipo==='total'?'var(--c-primary-light,#dbeafe)':'var(--bg-header)',
+                            color:dev.tipo==='total'?'var(--c-primary)':'var(--t-muted)'}}>
                             {dev.tipo==='total'?'Total':'Parcial'}
                           </span>
                         </div>
-                        <div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)'}}>{fmt.datetime(dev.data_devolucao)} · {(dev.usuarios as any)?.nome}</div>
+                        <div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)',marginBottom:2}}>
+                          {fmt.datetime(dev.data_devolucao)}
+                        </div>
+                        <div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>
+                          Operador: {(dev.usuarios as any)?.nome ?? '—'}
+                        </div>
+                        {dev.observacoes&&(
+                          <div style={{fontSize:'var(--fs-sm)',color:'var(--t-secondary)',marginTop:6,
+                            padding:'5px 8px',background:'var(--bg-header)',borderRadius:'var(--r-sm)',
+                            borderLeft:'2px solid var(--border)'}}>
+                            {dev.observacoes}
+                          </div>
+                        )}
                       </div>
-                      <div style={{display:'flex',gap:6,flexShrink:0}}>
+
+                      {/* Centro: valores (só mostra se há algo) */}
+                      {(dev.dias_atraso>0||dev.multa_atraso>0||dev.valor_avarias>0||dev.caucao_devolvido>0)&&(
+                        <div style={{display:'flex',gap:14,flexShrink:0,borderLeft:'1px solid var(--border)',
+                          paddingLeft:14,alignItems:'flex-start'}}>
+                          {dev.dias_atraso>0&&(
+                            <div style={{textAlign:'center'}}>
+                              <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginBottom:2}}>Atraso</div>
+                              <div style={{fontWeight:700,color:'var(--c-danger)',fontSize:'var(--fs-md)'}}>{dev.dias_atraso}d</div>
+                            </div>
+                          )}
+                          {dev.multa_atraso>0&&(
+                            <div style={{textAlign:'center'}}>
+                              <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginBottom:2}}>Multa</div>
+                              <div style={{fontWeight:700,color:'var(--c-danger)',fontSize:'var(--fs-md)'}}>{fmt.money(dev.multa_atraso)}</div>
+                            </div>
+                          )}
+                          {dev.valor_avarias>0&&(
+                            <div style={{textAlign:'center'}}>
+                              <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginBottom:2}}>Avarias</div>
+                              <div style={{fontWeight:700,color:'var(--c-warning-text)',fontSize:'var(--fs-md)'}}>{fmt.money(dev.valor_avarias)}</div>
+                            </div>
+                          )}
+                          {dev.caucao_devolvido>0&&(
+                            <div style={{textAlign:'center'}}>
+                              <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginBottom:2}}>Caução Dev.</div>
+                              <div style={{fontWeight:700,fontSize:'var(--fs-md)'}}>{fmt.money(dev.caucao_devolvido)}</div>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Direita: botões de ação com apenas ícones + title */}
+                      <div style={{display:'flex',gap:4,flexShrink:0,borderLeft:'1px solid var(--border)',paddingLeft:10}}>
+                        {/* Recibo */}
                         <button
-                          onClick={async()=>{
-                            const res = await fetch(`/api/documentos/fatura?contrato_id=${id}&devolucao_id=${dev.id}&tipo=recibo_devolucao`)
-                            const data = await res.json()
-                            if (data.ok && data.url) window.open(data.url,'_blank')
-                            else alert('Erro ao gerar recibo: '+(data.error??'Tente novamente'))
+                          title="Emitir Recibo de Devolução"
+                          onClick={async(e)=>{
+                            const btn = e.currentTarget
+                            btn.textContent = '...'
+                            btn.style.opacity = '0.6'
+                            try {
+                              const res = await fetch(`/api/documentos/recibo-devolucao?devolucao_id=${dev.id}`)
+                              const data = await res.json()
+                              if (data.ok && data.url) window.open(data.url,'_blank')
+                              else alert('Erro ao gerar recibo: '+(data.error??'Tente novamente'))
+                            } finally {
+                              btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>'
+                              btn.style.opacity = '1'
+                            }
                           }}
-                          style={{padding:'5px 10px',borderRadius:'var(--r-sm)',border:'1px solid var(--border)',
-                            background:'var(--bg-card)',color:'var(--c-primary)',fontSize:'var(--fs-xs)',
-                            cursor:'pointer',fontWeight:600,display:'flex',alignItems:'center',gap:4}}>
-                          📄 Recibo
+                          style={{width:30,height:30,padding:0,borderRadius:'var(--r-sm)',
+                            border:'1px solid var(--border)',background:'var(--bg-card)',
+                            color:'var(--c-primary)',cursor:'pointer',display:'flex',
+                            alignItems:'center',justifyContent:'center',transition:'all .15s'}}
+                          onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.background='var(--c-primary-light,#dbeafe)'}}
+                          onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.background='var(--bg-card)'}}>
+                          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14,2 14,8 20,8"/>
+                          </svg>
                         </button>
                       </div>
-                      <div style={{display:'flex',gap:16,flexShrink:0}}>
-                        {dev.dias_atraso>0&&<div style={{textAlign:'right'}}><div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)'}}>Atraso</div><div style={{fontWeight:700,color:'var(--c-danger)'}}>{dev.dias_atraso}d</div></div>}
-                        {dev.multa_atraso>0&&<div style={{textAlign:'right'}}><div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)'}}>Multa</div><div style={{fontWeight:700,color:'var(--c-danger)'}}>{fmt.money(dev.multa_atraso)}</div></div>}
-                        {dev.valor_avarias>0&&<div style={{textAlign:'right'}}><div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)'}}>Avarias</div><div style={{fontWeight:700,color:'var(--c-warning-text)'}}>{fmt.money(dev.valor_avarias)}</div></div>}
-                        <div style={{textAlign:'right'}}><div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)'}}>Caução Dev.</div><div style={{fontWeight:700}}>{fmt.money(dev.caucao_devolvido)}</div></div>
-                      </div>
+
                     </div>
-                    {dev.observacoes&&<div style={{fontSize:'var(--fs-md)',color:'var(--t-secondary)',borderTop:'1px solid var(--border)',paddingTop:8}}>{dev.observacoes}</div>}
                   </div>
                 ))}
               </div>
