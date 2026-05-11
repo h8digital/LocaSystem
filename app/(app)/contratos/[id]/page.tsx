@@ -81,6 +81,12 @@ export default function VerContratoPage() {
   const [salvandoEdicao, setSalvandoEdicao] = useState(false)
   const [erroEdicao, setErroEdicao] = useState('')
   const [formEdicao, setFormEdicao] = useState<any>({})
+  // ── Mini-modal: devolução rápida por item ─────────────────────────────────
+  const [modalDevItem, setModalDevItem] = useState(false)
+  const [itemDevoluver, setItemDevoluver] = useState<any>(null)
+  const [formDevItem, setFormDevItem]   = useState<any>({ qtd:1, condicao:'bom', custo_avaria:0, obs:'' })
+  const [salvandoDevItem, setSalvandoDevItem] = useState(false)
+  const [erroDevItem, setErroDevItem]   = useState('')
 
   useEffect(() => {
     async function load() {
@@ -541,6 +547,54 @@ export default function VerContratoPage() {
     {key:'timeline',     label:'Histórico'},
   ]
 
+  // ── Devolução rápida de item individual ──────────────────────────────────
+  function abrirDevItem(item: any) {
+    const pendente = Number(item.quantidade) - Number(item.qtd_devolvida ?? 0)
+    setItemDevoluver(item)
+    setFormDevItem({ qtd: pendente, condicao: 'bom', custo_avaria: 0, obs: '' })
+    setErroDevItem('')
+    setModalDevItem(true)
+  }
+
+  async function salvarDevItem() {
+    if (!itemDevoluver) return
+    const qtd = Number(formDevItem.qtd)
+    const pendente = Number(itemDevoluver.quantidade) - Number(itemDevoluver.qtd_devolvida ?? 0)
+    if (qtd <= 0 || qtd > pendente) {
+      setErroDevItem(`Quantidade inválida. Máximo pendente: ${pendente}`)
+      return
+    }
+    setSalvandoDevItem(true)
+    setErroDevItem('')
+    try {
+      const res = await fetch('/api/devolucoes/registrar', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contrato_id: contrato.id,
+          itens: [{
+            contrato_item_id: itemDevoluver.id,
+            patrimonio_id:    itemDevoluver.patrimonio_id ?? null,
+            quantidade_devolvida: qtd,
+            condicao:         formDevItem.condicao,
+            custo_avaria:     formDevItem.condicao !== 'bom' ? Number(formDevItem.custo_avaria) : 0,
+          }],
+          observacoes: formDevItem.obs || null,
+          caucao_devolvido: 0,
+        }),
+      })
+      const data = await res.json()
+      if (!data.ok) { setErroDevItem(data.error ?? 'Erro ao registrar devolução'); return }
+      setModalDevItem(false)
+      await load()  // recarrega contrato, itens e devoluções
+    } catch (e: any) {
+      setErroDevItem(e.message)
+    } finally {
+      setSalvandoDevItem(false)
+    }
+  }
+
+
   return(
     <div style={{display:"flex",flexDirection:"column",gap:16}}>
 
@@ -708,23 +762,45 @@ export default function VerContratoPage() {
                     <Th>Produto</Th>
                     <Th>Patrimônio</Th>
                     <Th right>Qtd</Th>
+                    <Th right>Devolvido</Th>
                     <Th right>Preço/dia</Th>
                     <Th right>Total</Th>
                     {(contrato.status==='rascunho'||contrato.status==='ativo')&&<Th></Th>}
                   </tr></thead>
                   <tbody>
-                    {itens.map(i=>(
+                    {itens.map(i=>{
+                      const pendente = Number(i.quantidade) - Number(i.qtd_devolvida ?? 0)
+                      return (
                       <tr key={i.id}>
                         <Td bold>{(i.produtos as any)?.nome}</Td>
                         <Td mono muted>{(i.patrimonios as any)?.numero_patrimonio??'—'}</Td>
                         <Td right>{i.quantidade}</Td>
+                        <Td right>
+                          {Number(i.qtd_devolvida??0)>0
+                            ? <span style={{color:pendente===0?'var(--c-success)':'var(--c-warning)',fontWeight:600,fontSize:'var(--fs-sm)'}}>
+                                {i.qtd_devolvida}/{i.quantidade}
+                              </span>
+                            : <span style={{color:'var(--t-muted)',fontSize:'var(--fs-sm)'}}>—</span>
+                          }
+                        </Td>
                         <Td right>{fmt.money(i.preco_unitario)}</Td>
                         <Td right bold primary>{fmt.money(i.total_item)}</Td>
                         {(contrato.status==='rascunho'||contrato.status==='ativo')&&(
                           <td style={{padding:'8px 12px',borderBottom:'1px solid var(--border)',whiteSpace:'nowrap'}}>
-                            <div style={{display:'flex',gap:4}}>
+                            <div style={{display:'flex',gap:4,alignItems:'center'}}>
                               <button onClick={()=>abrirEditarItem(i)}
                                 className="tbl-btn edit" title="Editar item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></button>
+                              {contrato.status==='ativo'&&pendente>0&&(
+                                <button
+                                  onClick={()=>abrirDevItem(i)}
+                                  className="tbl-btn"
+                                  title="Registrar devolução deste item"
+                                  style={{color:'var(--c-warning)',borderColor:'rgba(251,191,36,0.3)'}}>
+                                  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
+                                    <path d="M9 14L4 9l5-5"/><path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11"/>
+                                  </svg>
+                                </button>
+                              )}
                               {contrato.status==='rascunho'&&(
                                 <button onClick={()=>removerItem(i)}
                                   className="tbl-btn del" title="Remover item"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></button>
@@ -733,11 +809,12 @@ export default function VerContratoPage() {
                           </td>
                         )}
                       </tr>
-                    ))}
+                      )
+                    })}
                   </tbody>
                   <tfoot>
                     <tr style={{background:'var(--bg-header)'}}>
-                      <td colSpan={(contrato.status==='rascunho'||contrato.status==='ativo')?5:4}
+                      <td colSpan={(contrato.status==='rascunho'||contrato.status==='ativo')?6:5}
                         style={{padding:'10px 16px',fontWeight:700,fontSize:'var(--fs-md)',color:'var(--t-muted)',borderTop:'2px solid var(--border)'}}>Total</td>
                       <td style={{padding:'10px 16px',fontWeight:800,textAlign:'right',color:'var(--c-primary)',borderTop:'2px solid var(--border)'}}>{fmt.money(contrato.total)}</td>
                     </tr>
@@ -1158,6 +1235,121 @@ export default function VerContratoPage() {
               </div>
             </div>
           )}
+
+
+      {/* ── Modal: Devolução Rápida de Item ─────────────────────────────── */}
+      {modalDevItem && itemDevoluver && (
+        <div style={{
+          position:'fixed', inset:0, background:'rgba(0,0,0,0.55)', zIndex:1000,
+          display:'flex', alignItems:'center', justifyContent:'center', padding:20,
+        }} onClick={e => { if (e.target === e.currentTarget) setModalDevItem(false) }}>
+          <div style={{
+            background:'#1e293b', borderRadius:'var(--r-lg)', width:'100%', maxWidth:440,
+            border:'1px solid rgba(255,255,255,0.12)',
+            boxShadow:'0 20px 60px rgba(0,0,0,0.7)',
+          }}>
+            {/* Header */}
+            <div style={{
+              padding:'14px 20px', borderBottom:'1px solid rgba(255,255,255,0.08)',
+              display:'flex', justifyContent:'space-between', alignItems:'center',
+              background:'rgba(255,255,255,0.03)', borderRadius:'var(--r-lg) var(--r-lg) 0 0',
+            }}>
+              <div>
+                <div style={{fontWeight:700,fontSize:'var(--fs-base)',color:'rgba(255,255,255,0.9)'}}>
+                  ↩ Devolver Item
+                </div>
+                <div style={{fontSize:'var(--fs-sm)',color:'rgba(255,255,255,0.4)',marginTop:2}}>
+                  {(itemDevoluver.produtos as any)?.nome}
+                </div>
+              </div>
+              <button onClick={() => setModalDevItem(false)} style={{
+                background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.12)',
+                borderRadius:'var(--r-md)', width:28, height:28, cursor:'pointer',
+                color:'rgba(255,255,255,0.5)', fontSize:18, display:'flex',
+                alignItems:'center', justifyContent:'center',
+              }}>×</button>
+            </div>
+
+            <div style={{padding:'18px 20px', display:'flex', flexDirection:'column', gap:14}}>
+              {erroDevItem && <div className="ds-alert-error">{erroDevItem}</div>}
+
+              {/* Info do item */}
+              <div style={{
+                display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:10,
+                background:'rgba(255,255,255,0.04)', borderRadius:'var(--r-md)',
+                padding:'10px 14px', border:'1px solid rgba(255,255,255,0.07)',
+              }}>
+                <div>
+                  <div style={{fontSize:'var(--fs-xs)',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:3}}>Patrimônio</div>
+                  <div style={{fontFamily:'var(--font-mono)',fontSize:'var(--fs-md)',color:'rgba(255,255,255,0.85)',fontWeight:600}}>
+                    {(itemDevoluver.patrimonios as any)?.numero_patrimonio ?? '—'}
+                  </div>
+                </div>
+                <div>
+                  <div style={{fontSize:'var(--fs-xs)',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:3}}>Qtd Total</div>
+                  <div style={{fontSize:'var(--fs-md)',color:'rgba(255,255,255,0.85)',fontWeight:600}}>{itemDevoluver.quantidade}</div>
+                </div>
+                <div>
+                  <div style={{fontSize:'var(--fs-xs)',color:'rgba(255,255,255,0.35)',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:3}}>Pendente</div>
+                  <div style={{fontSize:'var(--fs-md)',color:'var(--c-warning)',fontWeight:700}}>
+                    {Number(itemDevoluver.quantidade) - Number(itemDevoluver.qtd_devolvida ?? 0)}
+                  </div>
+                </div>
+              </div>
+
+              {/* Quantidade a devolver */}
+              <FormField label="Quantidade a devolver">
+                <input
+                  type="number" min="1"
+                  max={Number(itemDevoluver.quantidade) - Number(itemDevoluver.qtd_devolvida ?? 0)}
+                  value={formDevItem.qtd}
+                  onChange={e => setFormDevItem((f:any) => ({ ...f, qtd: e.target.value }))}
+                  className={inputCls}
+                />
+              </FormField>
+
+              {/* Condição */}
+              <FormField label="Condição do equipamento">
+                <select value={formDevItem.condicao}
+                  onChange={e => setFormDevItem((f:any) => ({ ...f, condicao: e.target.value }))}
+                  className={selectCls}>
+                  <option value="bom">Bom Estado</option>
+                  <option value="avariado">Avariado</option>
+                  <option value="perdido">Extraviado / Perdido</option>
+                </select>
+              </FormField>
+
+              {/* Custo de avaria (condicional) */}
+              {formDevItem.condicao !== 'bom' && (
+                <FormField label="Custo da avaria / extravio (R$)">
+                  <input type="number" step="0.01" min="0"
+                    value={formDevItem.custo_avaria}
+                    onChange={e => setFormDevItem((f:any) => ({ ...f, custo_avaria: e.target.value }))}
+                    className={inputCls} placeholder="0,00" />
+                </FormField>
+              )}
+
+              {/* Observações */}
+              <FormField label="Observações">
+                <textarea value={formDevItem.obs}
+                  onChange={e => setFormDevItem((f:any) => ({ ...f, obs: e.target.value }))}
+                  className={textareaCls} rows={2}
+                  placeholder="Opcional — aparece no recibo de devolução" />
+              </FormField>
+
+              {/* Ações */}
+              <div style={{display:'flex', gap:8, marginTop:4}}>
+                <Btn loading={salvandoDevItem} onClick={salvarDevItem} style={{flex:1}}>
+                  ↩ Confirmar Devolução
+                </Btn>
+                <Btn variant="secondary" onClick={() => setModalDevItem(false)}>
+                  Cancelar
+                </Btn>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
 
 
       {/* ── Modal de Edição do Contrato (Aditivo) ───────────────────────── */}
