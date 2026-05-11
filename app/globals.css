@@ -629,3 +629,36 @@ input[type="date"],
 input[type="datetime-local"] {
   color-scheme: dark;
 }
+
+/* ── KPI Cards (compatibilidade glassmorphism) ───────────────────────────── */
+.kpi-grid {
+  display: grid;
+  gap: 10px;
+}
+.kpi-card {
+  background: rgba(255,255,255,0.05);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255,255,255,0.10);
+  border-top: 2px solid rgba(148,163,184,0.6);
+  border-radius: var(--r-lg);
+  padding: 14px 16px;
+}
+.kpi-card-success { border-top-color: #34d399 }
+.kpi-card-accent  { border-top-color: #818cf8 }
+.kpi-card-danger  { border-top-color: #f87171 }
+.kpi-card-warning { border-top-color: #fbbf24 }
+
+.kpi-label {
+  font-size: var(--fs-xs);
+  font-weight: 600;
+  color: rgba(255,255,255,0.4);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 8px;
+}
+.kpi-value {
+  font-size: 26px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.85);
+  line-height: 1;
+}

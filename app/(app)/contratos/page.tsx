@@ -9,7 +9,7 @@ import type { AcaoSecundaria } from '@/components/ui/ActionButtons'
 export default function ContratosPage() {
   const [contratos, setContratos] = useState<any[]>([])
   const [loading,   setLoading]   = useState(true)
-  const [filters,   setFilters]   = useState<Record<string,string>>({ busca:'', status:'', data_inicio_de:'', data_inicio_ate:'', data_fim_de:'', data_fim_ate:'' })
+  const [filters,   setFilters]   = useState<Record<string,string>>({ busca:'', status:'ativo', data_inicio_de:'', data_inicio_ate:'', data_fim_de:'', data_fim_ate:'' })
   const [totais,    setTotais]    = useState({ total:0, ativos:0, valor:0, vencidos:0, pendente_manutencao:0 })
   const router = useRouter()
 
@@ -192,28 +192,31 @@ export default function ContratosPage() {
         }
       />
 
-      {/* KPIs */}
-      <div className="kpi-grid" style={{gridTemplateColumns:'repeat(5,1fr)'}}>
-        <div className="kpi-card">
-          <div className="kpi-label">Total de Contratos</div>
-          <div className="kpi-value">{totais.total}</div>
-        </div>
-        <div className="kpi-card kpi-card-success">
-          <div className="kpi-label">Contratos Ativos</div>
-          <div className="kpi-value" style={{color:'var(--c-success)'}}>{totais.ativos}</div>
-        </div>
-        <div className="kpi-card kpi-card-accent">
-          <div className="kpi-label">Valor em Aberto</div>
-          <div className="kpi-value" style={{color:'var(--c-primary)'}}>{fmt.money(totais.valor)}</div>
-        </div>
-        <div className={(totais.vencidos??0)>0?'kpi-card kpi-card-danger':'kpi-card'}>
-          <div className="kpi-label">Retorno Vencido</div>
-          <div className="kpi-value" style={{color:(totais.vencidos??0)>0?'var(--c-danger)':'var(--t-muted)'}}>{totais.vencidos??0}</div>
-        </div>
-        <div className={(totais.pendente_manutencao??0)>0?'kpi-card kpi-card-warning':'kpi-card'}>
-          <div className="kpi-label">Pend. Manutenção</div>
-          <div className="kpi-value" style={{color:(totais.pendente_manutencao??0)>0?'var(--c-warning)':'var(--t-muted)'}}>{totais.pendente_manutencao??0}</div>
-        </div>
+      {/* KPIs — glassmorphism dark */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(5,1fr)',gap:10}}>
+        {([
+          { label:'Total de Contratos',   value: totais.total,                accent:'#94a3b8', fmt: (v:number)=>String(v) },
+          { label:'Contratos Ativos',     value: totais.ativos,               accent:'#34d399', fmt: (v:number)=>String(v) },
+          { label:'Valor em Aberto',      value: totais.valor,                accent:'#818cf8', fmt: (v:number)=>fmt.money(v) },
+          { label:'Retorno Vencido',      value: totais.vencidos??0,          accent:'#f87171', fmt: (v:number)=>String(v) },
+          { label:'Pend. Manutenção',     value: totais.pendente_manutencao??0, accent:'#fbbf24', fmt: (v:number)=>String(v) },
+        ] as {label:string;value:number;accent:string;fmt:(v:number)=>string}[]).map(k=>(
+          <div key={k.label} style={{
+            background:'rgba(255,255,255,0.05)',
+            backdropFilter:'blur(12px)',
+            border:'1px solid rgba(255,255,255,0.10)',
+            borderTop:`2px solid ${k.accent}`,
+            borderRadius:'var(--r-lg)',
+            padding:'14px 16px',
+          }}>
+            <div style={{fontSize:'var(--fs-xs)',fontWeight:600,color:'rgba(255,255,255,0.4)',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>
+              {k.label}
+            </div>
+            <div style={{fontSize:26,fontWeight:600,color:k.value>0?k.accent:'rgba(255,255,255,0.25)',lineHeight:1}}>
+              {k.fmt(k.value)}
+            </div>
+          </div>
+        ))}
       </div>
 
       <div style={{ display:'flex', gap:10, flexWrap:'wrap', alignItems:'flex-end' }}>
