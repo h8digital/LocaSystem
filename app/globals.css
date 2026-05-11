@@ -662,3 +662,120 @@ input[type="datetime-local"] {
   color: rgba(255,255,255,0.85);
   line-height: 1;
 }
+
+/* ── LookupField ─────────────────────────────────────────────────────────── */
+.ds-lookup {
+  display: flex;
+  align-items: center;
+  background: var(--bg-input);
+  border: 1px solid var(--border);
+  border-radius: var(--r-md);
+  min-height: 36px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  overflow: hidden;
+}
+.ds-lookup:focus-within {
+  border-color: var(--border-focus);
+  box-shadow: 0 0 0 3px rgba(129,140,248,0.15);
+}
+.ds-lookup-input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  outline: none;
+  padding: 0 11px;
+  font-size: var(--fs-base);
+  color: var(--t-primary);
+  font-family: var(--font-sans);
+  line-height: 36px;
+  min-width: 0;
+}
+.ds-lookup-input::placeholder { color: var(--t-muted) }
+.ds-lookup-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 36px;
+  background: transparent;
+  border: none;
+  border-left: 1px solid var(--border);
+  color: var(--t-muted);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.ds-lookup-btn:hover:not(:disabled) {
+  background: rgba(255,255,255,0.06);
+  color: var(--c-primary);
+}
+.ds-lookup-btn:disabled { opacity: 0.4; cursor: not-allowed }
+
+/* ── Dropdown genérico (LookupField + outros) ────────────────────────────── */
+.ds-dropdown {
+  background: #1e293b;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: var(--r-lg);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.6), 0 2px 8px rgba(0,0,0,0.4);
+  overflow: hidden;
+}
+.ds-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: 9px 14px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.82);
+  font-size: var(--fs-md);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background 0.12s, color 0.12s;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.ds-dropdown-item:last-child { border-bottom: none }
+.ds-dropdown-item:hover,
+.ds-dropdown-item.selected {
+  background: rgba(129,140,248,0.15);
+  color: #fff;
+}
+.ds-dropdown-item.selected { font-weight: 600 }
+
+/* ── ActionButtons — menu de 3 pontos ────────────────────────────────────── */
+.tbl-dropdown {
+  background: #1e293b;
+  border: 1px solid rgba(255,255,255,0.15);
+  border-radius: var(--r-lg);
+  box-shadow: 0 8px 32px rgba(0,0,0,0.7), 0 2px 8px rgba(0,0,0,0.5);
+  overflow: hidden;
+  min-width: 180px;
+  white-space: nowrap;
+}
+.tbl-dropdown-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 9px 16px;
+  text-align: left;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.82);
+  font-size: var(--fs-md);
+  font-family: var(--font-sans);
+  cursor: pointer;
+  transition: background 0.12s;
+}
+.tbl-dropdown-item:hover { background: rgba(129,140,248,0.15); color: #fff }
+.tbl-dropdown-item.item-danger { color: var(--c-danger) }
+.tbl-dropdown-item.item-danger:hover { background: rgba(248,113,113,0.12) }
+.tbl-dropdown-divider {
+  height: 1px;
+  background: rgba(255,255,255,0.08);
+  margin: 2px 0;
+}
+
+/* ── Select — forçar fundo escuro nas options (best-effort) ──────────────── */
+.ds-input, .ds-select {
+  color-scheme: dark;
+}
