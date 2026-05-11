@@ -88,28 +88,27 @@ export default function VerContratoPage() {
   const [salvandoDevItem, setSalvandoDevItem] = useState(false)
   const [erroDevItem, setErroDevItem]   = useState('')
 
-  useEffect(() => {
-    async function load() {
-      const [{ data:c },{ data:i },{ data:f }, s,{ data:t },{ data:per },{ data:d }] = await Promise.all([
-        supabase.from('contratos').select('*, clientes(*), usuarios(nome), periodos_locacao(nome, dias)').eq('id', id).single(),
-        supabase.from('contrato_itens').select('*, produtos(nome), patrimonios(numero_patrimonio)').eq('contrato_id', id),
-        supabase.from('faturas').select('*').eq('contrato_id', id).order('data_vencimento'),
-        supabase.from('contrato_saldo').select('*').eq('contrato_id', id).maybeSingle(),
-        supabase.from('doc_templates').select('id,nome,tipo').eq('ativo',1).order('tipo').order('nome'),
-        supabase.from('periodos_locacao').select('*').eq('ativo',1).order('dias'),
-        supabase.from('devolucoes').select('*, usuarios(nome)').eq('contrato_id', id).order('created_at',{ascending:false}),
-      ])
-      setContrato(c); setItens(i??[]); setFaturas(f??[]); setSaldoInfo(s?.data ?? s ?? null); setPeriodos(per??[])
-      // Carregar timeline
-      const tlRes = await fetch('/api/contrato-timeline?contrato_id=' + id)
-      const tlData = await tlRes.json()
-      setTimeline(tlData.ok ? tlData.data : [])
-      setTemplates(t??[]); setDevolucoes(d??[]); setLoading(false)
-      const pad = t?.find((x:any)=>x.padrao===1&&x.tipo==='contrato')
-      if(pad) setTemplateSel(String(pad.id))
-    }
-    load()
-  }, [id])
+  async function load() {
+    const [{ data:c },{ data:i },{ data:f }, s,{ data:t },{ data:per },{ data:d }] = await Promise.all([
+      supabase.from('contratos').select('*, clientes(*), usuarios(nome), periodos_locacao(nome, dias)').eq('id', id).single(),
+      supabase.from('contrato_itens').select('*, produtos(nome), patrimonios(numero_patrimonio)').eq('contrato_id', id),
+      supabase.from('faturas').select('*').eq('contrato_id', id).order('data_vencimento'),
+      supabase.from('contrato_saldo').select('*').eq('contrato_id', id).maybeSingle(),
+      supabase.from('doc_templates').select('id,nome,tipo').eq('ativo',1).order('tipo').order('nome'),
+      supabase.from('periodos_locacao').select('*').eq('ativo',1).order('dias'),
+      supabase.from('devolucoes').select('*, usuarios(nome)').eq('contrato_id', id).order('created_at',{ascending:false}),
+    ])
+    setContrato(c); setItens(i??[]); setFaturas(f??[]); setSaldoInfo(s?.data ?? s ?? null); setPeriodos(per??[])
+    const tlRes = await fetch('/api/contrato-timeline?contrato_id=' + id)
+    const tlData = await tlRes.json()
+    setTimeline(tlData.ok ? tlData.data : [])
+    setTemplates(t??[]); setDevolucoes(d??[]); setLoading(false)
+    const pad = t?.find((x:any)=>x.padrao===1&&x.tipo==='contrato')
+    if(pad) setTemplateSel(String(pad.id))
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { load() }, [id])
 
   async function cancelar() {
     if(!confirm('Cancelar este contrato? Esta ação não pode ser desfeita.'))return

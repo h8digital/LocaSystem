@@ -1,5 +1,6 @@
 'use client'
 import { useState, useRef, useEffect, useCallback } from 'react'
+import { createPortal } from 'react-dom'
 import { supabase } from '@/lib/supabase'
 import SlidePanel from './SlidePanel'
 
@@ -31,6 +32,7 @@ export default function LookupField({
   const [panelOpen,setPanelOpen]= useState(false)
   const [focused,  setFocused]  = useState(false)
   const [dropPos,  setDropPos]  = useState<DropPos|null>(null)
+  const [isMounted, setIsMounted] = useState(false)
 
   const inputRef   = useRef<HTMLInputElement>(null)
   const wrapRef    = useRef<HTMLDivElement>(null)   // wraps the whole field
@@ -56,6 +58,9 @@ export default function LookupField({
       above,
     })
   }, [])
+
+  // ── Marcar montagem no cliente (SSR-safe para portal) ──────────────────
+  useEffect(() => { setIsMounted(true) }, [])
 
   // ── Fechar ao clicar fora ────────────────────────────────────────────────
   useEffect(() => {
@@ -195,7 +200,7 @@ export default function LookupField({
       </div>
 
       {/* Dropdown — renderizado via portal com position:fixed */}
-      {open && dropPos && (
+      {open && dropPos && isMounted && createPortal(
         <div
           ref={dropRef}
           className="ds-dropdown"
@@ -205,7 +210,7 @@ export default function LookupField({
             bottom: dropPos.above ? `${window.innerHeight - dropPos.top}px` : 'auto',
             left:   dropPos.left,
             width:  dropPos.width,
-            zIndex: 9999,
+            zIndex: 99999,
             maxHeight: dropPos.above
               ? Math.min(280, dropPos.top - 8)
               : Math.min(280, window.innerHeight - dropPos.top - 8),
@@ -245,7 +250,8 @@ export default function LookupField({
               ))}
             </ul>
           )}
-        </div>
+        </div>,
+        document.body
       )}
 
       {hint  && !error && <p className="ds-hint">{hint}</p>}
