@@ -18,7 +18,7 @@ export const fmt = {
     // Aceita tanto 'YYYY-MM-DD' quanto timestamps completos 'YYYY-MM-DD HH:MM:SS...'
     const s = d.includes('T') || d.includes(' ') ? d : d + 'T12:00:00'
     const dt = new Date(s)
-    return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('pt-BR')
+    return isNaN(dt.getTime()) ? '—' : dt.toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo' })
   },
-  datetime: (d: string) => d ? new Date(d).toLocaleString('pt-BR') : '—',
+  datetime: (d: string) => d ? new Date(d).toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo', dateStyle: 'short', timeStyle: 'short' }) : '—',
 }

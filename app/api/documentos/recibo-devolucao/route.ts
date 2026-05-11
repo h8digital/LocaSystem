@@ -8,8 +8,8 @@ const sb = createClient(
 )
 
 function fmtM(v:number){ return 'R$ '+Number(v||0).toFixed(2).replace('.',',').replace(/\B(?=(\d{3})+(?!\d))/g,'.') }
-function fmtD(s:string){ if(!s)return'—'; return new Date(s.includes('T')?s:s+'T12:00:00').toLocaleDateString('pt-BR') }
-function fmtDT(s:string){ if(!s)return'—'; return new Date(s).toLocaleString('pt-BR',{dateStyle:'short',timeStyle:'short'}) }
+function fmtD(s:string){ if(!s)return'—'; return new Date(s.includes('T')?s:s+'T12:00:00').toLocaleDateString('pt-BR',{timeZone:'America/Sao_Paulo'}) }
+function fmtDT(s:string){ if(!s)return'—'; return new Date(s).toLocaleString('pt-BR',{timeZone:'America/Sao_Paulo',dateStyle:'short',timeStyle:'short'}) }
 
 // GET /api/documentos/recibo-devolucao?devolucao_id=X
 export async function GET(req: NextRequest) {
