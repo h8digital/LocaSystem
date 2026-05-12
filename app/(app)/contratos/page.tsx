@@ -52,11 +52,24 @@ export default function ContratosPage() {
     setContratos(data ?? [])
 
     const { data:tots } = await supabase.from('contratos').select('status, total, data_fim')
+
+    // Valor em aberto CORRETO: saldo real das faturas pendentes/parciais
+    // (considera pagamentos parciais — não soma o contrato inteiro)
+    const { data: fatsAbertas } = await supabase
+      .from('faturas')
+      .select('saldo_restante, contratos!inner(status)')
+      .in('status', ['pendente', 'parcial'])
+      .eq('contratos.status', 'ativo')
+    const valorAberto = (fatsAbertas ?? []).reduce((s, f) => s + Number(f.saldo_restante ?? 0), 0)
+
+    // Hoje no fuso de Brasília (string ISO YYYY-MM-DD)
+    const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone:'America/Sao_Paulo' })
+
     setTotais({
-      total:  tots?.length ?? 0,
-      ativos: tots?.filter(c => c.status === 'ativo').length ?? 0,
-      valor:  tots?.filter(c => c.status === 'ativo').reduce((s,c) => s + Number(c.total), 0) ?? 0,
-      vencidos: tots?.filter(c => c.status === 'ativo' && c.data_fim && Math.floor((new Date().getTime()-new Date(c.data_fim+'T23:59:59').getTime())/86400000) > 0).length ?? 0,
+      total:               tots?.length ?? 0,
+      ativos:              tots?.filter(c => c.status === 'ativo').length ?? 0,
+      valor:               valorAberto,
+      vencidos:            tots?.filter(c => c.status === 'ativo' && c.data_fim && c.data_fim < hojeStr).length ?? 0,
       pendente_manutencao: tots?.filter(c => c.status === 'pendente_manutencao').length ?? 0,
     })
     setLoading(false)
@@ -317,9 +330,9 @@ export default function ContratosPage() {
           { key:'status', label:'Status', render: r => (
             <div style={{display:'flex',flexDirection:'column',gap:2}}>
               <Badge value={r.status} dot />
-              {r.status==='ativo'&&r.data_fim&&Math.floor((new Date().getTime()-new Date(r.data_fim+'T23:59:59').getTime())/86400000)>0&&(
+              {r.status==='ativo'&&r.data_fim&&r.data_fim<new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'})&&(
                 <span style={{fontSize:'var(--fs-sm)',fontWeight:700,color:'var(--c-danger)'}}>
-                  ⚠ Vencido {Math.floor((new Date().getTime()-new Date(r.data_fim+'T23:59:59').getTime())/86400000)}d
+                  ⚠ {Math.floor((new Date(new Date().toLocaleDateString('sv-SE',{timeZone:'America/Sao_Paulo'})).getTime()-new Date(r.data_fim).getTime())/86400000)}d em atraso
                 </span>
               )}
             </div>

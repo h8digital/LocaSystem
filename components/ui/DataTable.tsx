@@ -69,6 +69,13 @@ export default function DataTable({
                   key={row.id ?? i}
                   data-clickable={onRowClick ? 'true' : undefined}
                   onClick={onRowClick ? () => onRowClick(row) : undefined}
+                  style={{ cursor: onRowClick ? 'pointer' : undefined }}
+                  onMouseEnter={onRowClick ? e => {
+                    (e.currentTarget as HTMLElement).style.background = 'rgba(129,140,248,0.06)'
+                  } : undefined}
+                  onMouseLeave={onRowClick ? e => {
+                    (e.currentTarget as HTMLElement).style.background = ''
+                  } : undefined}
                 >
                   {columns.map(c => (
                     <td key={c.key} style={{ textAlign: c.align ?? 'left' }}>
