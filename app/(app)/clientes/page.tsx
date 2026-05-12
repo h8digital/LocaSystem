@@ -234,7 +234,7 @@ export default function ClientesPage() {
 
 
 return (
-    <div>
+    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
 
       <PageHeader
         title="👤 Clientes"
