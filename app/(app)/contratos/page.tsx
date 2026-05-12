@@ -32,7 +32,8 @@ export default function ContratosPage() {
     let q = supabase
       .from('contratos')
       .select('*, clientes(nome), usuarios(nome)')
-      .order('created_at', { ascending:false })
+      .order('data_fim', { ascending:true, nullsFirst:false })
+      .order('data_inicio', { ascending:true })
 
     if (filters.status)          q = q.eq('status', filters.status)
     if (filters.busca) {
