@@ -1,5 +1,6 @@
 'use client'
 import React, { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
 
 export interface AcaoSecundaria {
   label: string
@@ -43,25 +44,29 @@ const IconMore = () => (
 
 export { IconEye, IconEdit, IconTrash }
 
-// Altura estimada do dropdown para calcular se abre acima ou abaixo
-const DROPDOWN_HEIGHT = 280
+const MENU_WIDTH    = 210  // largura estimada do menu
+const MENU_HEIGHT   = 300  // altura estimada do menu (máx)
 
 export default function ActionButtons({ onView, onEdit, onDelete, deleteConfirm, acoesSec }: ActionButtonsProps) {
-  const [dropOpen, setDropOpen] = useState(false)
+  const [dropOpen,  setDropOpen]  = useState(false)
   const [dropStyle, setDropStyle] = useState<React.CSSProperties>({})
-  const wrapRef = useRef<HTMLDivElement>(null)
-  const btnRef  = useRef<HTMLButtonElement>(null)
+  const [mounted,   setMounted]   = useState(false)
+  const btnRef = useRef<HTMLButtonElement>(null)
 
-  // Fechar ao clicar fora
+  // SSR-safe: só usa portal no cliente
+  useEffect(() => { setMounted(true) }, [])
+
+  // Fechar ao clicar fora do dropdown
   useEffect(() => {
+    if (!dropOpen) return
     function h(e: MouseEvent) {
-      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
+      if (btnRef.current && !btnRef.current.contains(e.target as Node)) {
         setDropOpen(false)
       }
     }
     document.addEventListener('mousedown', h)
     return () => document.removeEventListener('mousedown', h)
-  }, [])
+  }, [dropOpen])
 
   // Fechar com ESC
   useEffect(() => {
@@ -70,41 +75,48 @@ export default function ActionButtons({ onView, onEdit, onDelete, deleteConfirm,
     return () => document.removeEventListener('keydown', h)
   }, [])
 
+  // Fechar ao fazer scroll (o botão se move mas o menu fixed não)
+  useEffect(() => {
+    if (!dropOpen) return
+    function h() { setDropOpen(false) }
+    window.addEventListener('scroll', h, true)
+    return () => window.removeEventListener('scroll', h, true)
+  }, [dropOpen])
+
   function toggleDrop() {
     if (dropOpen) { setDropOpen(false); return }
     if (!btnRef.current) return
 
-    const r       = btnRef.current.getBoundingClientRect()
-    const viewH   = window.innerHeight
-    const viewW   = window.innerWidth
-    const dropW   = 200  // min-width do menu
+    const r    = btnRef.current.getBoundingClientRect()
+    const viewH = window.innerHeight
+    const viewW  = window.innerWidth
 
-    // Decidir se abre acima ou abaixo
+    // Abrir acima ou abaixo?
     const spaceBelow = viewH - r.bottom
-    const spaceAbove = r.top
-    const openAbove  = spaceBelow < DROPDOWN_HEIGHT && spaceAbove > spaceBelow
+    const openAbove  = spaceBelow < MENU_HEIGHT && r.top > MENU_HEIGHT
 
-    // Decidir se alinha à direita ou à esquerda do botão
-    // Sempre preferir alinhar à direita do botão (right do menu = right do botão)
-    const rightEdge = viewW - r.right  // distância da borda direita da janela
-    const alignRight = rightEdge >= 0  // sempre há espaço à direita para o menu
-
+    // Alinhar pelo lado direito do botão
+    // Se não couber à esquerda, alinhar pelo lado esquerdo
+    const rightFromEdge = viewW - r.right
     const style: React.CSSProperties = {
       position: 'fixed',
-      zIndex: 9999,
+      zIndex:   99999,
+      minWidth: MENU_WIDTH,
     }
 
+    // Vertical
     if (openAbove) {
       style.bottom = viewH - r.top + 4
     } else {
       style.top = r.bottom + 4
     }
 
-    // Alinhar pelo lado direito do botão (padrão — menu fica à esquerda)
-    if (r.right - dropW >= 0) {
-      style.right = viewW - r.right
+    // Horizontal — preferir alinhar pelo lado direito do botão
+    if (r.right >= MENU_WIDTH) {
+      // Menu cabe à esquerda do botão — alinha borda direita do menu com borda direita do botão
+      style.right = rightFromEdge
     } else {
-      // Sem espaço à esquerda — alinhar pelo lado esquerdo do botão
+      // Não cabe — alinha borda esquerda do menu com borda esquerda do botão
       style.left = r.left
     }
 
@@ -114,32 +126,56 @@ export default function ActionButtons({ onView, onEdit, onDelete, deleteConfirm,
 
   const hasMore = acoesSec && acoesSec.length > 0
 
+  const dropdown = dropOpen && mounted && hasMore && createPortal(
+    <div
+      className="tbl-dropdown"
+      style={dropStyle}
+    >
+      {acoesSec!.map((a, i) => (
+        <React.Fragment key={i}>
+          {i > 0 && acoesSec![i - 1].grupo !== a.grupo && (
+            <div className="tbl-dropdown-divider" />
+          )}
+          <button
+            className={`tbl-dropdown-item ${(a.danger || a.destrutivo) ? 'item-danger' : ''}`}
+            onClick={() => { a.onClick(); setDropOpen(false) }}
+          >
+            {a.icon && <span style={{ display:'inline-flex', width:16 }}>{a.icon}</span>}
+            {a.label}
+          </button>
+        </React.Fragment>
+      ))}
+    </div>,
+    document.body
+  )
+
   return (
-    <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:2 }}>
-      {onView && (
-        <button className="tbl-btn view" onClick={onView} title="Visualizar">
-          <IconEye />
-        </button>
-      )}
-      {onEdit && (
-        <button className="tbl-btn edit" onClick={onEdit} title="Editar">
-          <IconEdit />
-        </button>
-      )}
-      {onDelete && (
-        <button
-          className="tbl-btn del"
-          title="Excluir"
-          onClick={() => {
-            const msg = deleteConfirm ?? 'Tem certeza que deseja excluir?'
-            if (confirm(msg)) onDelete()
-          }}
-        >
-          <IconTrash />
-        </button>
-      )}
-      {hasMore && (
-        <div ref={wrapRef} style={{ position:'relative' }}>
+    <>
+      {dropdown}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:2 }}>
+        {onView && (
+          <button className="tbl-btn view" onClick={onView} title="Visualizar">
+            <IconEye />
+          </button>
+        )}
+        {onEdit && (
+          <button className="tbl-btn edit" onClick={onEdit} title="Editar">
+            <IconEdit />
+          </button>
+        )}
+        {onDelete && (
+          <button
+            className="tbl-btn del"
+            title="Excluir"
+            onClick={() => {
+              const msg = deleteConfirm ?? 'Tem certeza que deseja excluir?'
+              if (confirm(msg)) onDelete()
+            }}
+          >
+            <IconTrash />
+          </button>
+        )}
+        {hasMore && (
           <button
             ref={btnRef}
             className={`tbl-btn ${dropOpen ? 'tbl-btn-open' : ''}`}
@@ -149,27 +185,8 @@ export default function ActionButtons({ onView, onEdit, onDelete, deleteConfirm,
           >
             <IconMore />
           </button>
-
-          {dropOpen && (
-            <div className="tbl-dropdown" style={dropStyle}>
-              {acoesSec!.map((a, i) => (
-                <React.Fragment key={i}>
-                  {i > 0 && acoesSec![i - 1].grupo !== a.grupo && (
-                    <div className="tbl-dropdown-divider" />
-                  )}
-                  <button
-                    className={`tbl-dropdown-item ${(a.danger || a.destrutivo) ? 'item-danger' : ''}`}
-                    onClick={() => { a.onClick(); setDropOpen(false) }}
-                  >
-                    {a.icon && <span style={{ display:'inline-flex', width:16 }}>{a.icon}</span>}
-                    {a.label}
-                  </button>
-                </React.Fragment>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-    </div>
+        )}
+      </div>
+    </>
   )
 }
