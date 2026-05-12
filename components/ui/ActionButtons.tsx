@@ -44,23 +44,29 @@ const IconMore = () => (
 
 export { IconEye, IconEdit, IconTrash }
 
-const MENU_WIDTH    = 210  // largura estimada do menu
-const MENU_HEIGHT   = 300  // altura estimada do menu (máx)
+const MENU_WIDTH  = 210
+const MENU_HEIGHT = 300
 
 export default function ActionButtons({ onView, onEdit, onDelete, deleteConfirm, acoesSec }: ActionButtonsProps) {
   const [dropOpen,  setDropOpen]  = useState(false)
   const [dropStyle, setDropStyle] = useState<React.CSSProperties>({})
   const [mounted,   setMounted]   = useState(false)
-  const btnRef = useRef<HTMLButtonElement>(null)
+  const btnRef  = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)   // ref para o menu no portal
 
-  // SSR-safe: só usa portal no cliente
   useEffect(() => { setMounted(true) }, [])
 
-  // Fechar ao clicar fora do dropdown
+  // ── Fechar ao clicar FORA do botão E fora do menu ───────────────────────
+  // CRÍTICO: verificar tanto o btnRef quanto o menuRef
+  // Se verificar só o btnRef, o clique num item do menu fecha o menu
+  // antes do onClick do item executar (mousedown antes de click)
   useEffect(() => {
     if (!dropOpen) return
     function h(e: MouseEvent) {
-      if (btnRef.current && !btnRef.current.contains(e.target as Node)) {
+      const target = e.target as Node
+      const dentroBtn  = btnRef.current?.contains(target)
+      const dentroMenu = menuRef.current?.contains(target)
+      if (!dentroBtn && !dentroMenu) {
         setDropOpen(false)
       }
     }
@@ -70,12 +76,13 @@ export default function ActionButtons({ onView, onEdit, onDelete, deleteConfirm,
 
   // Fechar com ESC
   useEffect(() => {
+    if (!dropOpen) return
     function h(e: KeyboardEvent) { if (e.key === 'Escape') setDropOpen(false) }
     document.addEventListener('keydown', h)
     return () => document.removeEventListener('keydown', h)
-  }, [])
+  }, [dropOpen])
 
-  // Fechar ao fazer scroll (o botão se move mas o menu fixed não)
+  // Fechar ao fazer scroll (botão se move, menu fixed não)
   useEffect(() => {
     if (!dropOpen) return
     function h() { setDropOpen(false) }
@@ -87,36 +94,29 @@ export default function ActionButtons({ onView, onEdit, onDelete, deleteConfirm,
     if (dropOpen) { setDropOpen(false); return }
     if (!btnRef.current) return
 
-    const r    = btnRef.current.getBoundingClientRect()
+    const r     = btnRef.current.getBoundingClientRect()
     const viewH = window.innerHeight
-    const viewW  = window.innerWidth
+    const viewW = window.innerWidth
 
-    // Abrir acima ou abaixo?
-    const spaceBelow = viewH - r.bottom
-    const openAbove  = spaceBelow < MENU_HEIGHT && r.top > MENU_HEIGHT
+    const openAbove = (viewH - r.bottom) < MENU_HEIGHT && r.top > MENU_HEIGHT
 
-    // Alinhar pelo lado direito do botão
-    // Se não couber à esquerda, alinhar pelo lado esquerdo
-    const rightFromEdge = viewW - r.right
     const style: React.CSSProperties = {
       position: 'fixed',
       zIndex:   99999,
       minWidth: MENU_WIDTH,
     }
 
-    // Vertical
     if (openAbove) {
       style.bottom = viewH - r.top + 4
     } else {
       style.top = r.bottom + 4
     }
 
-    // Horizontal — preferir alinhar pelo lado direito do botão
+    // Alinhar borda direita do menu com borda direita do botão
+    // Se não couber, alinhar borda esquerda
     if (r.right >= MENU_WIDTH) {
-      // Menu cabe à esquerda do botão — alinha borda direita do menu com borda direita do botão
-      style.right = rightFromEdge
+      style.right = viewW - r.right
     } else {
-      // Não cabe — alinha borda esquerda do menu com borda esquerda do botão
       style.left = r.left
     }
 
@@ -128,6 +128,7 @@ export default function ActionButtons({ onView, onEdit, onDelete, deleteConfirm,
 
   const dropdown = dropOpen && mounted && hasMore && createPortal(
     <div
+      ref={menuRef}
       className="tbl-dropdown"
       style={dropStyle}
     >
@@ -138,7 +139,8 @@ export default function ActionButtons({ onView, onEdit, onDelete, deleteConfirm,
           )}
           <button
             className={`tbl-dropdown-item ${(a.danger || a.destrutivo) ? 'item-danger' : ''}`}
-            onClick={() => { a.onClick(); setDropOpen(false) }}
+            onMouseDown={e => e.stopPropagation()} // impede que o mousedown feche o menu
+            onClick={() => { setDropOpen(false); a.onClick() }} // fecha DEPOIS de chamar o onClick
           >
             {a.icon && <span style={{ display:'inline-flex', width:16 }}>{a.icon}</span>}
             {a.label}
