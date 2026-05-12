@@ -1,8 +1,8 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import { supabase, fmt } from '@/lib/supabase'
 import { validarDoc, formatarDoc, formatarPhone, formatarCEP } from '@/lib/validators'
-import { SlidePanel, PageHeader, DataTable, Filters, Badge, ActionButtons, Btn, Tabs, FormField, inputCls, selectCls, textareaCls } from '@/components/ui'
+import { SlidePanel, PageHeader, Badge, ActionButtons, Btn, Tabs, FormField, inputCls, selectCls, textareaCls } from '@/components/ui'
 
 
 function toTitle(s:string){if(!s)return'';const m=new Set(['de','da','do','das','dos','e','a','o','em','com','por','para']);return s.toLowerCase().split(' ').map((w,i)=>(!m.has(w)||i===0)?w.charAt(0).toUpperCase()+w.slice(1):w).join(' ')}
@@ -14,7 +14,6 @@ const emptyCt  =()=>({nome:'',cargo:'',telefone:'',celular:'',email:'',autorizad
 export default function ClientesPage() {
   const [lista,setLista]         = useState<any[]>([])
   const [loading,setLoading]     = useState(true)
-  const [filters,setFilters]     = useState<Record<string,string>>({busca:'',tipo:'',cpf_cnpj:'',telefone:''})
   const [panel,setPanel]         = useState(false)
   const [editId,setEditId]       = useState<number|null>(null)
   const [tab,setTab]             = useState('dados')
@@ -36,17 +35,59 @@ export default function ClientesPage() {
   const [novaSpc,setNovaSpc]     = useState({resultado:'limpo',observacoes:''})
   const [spcIntervalo,setSpcIntervalo]=useState(30)
   const [tiposEnd,setTiposEnd]   = useState<string[]>([])
+  const [kpis, setKpis] = useState({ total:0, pf:0, pj:0, spc_restrito:0, spc_pendente:0, limite_total:0 })
 
-  async function load(){
+  // Filtros
+  const [fBusca,    setFBusca]    = useState('')
+  const [fTipo,     setFTipo]     = useState('')
+  const [fCpfCnpj,  setFCpfCnpj]  = useState('')
+  const [fTelefone, setFTelefone] = useState('')
+  const [fCidade,   setFCidade]   = useState('')
+  const [fSPC,      setFSPC]      = useState('')
+  const [fPapel,    setFPapel]    = useState('')
+
+  const load = useCallback(async () => {
     setLoading(true)
-    let q=supabase.from('clientes').select('id,tipo,nome,cpf_cnpj,email,celular,telefone,cidade,estado,ativo,ultima_consulta_spc,status_spc,rg_ie,limite_credito,observacoes,endereco,numero,complemento,bairro,cep,papeis').eq('ativo',1).order('nome')
-    if(filters.busca)   q=q.ilike('nome',`%${filters.busca}%`)
-    if(filters.tipo)    q=q.eq('tipo',filters.tipo)
-    if(filters.cpf_cnpj)q=q.ilike('cpf_cnpj',`%${filters.cpf_cnpj.replace(/\D/g,'')}%`)
-    if(filters.telefone) q=q.or(`celular.ilike.%${filters.telefone}%,telefone.ilike.%${filters.telefone}%`)
-    const{data}=await q;setLista(data??[]);setLoading(false)
-  }
-  useEffect(()=>{load()},[filters])
+
+    // KPIs — sem filtros
+    const { data: todos } = await supabase.from('clientes')
+      .select('tipo,status_spc,ultima_consulta_spc,limite_credito,papeis')
+      .eq('ativo', 1)
+    const lt = todos ?? []
+    const hoje = new Date()
+    setKpis({
+      total:        lt.length,
+      pf:           lt.filter(c => c.tipo === 'PF').length,
+      pj:           lt.filter(c => c.tipo === 'PJ').length,
+      spc_restrito: lt.filter(c => c.status_spc === 'restrito').length,
+      spc_pendente: lt.filter(c => !c.ultima_consulta_spc ||
+        (hoje.getTime() - new Date(c.ultima_consulta_spc).getTime()) / 86400000 > spcIntervalo
+      ).length,
+      limite_total: lt.reduce((s,c) => s + Number(c.limite_credito ?? 0), 0),
+    })
+
+    // Tabela — com filtros
+    let q = supabase.from('clientes')
+      .select('id,tipo,nome,cpf_cnpj,email,celular,telefone,cidade,estado,ativo,ultima_consulta_spc,status_spc,rg_ie,limite_credito,observacoes,papeis')
+      .eq('ativo', 1).order('nome')
+    if (fBusca)    q = q.ilike('nome', `%${fBusca}%`)
+    if (fTipo)     q = q.eq('tipo', fTipo)
+    if (fCpfCnpj)  q = q.ilike('cpf_cnpj', `%${fCpfCnpj.replace(/\D/g,'')}%`)
+    if (fTelefone) q = q.or(`celular.ilike.%${fTelefone}%,telefone.ilike.%${fTelefone}%`)
+    if (fCidade)   q = q.ilike('cidade', `%${fCidade}%`)
+    if (fSPC)      q = q.eq('status_spc', fSPC)
+    const { data } = await q
+
+    let resultado = data ?? []
+    if (fPapel) {
+      resultado = resultado.filter(c => (c.papeis ?? ['cliente']).includes(fPapel))
+    }
+
+    setLista(resultado)
+    setLoading(false)
+  }, [fBusca, fTipo, fCpfCnpj, fTelefone, fCidade, fSPC, fPapel, spcIntervalo])
+
+  useEffect(() => { load() }, [load])
   useEffect(()=>{
     supabase.from('parametros').select('valor').eq('chave','spc_intervalo_dias').single().then(({data})=>{if(data)setSpcIntervalo(Number(data.valor))})
     supabase.from('tipos_endereco_cliente').select('nome').eq('ativo',1).order('ordem').then(({data})=>setTiposEnd(data?.map((t:any)=>t.nome)??['Residencial','Comercial','Sede','Obra','Outros']))
@@ -117,7 +158,7 @@ export default function ClientesPage() {
   function alertaSPC(c:any){if(!c.ultima_consulta_spc)return'warning';return Math.floor((Date.now()-new Date(c.ultima_consulta_spc).getTime())/86400000)>spcIntervalo?'warning':'ok'}
   const F=(k:string)=>({value:form[k]??'',onChange:(e:any)=>setForm({...form,[k]:e.target.value})})
 
-  const hasFilter = Object.values(filters).some(Boolean)
+  const hasFilter = !!(fBusca||fTipo||fCpfCnpj||fTelefone||fCidade||fSPC||fPapel)
 
     // ── Tipos de documento disponíveis ─────────────────────────────────────────
   const TIPOS_DOC = [
@@ -201,85 +242,178 @@ return (
         actions={<Btn onClick={() => abrir()}>+ Novo Cliente</Btn>}
       />
 
-      {/* ── Filtros ─────────────────────────────────────────────────────── */}
-      <div className="filter-row">
-        <div style={{position:'relative',flex:'2 1 180px',minWidth:160}}>
-          <svg style={{position:'absolute',left:10,top:'50%',transform:'translateY(-50%)',pointerEvents:'none'}}
-            width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--t-light)" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-          </svg>
-          <input className="ds-input" style={{paddingLeft:32}}
-            placeholder="Nome do cliente..." value={filters.busca}
-            onChange={e=>setFilters(f=>({...f,busca:e.target.value}))} />
+      {/* ── KPIs ─────────────────────────────────────────────────────────── */}
+      <div style={{display:'grid',gridTemplateColumns:'repeat(6,1fr)',gap:10}}>
+        {([
+          {l:'Total de Clientes', v:kpis.total,        accent:'#94a3b8'},
+          {l:'Pessoa Física',     v:kpis.pf,            accent:'#818cf8', sub:'PF', onClick:()=>setFTipo('PF')},
+          {l:'Pessoa Jurídica',   v:kpis.pj,            accent:'#a78bfa', sub:'PJ', onClick:()=>setFTipo('PJ')},
+          {l:'Limite de Crédito', v:fmt.money(kpis.limite_total), accent:'#34d399'},
+          {l:'SPC Restrito',      v:kpis.spc_restrito,  accent:'#f87171',
+            onClick:()=>setFSPC('restrito')},
+          {l:'SPC Pendente',      v:kpis.spc_pendente,  accent:'#fbbf24',
+            sub:kpis.spc_pendente>0?'Consulta necessária':undefined},
+        ] as any[]).map((k:any)=>(
+          <div key={k.l} onClick={k.onClick}
+            style={{background:'rgba(255,255,255,0.05)',backdropFilter:'blur(12px)',
+              border:'1px solid rgba(255,255,255,0.10)',borderTop:`2px solid ${k.accent}`,
+              borderRadius:'var(--r-lg)',padding:'14px 16px',
+              cursor:k.onClick?'pointer':'default',transition:'all .2s'}}
+            onMouseEnter={e=>{if(k.onClick)(e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.09)'}}
+            onMouseLeave={e=>{if(k.onClick)(e.currentTarget as HTMLElement).style.background='rgba(255,255,255,0.05)'}}>
+            <div style={{fontSize:'var(--fs-xs)',fontWeight:600,color:'rgba(255,255,255,0.4)',
+              textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:8}}>{k.l}</div>
+            <div style={{fontSize:24,fontWeight:600,lineHeight:1,
+              color:Number(k.v)===0||k.v==='R$ 0,00'?'rgba(255,255,255,0.22)':k.accent}}>{k.v}</div>
+            {k.sub&&<div style={{fontSize:'var(--fs-xs)',color:'rgba(255,255,255,0.35)',marginTop:4}}>{k.sub}</div>}
+          </div>
+        ))}
+      </div>
+
+      {/* ── Filtros ───────────────────────────────────────────────────────── */}
+      <div style={{background:'rgba(255,255,255,0.05)',backdropFilter:'blur(12px)',
+        border:'1px solid rgba(255,255,255,0.10)',borderRadius:'var(--r-lg)',padding:'14px 16px'}}>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'flex-end',marginBottom:10}}>
+          {[
+            {label:'Nome',        value:fBusca,    set:setFBusca,    placeholder:'Nome do cliente...', flex:'2 1 200px'},
+            {label:'CPF / CNPJ',  value:fCpfCnpj,  set:setFCpfCnpj,  placeholder:'000.000.000-00',    flex:'1 1 150px'},
+            {label:'Telefone',    value:fTelefone, set:setFTelefone, placeholder:'(51) 9...',          flex:'1 1 140px'},
+            {label:'Cidade',      value:fCidade,   set:setFCidade,   placeholder:'São Leopoldo...',    flex:'1 1 150px'},
+          ].map(fi=>(
+            <div key={fi.label} style={{flex:fi.flex,minWidth:130}}>
+              <div style={{fontSize:'var(--fs-xs)',color:'rgba(255,255,255,0.4)',
+                textTransform:'uppercase',letterSpacing:'.05em',marginBottom:5,fontWeight:600}}>{fi.label}</div>
+              <input value={fi.value} onChange={e=>fi.set(e.target.value)}
+                className={inputCls} placeholder={fi.placeholder} style={{width:'100%'}} />
+            </div>
+          ))}
         </div>
-        <input className="ds-input" style={{flex:'1 1 140px',minWidth:130}}
-          placeholder="CPF / CNPJ..." value={filters.cpf_cnpj}
-          onChange={e=>setFilters(f=>({...f,cpf_cnpj:e.target.value}))} />
-        <input className="ds-input" style={{flex:'1 1 140px',minWidth:130}}
-          placeholder="Telefone..." value={filters.telefone}
-          onChange={e=>setFilters(f=>({...f,telefone:e.target.value}))} />
-        <select className="ds-select" style={{flex:'0 0 auto',width:'auto',minWidth:130}}
-          value={filters.tipo} onChange={e=>setFilters(f=>({...f,tipo:e.target.value}))}>
-          <option value="">Todos os tipos</option>
-          <option value="PF">Pessoa Física</option>
-          <option value="PJ">Pessoa Jurídica</option>
-        </select>
-        {hasFilter && (
-          <button className="btn-clear-filter"
-            onClick={()=>setFilters({busca:'',tipo:'',cpf_cnpj:'',telefone:''})}>
+        <div style={{display:'flex',gap:8,flexWrap:'wrap',alignItems:'flex-end'}}>
+          <div style={{flex:'0 1 150px'}}>
+            <div style={{fontSize:'var(--fs-xs)',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:5,fontWeight:600}}>Tipo</div>
+            <select value={fTipo} onChange={e=>setFTipo(e.target.value)} className={selectCls} style={{width:'100%'}}>
+              <option value="">Todos</option>
+              <option value="PF">Pessoa Física</option>
+              <option value="PJ">Pessoa Jurídica</option>
+            </select>
+          </div>
+          <div style={{flex:'0 1 160px'}}>
+            <div style={{fontSize:'var(--fs-xs)',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:5,fontWeight:600}}>Papel</div>
+            <select value={fPapel} onChange={e=>setFPapel(e.target.value)} className={selectCls} style={{width:'100%'}}>
+              <option value="">Todos os papéis</option>
+              <option value="cliente">Cliente</option>
+              <option value="fornecedor">Fornecedor</option>
+              <option value="transportador">Transportador</option>
+              <option value="funcionario">Funcionário</option>
+            </select>
+          </div>
+          <div style={{flex:'0 1 160px'}}>
+            <div style={{fontSize:'var(--fs-xs)',color:'rgba(255,255,255,0.4)',textTransform:'uppercase',letterSpacing:'.05em',marginBottom:5,fontWeight:600}}>Status SPC</div>
+            <select value={fSPC} onChange={e=>setFSPC(e.target.value)} className={selectCls} style={{width:'100%'}}>
+              <option value="">Todos</option>
+              <option value="limpo">Limpo</option>
+              <option value="restrito">Restrito</option>
+              <option value="pendente">Pendente consulta</option>
+            </select>
+          </div>
+          <button onClick={()=>{setFBusca('');setFTipo('');setFCpfCnpj('');setFTelefone('');setFCidade('');setFSPC('');setFPapel('')}}
+            style={{alignSelf:'flex-end',padding:'7px 14px',borderRadius:'var(--r-md)',
+              background:'rgba(255,255,255,0.07)',border:'1px solid rgba(255,255,255,0.12)',
+              color:'rgba(255,255,255,0.6)',fontSize:'var(--fs-md)',cursor:'pointer',
+              fontFamily:'var(--font-sans)',whiteSpace:'nowrap'}}>
             ✕ Limpar
           </button>
+        </div>
+        <div style={{marginTop:10,fontSize:'var(--fs-xs)',color:'rgba(255,255,255,0.3)'}}>
+          {lista.length} resultado(s)
+        </div>
+      </div>
+
+      {/* ── Tabela ────────────────────────────────────────────────────────── */}
+      <div style={{background:'rgba(255,255,255,0.05)',backdropFilter:'blur(12px)',
+        border:'1px solid rgba(255,255,255,0.10)',borderRadius:'var(--r-lg)',overflow:'hidden'}}>
+        {loading ? (
+          <div className="ds-loading"><div className="ds-dots"><span/><span/><span/></div></div>
+        ) : lista.length === 0 ? (
+          <div className="ds-empty">
+            <div className="ds-empty-icon">👥</div>
+            <div className="ds-empty-title">Nenhum cliente encontrado.</div>
+          </div>
+        ) : (
+          <table style={{width:'100%',borderCollapse:'collapse',fontSize:'var(--fs-md)'}}>
+            <thead>
+              <tr>
+                {(['Nome','Tipo','Papéis','CPF / CNPJ','Contato','Cidade / UF','SPC',''] as string[]).map(h=>(
+                  <th key={h} style={{padding:'8px 14px',textAlign:h===''?'center':'left',
+                    fontSize:'var(--fs-xs)',fontWeight:600,color:'rgba(255,255,255,0.38)',
+                    textTransform:'uppercase',letterSpacing:'0.05em',
+                    borderBottom:'1px solid rgba(255,255,255,0.08)',
+                    background:'rgba(255,255,255,0.03)',whiteSpace:'nowrap'}}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {lista.map(r=>{
+                const icons:Record<string,string>={cliente:'👤',fornecedor:'📦',transportador:'🚛',funcionario:'👷',representante:'🤝'}
+                const papeis=(r.papeis??['cliente']) as string[]
+                const spcStatus = alertaSPC(r)
+                return (
+                  <tr key={r.id} onClick={()=>abrir(r)} style={{cursor:'pointer'}}
+                    onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(129,140,248,0.06)'}
+                    onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                    <td style={{padding:'10px 14px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+                      <div style={{fontWeight:600,color:'rgba(255,255,255,0.88)'}}>{r.nome}</div>
+                      {r.email&&<div style={{fontSize:'var(--fs-xs)',color:'rgba(255,255,255,0.35)',marginTop:1}}>{r.email}</div>}
+                    </td>
+                    <td style={{padding:'10px 14px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+                      <span style={{padding:'2px 8px',borderRadius:99,fontSize:'var(--fs-xs)',fontWeight:600,
+                        background:r.tipo==='PJ'?'rgba(167,139,250,0.15)':'rgba(129,140,248,0.15)',
+                        color:r.tipo==='PJ'?'#a78bfa':'#818cf8',
+                        border:`1px solid ${r.tipo==='PJ'?'rgba(167,139,250,0.3)':'rgba(129,140,248,0.3)'}`}}>
+                        {r.tipo}
+                      </span>
+                    </td>
+                    <td style={{padding:'10px 14px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+                      <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
+                        {papeis.map((p:string)=>(
+                          <span key={p} style={{display:'inline-flex',alignItems:'center',gap:3,
+                            padding:'2px 7px',borderRadius:4,fontSize:10,fontWeight:600,
+                            background:'rgba(129,140,248,0.12)',color:'#a5b4fc',
+                            border:'1px solid rgba(129,140,248,0.25)'}}>
+                            {icons[p]??'•'} {p.charAt(0).toUpperCase()+p.slice(1)}
+                          </span>
+                        ))}
+                      </div>
+                    </td>
+                    <td style={{padding:'10px 14px',borderBottom:'1px solid rgba(255,255,255,0.05)',
+                      fontFamily:'var(--font-mono)',fontSize:'var(--fs-sm)',color:'rgba(255,255,255,0.45)'}}>
+                      {r.cpf_cnpj||'—'}
+                    </td>
+                    <td style={{padding:'10px 14px',borderBottom:'1px solid rgba(255,255,255,0.05)',
+                      fontSize:'var(--fs-sm)',color:'rgba(255,255,255,0.55)'}}>
+                      {r.celular||r.telefone||'—'}
+                    </td>
+                    <td style={{padding:'10px 14px',borderBottom:'1px solid rgba(255,255,255,0.05)',
+                      fontSize:'var(--fs-sm)',color:'rgba(255,255,255,0.45)'}}>
+                      {r.cidade?`${r.cidade}${r.estado?' / '+r.estado:''}` : '—'}
+                    </td>
+                    <td style={{padding:'10px 14px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}>
+                      {spcStatus==='warning'
+                        ?<Badge value="pendente" label={r.ultima_consulta_spc?'SPC Vencido':'Pendente'} dot/>
+                        :<Badge value={r.status_spc||'limpo'} label={r.status_spc||'Limpo'} dot/>}
+                    </td>
+                    <td style={{padding:'8px 12px',borderBottom:'1px solid rgba(255,255,255,0.05)'}}
+                      onClick={e=>e.stopPropagation()}>
+                      <ActionButtons onDelete={()=>inativar(r.id)} deleteConfirm="Inativar este cliente?" />
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         )}
       </div>
 
-      <DataTable loading={loading} emptyMessage="Nenhum cliente encontrado."
-        columns={[
-          {key:'nome', label:'Nome', render:r=>(
-            <div>
-              <div className="tbl-cell-main">{r.nome}</div>
-              {r.email && <div className="tbl-cell-sub">{r.email}</div>}
-            </div>
-          )},
-          {key:'tipo', label:'Tipo', render:r=><Badge value={r.tipo} />},
-          {key:'papeis', label:'Papéis', render:r=>{
-            const icons:Record<string,string>={cliente:'👤',fornecedor:'📦',transportador:'🚛',funcionario:'👷',representante:'🤝'}
-            const papeis=(r.papeis??['cliente']) as string[]
-            return (
-              <div style={{display:'flex',gap:4,flexWrap:'wrap'}}>
-                {papeis.map((p:string)=>(
-                  <span key={p} style={{display:'inline-flex',alignItems:'center',gap:3,
-                    padding:'2px 8px',borderRadius:'var(--r-sm)',fontSize:'var(--fs-xs)',fontWeight:600,
-                    background:'var(--c-primary-light,#e8f4f8)',color:'var(--c-primary)',border:'1px solid var(--c-primary)'}}>
-                    {icons[p]??'•'} {p.charAt(0).toUpperCase()+p.slice(1)}
-                  </span>
-                ))}
-              </div>
-            )
-          }},
-          {key:'cpf_cnpj', label:'CPF/CNPJ', render:r=>(
-            <span className="tbl-mono">{r.cpf_cnpj||'—'}</span>
-          )},
-          {key:'contato', label:'Contato', render:r=>(
-            <span style={{fontSize:'var(--fs-md)',color:'var(--t-secondary)'}}>{r.celular||r.telefone||'—'}</span>
-          )},
-          {key:'cidade', label:'Cidade / UF', render:r=>(
-            <span style={{fontSize:'var(--fs-md)',color:'var(--t-secondary)'}}>
-              {r.cidade?`${r.cidade}${r.estado?' / '+r.estado:''}` : '—'}
-            </span>
-          )},
-          {key:'spc', label:'SPC', render:r=>alertaSPC(r)==='warning'
-            ?<Badge value="pendente" label={r.ultima_consulta_spc?'SPC Vencido':'Pendente'} dot />
-            :<Badge value={r.status_spc||'limpo'} label={r.status_spc||'Limpo'} dot />
-          },
-        ]}
-        data={lista}
-        onRowClick={row=>abrir(row)}
-        actions={row=>(
-          <div style={{display:'flex',justifyContent:'center'}}>
-            <ActionButtons onDelete={()=>inativar(row.id)} deleteConfirm="Inativar este cliente?" />
-          </div>
-        )}
-      />
 
       <SlidePanel open={panel} onClose={()=>setPanel(false)} title={editId?'Editar Cliente':'Novo Cliente'} subtitle={editId?form.nome:'Preencha os dados do cliente'} width="lg"
         footer={<div style={{display:'flex',gap:10}}><Btn variant="secondary" style={{flex:1}} onClick={()=>setPanel(false)}>Cancelar</Btn><Btn style={{flex:1}} loading={saving} onClick={salvar}>{editId?'Atualizar':'Salvar'} Cliente</Btn></div>}>
