@@ -6,7 +6,7 @@ import { Btn, Badge, inputCls } from '@/components/ui'
 import { calcularPrecoItem, calcularDias, type PrecosProduto } from '@/lib/calcularCobranca'
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
-type Aba = 'inventario' | 'historico' | 'contratos' | 'precos'
+type Aba = 'inventario' | 'historico' | 'contratos' | 'precos' | 'acessorios'
 
 const STATUS_COLOR: Record<string, string> = {
   disponivel: 'var(--c-success,#16a34a)',
@@ -158,6 +158,7 @@ export default function EquipamentoDetalhe() {
           ['historico',  `📋 Histórico de Movimentações (${movs.length})`],
           ['contratos',  `📄 Contratos (${contratos.length})`],
           ['precos',     '💰 Tabela de Preços'],
+          ['acessorios', `🔩 Acessórios (${acessorios.length})`],
         ] as const).map(([k, l]) => (
           <button key={k} onClick={() => setAba(k as Aba)}
             style={{
@@ -507,6 +508,132 @@ export default function EquipamentoDetalhe() {
               )}
             </div>
           ))}
+        </div>
+      )}
+
+
+      {/* ── ABA: ACESSÓRIOS ─────────────────────────────────────────────── */}
+      {aba === 'acessorios' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
+
+          {/* Formulário novo acessório */}
+          <div style={{ background:'var(--bg-card)', border:'1px solid var(--border)',
+            borderRadius:'var(--r-lg)', padding:16 }}>
+            <div style={{ fontWeight:600, marginBottom:12, color:'var(--t-secondary)' }}>
+              + Adicionar Acessório
+            </div>
+            {erroAcc && <div className="ds-alert-error" style={{marginBottom:10}}>{erroAcc}</div>}
+            <div style={{ display:'grid', gridTemplateColumns:'1fr 120px 120px auto', gap:8, alignItems:'end' }}>
+              <div>
+                <div className="ds-label">Nome do acessório *</div>
+                <input className="ds-input" value={formAcess.nome}
+                  onChange={e=>setFormAcess(f=>({...f,nome:e.target.value}))}
+                  placeholder="Ex: Bateria, Carregador, Maleta..." />
+              </div>
+              <div>
+                <div className="ds-label">Quantidade</div>
+                <input type="number" min="1" className="ds-input" value={formAcess.quantidade}
+                  onChange={e=>setFormAcess(f=>({...f,quantidade:Number(e.target.value)}))} />
+              </div>
+              <div>
+                <div className="ds-label">Obrigatório</div>
+                <select className="ds-select" value={formAcess.obrigatorio?'1':'0'}
+                  onChange={e=>setFormAcess(f=>({...f,obrigatorio:e.target.value==='1'}))}>
+                  <option value="1">Sim</option>
+                  <option value="0">Não</option>
+                </select>
+              </div>
+              <button
+                onClick={async()=>{
+                  if(!formAcess.nome.trim()){setErroAcc('Informe o nome.');return}
+                  setSalvandoAcc(true);setErroAcc('')
+                  const{error}=await supabase.from('produto_acessorios').insert({
+                    produto_id:  Number(params.id),
+                    nome:        formAcess.nome.trim(),
+                    quantidade:  formAcess.quantidade,
+                    obrigatorio: formAcess.obrigatorio,
+                    ativo:       1,
+                  })
+                  if(error){setErroAcc(error.message);setSalvandoAcc(false);return}
+                  setFormAcess({nome:'',descricao:'',quantidade:1,obrigatorio:true})
+                  const{data}=await supabase.from('produto_acessorios')
+                    .select('*').eq('produto_id',Number(params.id)).eq('ativo',1).order('id')
+                  setAcessorios(data??[])
+                  setSalvandoAcc(false)
+                }}
+                disabled={salvandoAcc}
+                style={{ padding:'8px 16px', borderRadius:'var(--r-md)',
+                  background:'linear-gradient(135deg,#6366f1,#818cf8)',
+                  border:'none', color:'#fff', fontWeight:600, cursor:'pointer',
+                  fontSize:'var(--fs-md)', fontFamily:'var(--font-sans)' }}>
+                {salvandoAcc ? '...' : '+ Adicionar'}
+              </button>
+            </div>
+          </div>
+
+          {/* Lista de acessórios */}
+          {acessorios.length === 0 ? (
+            <div className="ds-empty">
+              <div className="ds-empty-icon">🔩</div>
+              <div className="ds-empty-title">Nenhum acessório cadastrado.</div>
+              <div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)',marginTop:4}}>
+                Acessórios aparecem automaticamente no contrato de locação junto com este equipamento.
+              </div>
+            </div>
+          ) : (
+            <div style={{ background:'var(--bg-card)', border:'1px solid var(--border)',
+              borderRadius:'var(--r-lg)', overflow:'hidden' }}>
+              <table style={{ width:'100%', borderCollapse:'collapse' }}>
+                <thead>
+                  <tr style={{ background:'rgba(255,255,255,0.03)' }}>
+                    {['Acessório','Qtd','Obrigatório',''].map(h=>(
+                      <th key={h} style={{ padding:'8px 14px', textAlign:'left',
+                        fontSize:'var(--fs-xs)', fontWeight:600, color:'var(--t-muted)',
+                        textTransform:'uppercase', letterSpacing:'.05em',
+                        borderBottom:'1px solid var(--border)' }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {acessorios.map(a=>(
+                    <tr key={a.id}
+                      style={{ borderBottom:'1px solid var(--border)' }}
+                      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='rgba(129,140,248,0.06)'}
+                      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                      <td style={{ padding:'10px 14px', fontWeight:500, color:'var(--t-primary)' }}>
+                        {a.nome}
+                      </td>
+                      <td style={{ padding:'10px 14px', color:'var(--t-secondary)' }}>
+                        {a.quantidade}x
+                      </td>
+                      <td style={{ padding:'10px 14px' }}>
+                        <span style={{
+                          padding:'2px 8px', borderRadius:99, fontSize:'var(--fs-xs)', fontWeight:600,
+                          background: a.obrigatorio ? 'rgba(52,211,153,0.15)' : 'rgba(148,163,184,0.12)',
+                          color: a.obrigatorio ? '#34d399' : '#94a3b8',
+                        }}>{a.obrigatorio ? 'Obrigatório' : 'Opcional'}</span>
+                      </td>
+                      <td style={{ padding:'8px 12px', textAlign:'right' }}>
+                        <button
+                          onClick={async()=>{
+                            if(!confirm(`Remover "${a.nome}"?`)) return
+                            await supabase.from('produto_acessorios').update({ativo:0}).eq('id',a.id)
+                            setAcessorios(prev=>prev.filter(x=>x.id!==a.id))
+                          }}
+                          className="tbl-btn del" title="Remover">
+                          ×
+                        </button>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ padding:'8px 14px', fontSize:'var(--fs-xs)', color:'var(--t-muted)',
+                borderTop:'1px solid var(--border)', background:'rgba(255,255,255,0.02)' }}>
+                🔩 {acessorios.length} acessório(s) — aparecem automaticamente no contrato de locação
+              </div>
+            </div>
+          )}
         </div>
       )}
 

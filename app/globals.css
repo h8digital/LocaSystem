@@ -322,6 +322,7 @@ input[class~="ds-input"], select[class~="ds-select"] {
   font-family: var(--font-sans);
   transition: border-color 0.15s, box-shadow 0.15s;
   outline: none;
+  color-scheme: dark;
 }
 .ds-input:focus, .ds-select:focus, .ds-textarea:focus {
   border-color: var(--border-focus);
@@ -330,9 +331,17 @@ input[class~="ds-input"], select[class~="ds-select"] {
 .ds-input::placeholder { color: var(--t-muted) }
 .ds-input[type="date"] { color-scheme: dark }
 
-.ds-select option {
-  background: #1e293b;
-  color: var(--t-primary);
+.ds-select option,
+select option {
+  background: #1e293b !important;
+  color: rgba(255,255,255,0.88) !important;
+}
+
+/* Garantir dark em TODOS os selects nativos */
+select {
+  color-scheme: dark;
+  background-color: #1e293b;
+  color: rgba(255,255,255,0.88);
 }
 .ds-textarea { resize: vertical; min-height: 80px; line-height: 1.5 }
 .ds-hint { font-size: var(--fs-xs); color: var(--t-muted); margin-top: 4px }
@@ -775,7 +784,24 @@ input[type="datetime-local"] {
   margin: 2px 0;
 }
 
-/* ── Select — forçar fundo escuro nas options (best-effort) ──────────────── */
-.ds-input, .ds-select {
-  color-scheme: dark;
+/* color-scheme dark já aplicado acima globalmente */
+
+/* ── Modais — fundo sólido (glassmorphism não funciona em modal) ─────────── */
+.ds-modal-body {
+  background: #1e293b;
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: var(--r-lg);
+  box-shadow: 0 20px 60px rgba(0,0,0,0.8), 0 4px 20px rgba(0,0,0,0.5);
+}
+
+.ds-modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.65);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  backdrop-filter: blur(4px);
 }

@@ -103,7 +103,8 @@ export async function POST(req: NextRequest) {
       .select('*, clientes(*), usuarios(nome)')
       .eq('id', contrato_id).single(),
     sb.from('contrato_itens')
-      .select(`*, produtos(nome,preco_locacao_diario,custo_reposicao,prazo_entrega_dias),
+      .select(`*, produtos(nome,preco_locacao_diario,custo_reposicao,prazo_entrega_dias,
+               produto_acessorios(nome,quantidade,obrigatorio,ativo)),
                patrimonios(numero_patrimonio,numero_serie)`)
       .eq('contrato_id', contrato_id)
       .order('tipo_item')
@@ -202,21 +203,32 @@ export async function POST(req: NextRequest) {
   const empresaEstado   = p['empresa_estado']   ?? ''
 
   // ── Loops de itens ────────────────────────────────────────────────────────
-  const rowsLocacao: Record<string,string>[] = itensLocacao.map((i: any) => ({
-    nome:              i.descricao_livre ?? i.produtos?.nome ?? '—',
-    patrimonio_num:    i.patrimonios?.numero_patrimonio ?? '—',
-    numero_serie:      i.patrimonios?.numero_serie ?? '—',
-    quantidade:        String(i.quantidade),
-    preco_unitario:    fmt_money(i.preco_unitario),
-    periodo_descricao: periodoNome,
-    total_item:        fmt_money(i.total_item),
-    // Tags de limpeza por item (usadas no template)
-    tem_limpeza_item:   i.limpeza_contratada ? '1' : '0',
-    taxa_limpeza_unit:  i.limpeza_contratada && Number(i.quantidade) > 0
-      ? fmt_money(Number(i.valor_limpeza ?? 0) / Number(i.quantidade))
-      : 'R$ 0,00',
-    valor_limpeza_item: fmt_money(Number(i.valor_limpeza ?? 0)),
-  }))
+  const rowsLocacao: Record<string,string>[] = itensLocacao.map((i: any) => {
+    // Acessórios vinculados ao produto
+    const acessorios = ((i.produtos?.produto_acessorios ?? []) as any[])
+      .filter((a: any) => a.ativo === 1)
+    const acessoriosStr = acessorios.length > 0
+      ? acessorios.map((a: any) => `${a.quantidade}x ${a.nome}`).join(', ')
+      : ''
+    return {
+      nome:              i.descricao_livre ?? i.produtos?.nome ?? '—',
+      patrimonio_num:    i.patrimonios?.numero_patrimonio ?? '—',
+      numero_serie:      i.patrimonios?.numero_serie ?? '—',
+      quantidade:        String(i.quantidade),
+      preco_unitario:    fmt_money(i.preco_unitario),
+      periodo_descricao: periodoNome,
+      total_item:        fmt_money(i.total_item),
+      // Acessórios do produto — aparece no template como {{acessorios_item}}
+      acessorios_item:   acessoriosStr,
+      tem_acessorios:    acessoriosStr ? '1' : '0',
+      // Tags de limpeza por item
+      tem_limpeza_item:   i.limpeza_contratada ? '1' : '0',
+      taxa_limpeza_unit:  i.limpeza_contratada && Number(i.quantidade) > 0
+        ? fmt_money(Number(i.valor_limpeza ?? 0) / Number(i.quantidade))
+        : 'R$ 0,00',
+      valor_limpeza_item: fmt_money(Number(i.valor_limpeza ?? 0)),
+    }
+  })
 
   const rowsAcessorios: Record<string,string>[] = itensAcessorios.map((i: any) => ({
     nome:           i.descricao_livre ?? i.produtos?.nome ?? '—',
