@@ -33,25 +33,25 @@ export async function POST(req: NextRequest) {
     let clienteId: number | null = null
     if (cliente.email) {
       const { data: existe } = await sb.from('clientes')
-        .select('id').ilike('email', cliente.email.trim()).limit(1).single()
-      if (existe) clienteId = existe.id
+        .select('id').ilike('email', cliente.email.trim()).limit(1).maybeSingle()
+      if (existe?.id) clienteId = existe.id
     }
     if (!clienteId && cliente.telefone) {
       const tel = cliente.telefone.replace(/\D/g, '')
       const { data: existe } = await sb.from('clientes')
-        .select('id').or(`celular.ilike.%${tel}%,telefone.ilike.%${tel}%`).limit(1).single()
-      if (existe) clienteId = existe.id
+        .select('id').or(`celular.ilike.%${tel}%,telefone.ilike.%${tel}%`).limit(1).maybeSingle()
+      if (existe?.id) clienteId = existe.id
     }
     if (!clienteId) {
-      const { data: novo } = await sb.from('clientes').insert({
+      const { data: novo, error: insErr } = await sb.from('clientes').insert({
         nome:    cliente.nome.trim(),
         email:   cliente.email?.trim() || null,
         celular: cliente.telefone?.trim() || null,
         cidade:  cliente.cidade?.trim() || null,
         tipo:    'PF',
         ativo:   1,
-        papeis:  ['cliente'],
-      }).select('id').single()
+      }).select('id').maybeSingle()
+      if (insErr) return NextResponse.json({ ok:false, error:'Erro ao criar cliente: ' + insErr.message })
       clienteId = novo?.id ?? null
     }
     if (!clienteId) return NextResponse.json({ ok: false, error: 'Erro ao registrar cliente.' })
@@ -82,7 +82,7 @@ export async function POST(req: NextRequest) {
     const hoje     = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
     const validade = new Date(Date.now() + 7 * 86400000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
 
-    const { data: cotacao } = await sb.from('cotacoes').insert({
+    const { data: cotacao, error: cotErr } = await sb.from('cotacoes').insert({
       cliente_id:   clienteId,
       status:       'aguardando',
       data_emissao: hoje,
@@ -92,9 +92,10 @@ export async function POST(req: NextRequest) {
       acrescimo:    0,
       total:        subtotal,
       observacoes:  `Cotação rápida. Cliente: ${cliente.nome}${cliente.cidade ? ' — ' + cliente.cidade : ''}`,
-    }).select('id,numero').single()
+    }).select('id,numero').maybeSingle()
 
-    if (!cotacao) return NextResponse.json({ ok: false, error: 'Erro ao criar cotação.' })
+    if (cotErr) return NextResponse.json({ ok: false, error: 'Erro ao criar cotação: ' + cotErr.message })
+    if (!cotacao) return NextResponse.json({ ok: false, error: 'Cotação não retornou dados.' })
 
     // ── Inserir itens ──────────────────────────────────────────────────────
     await sb.from('cotacao_itens').insert(

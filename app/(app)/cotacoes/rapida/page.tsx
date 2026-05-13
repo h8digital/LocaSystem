@@ -360,7 +360,27 @@ export default function CotacaoRapidaPage() {
                 </div>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 5 }}>Telefone / WhatsApp</div>
-                  <input {...C('telefone')} className={inputCls} placeholder="(51) 9 9999-9999" style={{ width: '100%' }} />
+                  <input
+                    value={cliente.telefone}
+                    onChange={e => {
+                      // Máscara: (99) 9 9999-9999 ou (99) 9999-9999
+                      let v = e.target.value.replace(/\D/g, '').slice(0, 11)
+                      if (v.length > 10) {
+                        v = v.replace(/(\d{2})(\d{1})(\d{4})(\d{4})/, '($1) $2 $3-$4')
+                      } else if (v.length > 6) {
+                        v = v.replace(/(\d{2})(\d{4})(\d{0,4})/, '($1) $2-$3')
+                      } else if (v.length > 2) {
+                        v = v.replace(/(\d{2})(\d+)/, '($1) $2')
+                      } else if (v.length > 0) {
+                        v = v.replace(/(\d+)/, '($1')
+                      }
+                      setCliente(c => ({ ...c, telefone: v }))
+                    }}
+                    className={inputCls}
+                    placeholder="(51) 9 9999-9999"
+                    inputMode="numeric"
+                    style={{ width: '100%' }}
+                  />
                 </div>
               </div>
 
