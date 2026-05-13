@@ -125,7 +125,7 @@ export default function CotacaoRapidaPage() {
   const [loading, setLoading]    = useState(true)
   const [carrinho, setCarrinho]  = useState<ItemCarrinho[]>([])
   const [salvando, setSalvando]  = useState(false)
-  const [resultado, setResultado]= useState<{ token: string; numero: string } | null>(null)
+  const [resultado, setResultado]= useState<{ token: string; numero: string; cotacao_id: number } | null>(null)
   const [erro, setErro]          = useState('')
 
   const [cliente, setCliente] = useState({ nome: '', email: '', telefone: '', cidade: '' })
