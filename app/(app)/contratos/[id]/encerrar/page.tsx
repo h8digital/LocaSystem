@@ -134,10 +134,12 @@ export default function EncerrarContratoPage() {
   const totalPagarAgora = pagamentos.filter(p => p.pagar).reduce((s, p) => s + Number(p.valor_pago), 0)
   const valorAvarias   = itens.filter(i => i.condicao === 'avariado').reduce((s, i)   => s + Number(i.custo_avaria), 0)
   const valorExtravios = itens.filter(i => i.condicao === 'extraviado').reduce((s, i) => s + Number(i.custo_avaria), 0)
-  // Multa de entrega: diária × quantidade devolvida × dias atraso
+  // Multa de entrega: diária × quantidade PENDENTE (em posse do cliente) × dias atraso
+  // A multa incide sobre tudo que estava com o cliente além do prazo,
+  // independentemente de quantas unidades ele vai devolver agora.
   const multaAtraso = (multaEntregaAtivo && diasAtraso > 0)
-    ? itens.filter(i => i.quantidade_devolvida > 0).reduce((s, i) =>
-        s + Number(i.preco_diario ?? 0) * Number(i.quantidade_devolvida) * diasAtraso, 0)
+    ? itens.reduce((s, i) =>
+        s + Number(i.preco_diario ?? 0) * Number(i.qtd_pendente ?? i.quantidade_devolvida) * diasAtraso, 0)
     : 0
   const totalExtras    = multaAtraso + valorAvarias + valorExtravios
 
@@ -592,7 +594,7 @@ export default function EncerrarContratoPage() {
                       <span>{(item.produtos as any)?.nome ?? 'Item'} × {item.quantidade_devolvida} un.</span>
                       <span style={{ fontFamily:'var(--font-mono)', fontWeight:600 }}>
                         {Number(item.preco_diario ?? 0) > 0
-                          ? `${fmt.money(Number(item.preco_diario))} × ${item.quantidade_devolvida} × ${diasAtraso}d = ${fmt.money(Number(item.preco_diario) * Number(item.quantidade_devolvida) * diasAtraso)}`
+                          ? `${fmt.money(Number(item.preco_diario))} × ${item.qtd_pendente ?? item.quantidade_devolvida} × ${diasAtraso}d = ${fmt.money(Number(item.preco_diario) * Number(item.quantidade_devolvida) * diasAtraso)}`
                           : 'sem diária'}
                       </span>
                     </div>

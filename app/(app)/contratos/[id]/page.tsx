@@ -880,7 +880,7 @@ export default function VerContratoPage() {
                   <div className="form-grid-3">
                     {[
                       {l:'Locação',          v:saldoInfo.fat_locacao,     c:'var(--t-primary)'},
-                      {l:'Multa/Atraso',     v:saldoInfo.fat_multa,       c:Number(saldoInfo.fat_multa)>0?'var(--c-danger)':'var(--t-muted)'},
+                      {l:'Multa Faturada',   v:saldoInfo.fat_multa,       c:Number(saldoInfo.fat_multa)>0?'var(--c-danger)':'var(--t-muted)'},
                       {l:'Manutenção/OS',    v:saldoInfo.fat_manutencao,  c:Number(saldoInfo.fat_manutencao)>0?'var(--c-warning)':'var(--t-muted)'},
                       {l:'Total Faturado',   v:saldoInfo.total_faturado,  c:'var(--c-primary)'},
                       {l:'Recebido',         v:saldoInfo.total_recebido,  c:'var(--c-success)'},
@@ -928,6 +928,40 @@ export default function VerContratoPage() {
                 </div>
               </div>
               </div>
+
+              {/* Alerta de multa prevista por atraso */}
+              {saldoInfo && Number(saldoInfo.multa_prevista) > 0 && (
+                <div style={{
+                  background:'rgba(248,113,113,0.12)',
+                  border:'1px solid rgba(248,113,113,0.4)',
+                  borderLeft:'4px solid var(--c-danger)',
+                  borderRadius:'var(--r-md)',
+                  padding:'12px 16px',
+                  display:'flex',
+                  alignItems:'center',
+                  justifyContent:'space-between',
+                  gap:12,
+                }}>
+                  <div>
+                    <div style={{fontWeight:700,color:'var(--c-danger)',fontSize:'var(--fs-base)',marginBottom:3}}>
+                      ⚠ Multa por Atraso na Devolução
+                    </div>
+                    <div style={{fontSize:'var(--fs-md)',color:'var(--c-danger-text)'}}>
+                      Contrato vencido há <strong>{saldoInfo.dias_atraso_hoje} dia(s)</strong>.
+                      Multa calculada sobre todos os itens ainda não devolvidos.
+                    </div>
+                  </div>
+                  <div style={{textAlign:'right',flexShrink:0}}>
+                    <div style={{fontSize:'var(--fs-sm)',color:'var(--c-danger-text)',marginBottom:2}}>Multa Prevista</div>
+                    <div style={{fontWeight:800,fontSize:22,color:'var(--c-danger)',fontFamily:'var(--font-mono)'}}>
+                      {fmt.money(Number(saldoInfo.multa_prevista))}
+                    </div>
+                    <div style={{fontSize:'var(--fs-xs)',color:'rgba(248,113,113,0.6)',marginTop:2}}>
+                      Será cobrada no encerramento
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Faturas */}
               <div>
