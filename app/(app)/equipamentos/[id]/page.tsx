@@ -552,7 +552,7 @@ export default function EquipamentoDetalhe() {
                   if(!formAcess.nome.trim()){setErroAcc('Informe o nome.');return}
                   setSalvandoAcc(true);setErroAcc('')
                   const{error}=await supabase.from('produto_acessorios').insert({
-                    produto_id:  Number(params.id),
+                    produto_id:  Number(id),
                     nome:        formAcess.nome.trim(),
                     quantidade:  formAcess.quantidade,
                     obrigatorio: formAcess.obrigatorio,
@@ -561,7 +561,7 @@ export default function EquipamentoDetalhe() {
                   if(error){setErroAcc(error.message);setSalvandoAcc(false);return}
                   setFormAcess({nome:'',descricao:'',quantidade:1,obrigatorio:true})
                   const{data}=await supabase.from('produto_acessorios')
-                    .select('*').eq('produto_id',Number(params.id)).eq('ativo',1).order('id')
+                    .select('*').eq('produto_id',Number(id)).eq('ativo',1).order('id')
                   setAcessorios(data??[])
                   setSalvandoAcc(false)
                 }}
