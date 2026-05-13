@@ -74,7 +74,7 @@ export default function EncerrarContratoPage() {
         supabase.from('contratos').select('*, clientes(nome)').eq('id', id).single(),
         supabase.from('faturas').select('*').eq('contrato_id', id).order('data_vencimento'),
         supabase.from('contrato_itens')
-          .select('*, produtos(nome, taxa_limpeza_avulsa), patrimonios(numero_patrimonio)')
+          .select('*, produtos(nome, taxa_limpeza_avulsa, preco_locacao_diario), patrimonios(numero_patrimonio)')
           .eq('contrato_id', id)
           .order('id'),
         supabase.from('parametros').select('valor').eq('chave', 'multa_entrega_ativo').single(),
@@ -86,12 +86,15 @@ export default function EncerrarContratoPage() {
 
       setContrato(c)
       setFaturas(f ?? [])
-      setMultaEntregaAtivo((mp as any)?.data?.valor === 'sim')
+      setMultaEntregaAtivo((mp as any)?.valor === 'sim')
       setCaucaoDevolvido(Number(c.caucao ?? 0))
 
-      // Atraso automático
+      // Atraso automático — usando timezone de Brasília
       if (c.data_fim) {
-        const diff = Math.floor((Date.now() - new Date(c.data_fim).getTime()) / 86400000)
+        const hojeStr = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
+        const hoje    = new Date(hojeStr + 'T00:00:00')
+        const fim     = new Date(c.data_fim + 'T00:00:00')
+        const diff    = Math.floor((hoje.getTime() - fim.getTime()) / 86400000)
         if (diff > 0) setDiasAtraso(diff)
       }
 
@@ -107,6 +110,8 @@ export default function EncerrarContratoPage() {
         custo_avaria:         0,
         limpeza_cobrada:      false,
         taxa_limpeza_avulsa:  Number((item.produtos as any)?.taxa_limpeza_avulsa ?? 0),
+        // preco_diario: usa o campo do contrato_itens; fallback para o do produto
+        preco_diario: Number(item.preco_diario ?? (item.produtos as any)?.preco_locacao_diario ?? 0),
       })).filter((item: any) => item.qtd_pendente > 0))
 
       const pendentes = (f ?? []).filter((fat: Fatura) => fat.status !== 'pago')
