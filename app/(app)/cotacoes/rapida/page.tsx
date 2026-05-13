@@ -209,9 +209,13 @@ export default function CotacaoRapidaPage() {
 
   // ── Renderização ───────────────────────────────────────────────────────────
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+    <div style={{ display: 'flex', flexDirection: 'column', height: 'calc(100vh - 40px)' }}>
 
-      {/* Header com steps */}
+      {/* Header fixo com steps + filtros (sticky) */}
+      <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 10,
+        paddingBottom: 10, position: 'sticky', top: 0, zIndex: 50,
+        background: 'linear-gradient(180deg,#0f172a 80%,transparent 100%)' }}>
+
       <div style={{ background: 'rgba(255,255,255,0.05)', backdropFilter: 'blur(12px)',
         border: '1px solid rgba(255,255,255,0.10)', borderRadius: 'var(--r-lg)', padding: '14px 20px' }}>
         <div style={{ marginBottom: 12 }}>
@@ -256,12 +260,12 @@ export default function CotacaoRapidaPage() {
         </div>
       </div>
 
-      {/* ── ETAPA 1: CATÁLOGO ─────────────────────────────────────────────── */}
+      {/* Barra de busca + categoria — dentro do header fixo, só no step 1 */}
       {step === 1 && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-
-          {/* Barra de busca + categoria */}
-          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center',
+          background: 'rgba(255,255,255,0.04)', backdropFilter: 'blur(12px)',
+          border: '1px solid rgba(255,255,255,0.10)', borderRadius: 'var(--r-lg)',
+          padding: '10px 14px' }}>
             <input value={busca} onChange={e => setBusca(e.target.value)}
               className={inputCls} placeholder="Buscar equipamento..."
               style={{ flex: '1 1 200px', minWidth: 180 }} />
@@ -285,7 +289,17 @@ export default function CotacaoRapidaPage() {
                 </button>
               ))}
             </div>
-          </div>
+        </div>
+      )}
+
+      </div>{/* fim do header fixo */}
+
+      {/* ── Área scrollável ────────────────────────────────────────────────── */}
+      <div style={{ flex: 1, overflowY: 'auto', paddingTop: 12 }}>
+
+      {/* ── ETAPA 1: CATÁLOGO ─────────────────────────────────────────────── */}
+      {step === 1 && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 12, paddingBottom: 80 }}>
 
           {loading ? (
             <div className="ds-loading"><div className="ds-dots"><span/><span/><span/></div></div>
@@ -470,6 +484,24 @@ export default function CotacaoRapidaPage() {
             </a>
           </div>
 
+          {/* Links para consulta futura */}
+          <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
+            <a href={`/cotacoes/${resultado.cotacao_id}`}
+              style={{ padding: '7px 14px', borderRadius: 'var(--r-md)',
+                border: '1px solid rgba(129,140,248,0.3)', background: 'rgba(129,140,248,0.1)',
+                color: '#a5b4fc', fontSize: 12, fontWeight: 500, textDecoration: 'none',
+                display: 'flex', alignItems: 'center', gap: 5 }}>
+              📋 Ver cotação salva
+            </a>
+            <a href="/cotacoes"
+              style={{ padding: '7px 14px', borderRadius: 'var(--r-md)',
+                border: '1px solid rgba(255,255,255,0.12)', background: 'rgba(255,255,255,0.06)',
+                color: 'rgba(255,255,255,0.55)', fontSize: 12, fontWeight: 500, textDecoration: 'none',
+                display: 'flex', alignItems: 'center', gap: 5 }}>
+              📄 Ver todas as cotações
+            </a>
+          </div>
+
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
             borderRadius: 'var(--r-md)', padding: '10px 16px', fontSize: 12, color: 'rgba(255,255,255,0.4)',
             textAlign: 'center', maxWidth: 420 }}>
@@ -487,6 +519,7 @@ export default function CotacaoRapidaPage() {
           </button>
         </div>
       )}
+      </div>{/* fim da área scrollável */}
     </div>
   )
 }
