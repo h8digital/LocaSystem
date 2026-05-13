@@ -6,7 +6,6 @@ import { usePathname, useRouter } from 'next/navigation'
 const nav = [
   { href:'/dashboard',               icon:'⊞',  label:'Dashboard',              section:'PRINCIPAL' },
   { href:'/cotacoes',                icon:'📋', label:'Cotações',               section:'COMERCIAL' },
-  { href:'/cotacoes/rapida', icon:'⚡', label:'Cotação Rápida', section:null },
   { href:'/contratos',               icon:'📄', label:'Contratos',              section:null },
   { href:'/financeiro',              icon:'💰', label:'Financeiro',             section:null },
   { href:'/clientes',                icon:'👥', label:'Clientes',               section:null },

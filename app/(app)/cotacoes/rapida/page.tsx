@@ -125,7 +125,7 @@ export default function CotacaoRapidaPage() {
   const [loading, setLoading]    = useState(true)
   const [carrinho, setCarrinho]  = useState<ItemCarrinho[]>([])
   const [salvando, setSalvando]  = useState(false)
-  const [resultado, setResultado]= useState<{ token: string; numero: string; cotacao_id: number } | null>(null)
+  const [resultado, setResultado]= useState<{ token: string; token_aprovacao: string; numero: string; cotacao_id: number } | null>(null)
   const [erro, setErro]          = useState('')
 
   const [cliente, setCliente] = useState({ nome: '', email: '', telefone: '', cidade: '' })
@@ -473,7 +473,10 @@ export default function CotacaoRapidaPage() {
             </a>
             <a
               href={`https://wa.me/?text=${encodeURIComponent(
-                `Segue sua cotação de equipamentos:\n${window.location.origin}/doc/${resultado.token}`
+                `Olá! Segue sua cotação de equipamentos para locação.\n\n` +
+                `Você pode visualizar, aprovar ou recusar online pelo link abaixo:\n` +
+                `${window.location.origin}/cotacao/${resultado.token_aprovacao}\n\n` +
+                `Cotação válida por 7 dias.`
               )}`}
               target="_blank" rel="noreferrer">
               <button style={{ padding: '8px 16px', borderRadius: 'var(--r-md)', border: '1px solid rgba(52,211,153,0.4)',
@@ -483,6 +486,18 @@ export default function CotacaoRapidaPage() {
               </button>
             </a>
           </div>
+
+          {/* Botão copiar link público */}
+          <button onClick={() => {
+              navigator.clipboard.writeText(`${window.location.origin}/cotacao/${resultado.token_aprovacao}`)
+              alert('✅ Link copiado! O cliente pode visualizar, aprovar ou recusar a proposta online.')
+            }}
+            style={{ padding: '7px 16px', borderRadius: 'var(--r-md)',
+              border: '1px solid rgba(129,140,248,0.35)', background: 'rgba(129,140,248,0.12)',
+              color: '#a5b4fc', fontSize: 12, fontWeight: 500,
+              cursor: 'pointer', fontFamily: 'var(--font-sans)' }}>
+            🔗 Copiar link da proposta
+          </button>
 
           {/* Links para consulta futura */}
           <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', justifyContent: 'center' }}>
@@ -504,8 +519,9 @@ export default function CotacaoRapidaPage() {
 
           <div style={{ background: 'rgba(255,255,255,0.04)', border: '1px solid rgba(255,255,255,0.08)',
             borderRadius: 'var(--r-md)', padding: '10px 16px', fontSize: 12, color: 'rgba(255,255,255,0.4)',
-            textAlign: 'center', maxWidth: 420 }}>
-            O link do PDF fica disponível por 30 dias e pode ser compartilhado diretamente com o cliente.
+            textAlign: 'center', maxWidth: 460 }}>
+            O link da proposta permite ao cliente <strong style={{color:'rgba(255,255,255,0.6)'}}>visualizar, aprovar ou recusar</strong> online.
+            As visualizações são registradas automaticamente. Válido por 7 dias.
           </div>
 
           <button onClick={() => {

@@ -195,7 +195,17 @@ export default function CotacoesPage() {
     <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
 
       <PageHeader title="📋 Cotações" subtitle="Propostas comerciais para clientes"
-        actions={<Btn onClick={() => router.push('/cotacoes/criar')}>+ Nova Cotação</Btn>} />
+        actions={<div style={{display:'flex',gap:8}}>
+          <button onClick={() => router.push('/cotacoes/rapida')}
+            style={{ padding:'7px 14px', borderRadius:'var(--r-md)',
+              border:'1px solid rgba(129,140,248,0.35)', background:'rgba(129,140,248,0.12)',
+              color:'#a5b4fc', fontSize:'var(--fs-md)', fontWeight:500,
+              cursor:'pointer', fontFamily:'var(--font-sans)',
+              display:'flex', alignItems:'center', gap:6 }}>
+            ⚡ Cotação Rápida
+          </button>
+          <Btn onClick={() => router.push('/cotacoes/criar')}>+ Nova Cotação</Btn>
+        </div>} />
 
       {/* ── KPIs ─────────────────────────────────────────────────────────── */}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(5,1fr)', gap:10 }}>

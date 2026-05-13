@@ -86,17 +86,25 @@ export async function POST(req: NextRequest) {
     const hoje     = new Date().toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
     const validade = new Date(Date.now() + 7 * 86400000).toLocaleDateString('sv-SE', { timeZone: 'America/Sao_Paulo' })
 
+    // Token de aprovação — permite cliente ver, aprovar e recusar pelo link público
+    const tokenAprovacao = [
+      Math.random().toString(36).slice(2),
+      Math.random().toString(36).slice(2),
+      Date.now().toString(36),
+    ].join('')
+
     const { data: cotacao, error: cotErr } = await sb.from('cotacoes').insert({
-      cliente_id:   clienteId,
-      status:       'aguardando',
-      data_emissao: hoje,
-      data_validade: validade,
+      cliente_id:      clienteId,
+      status:          'aguardando',
+      data_emissao:    hoje,
+      data_validade:   validade,
       subtotal,
-      desconto:     0,
-      acrescimo:    0,
-      total:        subtotal,
-      usuario_id:   null,
-      observacoes:  `Cotação rápida. Cliente: ${cliente.nome}${cliente.cidade ? ' — ' + cliente.cidade : ''}`,
+      desconto:        0,
+      acrescimo:       0,
+      total:           subtotal,
+      usuario_id:      null,
+      token_aprovacao: tokenAprovacao,
+      observacoes:     `Cotação rápida. Cliente: ${cliente.nome}${cliente.cidade ? ' — ' + cliente.cidade : ''}`,
     }).select('id,numero').maybeSingle()
 
     if (cotErr) {
