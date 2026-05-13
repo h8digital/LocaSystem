@@ -146,12 +146,14 @@ export async function POST(req: NextRequest) {
     }).eq('id', contrato_id)
 
     // ── 7. Timeline ──────────────────────────────────────────────────────────
-    await sb.from('contrato_timeline').insert({
-      contrato_id,
-      usuario_id: user.id,
-      tipo:       'encerramento',
-      descricao:  `Contrato ${contrato.numero} encerrado com sucesso.`,
-    }).catch(() => {})
+    try {
+      await sb.from('contrato_timeline').insert({
+        contrato_id,
+        usuario_id: user.id,
+        tipo:       'encerramento',
+        descricao:  `Contrato ${contrato.numero} encerrado com sucesso.`,
+      })
+    } catch (_) { /* timeline é opcional — não bloqueia encerramento */ }
 
     return NextResponse.json({
       ok:  true,
