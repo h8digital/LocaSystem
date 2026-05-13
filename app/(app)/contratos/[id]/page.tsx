@@ -251,15 +251,40 @@ export default function VerContratoPage() {
     window.location.reload()
   }
 
-  async function iniciarCheckin() { router.push(`/contratos/${id}/encerrar`) }
-
-  async function encerrarPendente() {
-    const res = await fetch('/api/contratos/encerrar', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ contrato_id: Number(id) }) })
-    const data = await res.json()
-    if (data.fatura_gerada) { alert(data.error); window.location.reload(); return }
-    if (!data.ok) { alert(`Erro: ${data.error}`); return }
-    alert(data.msg); window.location.reload()
+  function iniciarCheckin() {
+    // Navega para aba de Itens onde o usuário faz devoluções individuais
+    setAba('itens')
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
+
+  async function encerrarContrato() {
+    if (!confirm('Encerrar este contrato?\n\nO sistema verificará se todos os equipamentos foram devolvidos e gerará a fatura de locação se necessário.')) return
+    const res = await fetch('/api/contratos/encerrar', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ contrato_id: Number(id) }),
+    })
+    const data = await res.json()
+    if (data.precisa_devolucao) {
+      alert('⚠️ ' + data.error + '\n\nAcesse a aba Itens e registre a devolução primeiro.')
+      setAba('itens')
+      return
+    }
+    if (data.fatura_gerada || data.precisa_pagamento) {
+      alert('📄 ' + data.error + '\n\nAcesse a aba Financeiro para registrar o pagamento.')
+      setAba('financeiro')
+      window.location.reload()
+      return
+    }
+    if (!data.ok) {
+      alert('Erro: ' + data.error)
+      return
+    }
+    alert('✅ ' + data.msg)
+    window.location.reload()
+  }
+  // manter alias para compatibilidade
+  const encerrarPendente = encerrarContrato
 
   // ── Funções de pagamento ─────────────────────────────────
   async function abrirPagamento(fatura: any) {
@@ -639,14 +664,17 @@ export default function VerContratoPage() {
           {(()=>{
             const sec: AcaoSecundaria[] = []
             if(contrato.status==='ativo'||contrato.status==='em_devolucao'){
-              sec.push({ label:'📦 Iniciar Devolução', onClick:iniciarCheckin, grupo:1 })
+              sec.push({ label:'↩ Registrar Devolução', onClick:iniciarCheckin, grupo:1 })
+            }
+            if(contrato.status==='ativo'||contrato.status==='em_devolucao'||contrato.status==='pendente_manutencao'){
+              sec.push({ label:'🔒 Encerrar Contrato', onClick:encerrarContrato, grupo:1 })
             }
             sec.push({ label:'📄 Gerar Documento', onClick:()=>{setAba('documentos');setDocLink('')}, grupo:1 })
             if(contrato.status==='rascunho'||contrato.status==='ativo'){
-              sec.push({ label:'Alterar Contrato', onClick:abrirEditar, grupo:1 })
+              sec.push({ label:'✏️ Alterar Contrato', onClick:abrirEditar, grupo:1 })
             }
             if(contrato.status==='ativo'){
-              sec.push({ label:'Cancelar Contrato', onClick:cancelar, grupo:2, destrutivo:true })
+              sec.push({ label:'✕ Cancelar Contrato', onClick:cancelar, grupo:2, destrutivo:true })
             }
             if(contrato.status==='rascunho'||contrato.status==='cancelado'){
               sec.push({ label:'Excluir Contrato', onClick:excluirContrato, grupo:2, destrutivo:true })

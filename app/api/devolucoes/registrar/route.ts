@@ -163,20 +163,9 @@ export async function POST(req: NextRequest) {
     const qtdDevTotal = (todosItens ?? []).reduce((s: number, i: any) => s + Number(i.qtd_devolvida ?? 0), 0)
     const pct = qtdTotal > 0 ? Math.round(100 * qtdDevTotal / qtdTotal) : 100
 
-    // ── Verificar saldo devedor SOMENTE se encerrar total ─────────────────────
-    if (tudoDevolvido) {
-      const { data: saldo } = await sb.from('contrato_saldo')
-        .select('saldo_devedor')
-        .eq('contrato_id', contrato_id).single()
-      if (saldo && Number(saldo.saldo_devedor) > 0.01) {
-        // Rollback: desfazer o que foi processado
-        await sb.from('devolucoes').delete().eq('id', dev.id)
-        return NextResponse.json({
-          ok: false,
-          error: `Existe saldo devedor de ${fmtMoney(Number(saldo.saldo_devedor))} pendente. Quite todas as faturas antes de encerrar o contrato.`
-        })
-      }
-    }
+    // A verificação de saldo devedor é feita na etapa de ENCERRAMENTO,
+    // não aqui. A devolução registra apenas a entrega física dos equipamentos.
+    // O encerramento financeiro é tratado separadamente.
 
     // ── Multa por atraso na ENTREGA: preco_diario × qtd_devolvida × dias ────
     let multa_atraso = 0
