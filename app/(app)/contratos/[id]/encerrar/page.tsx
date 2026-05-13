@@ -156,25 +156,32 @@ export default function EncerrarContratoPage() {
   async function confirmar() {
     setSaving(true); setErro('')
     try {
+      // Registrar pagamentos pendentes marcados
       for (const pag of pagamentos.filter(p => p.pagar)) {
         await supabase.from('faturas').update({
-          status: 'pago', valor_pago: pag.valor_pago,
-          forma_pagamento: pag.forma_pagamento, data_pagamento: pag.data_pagamento,
+          status:          'pago',
+          valor_pago:      pag.valor_pago,
+          valor_recebido:  pag.valor_pago,
+          saldo_restante:  0,
+          forma_pagamento: pag.forma_pagamento,
+          data_pagamento:  pag.data_pagamento,
         }).eq('id', pag.fatura_id)
       }
 
-      const res = await fetch('/api/devolucoes/registrar', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contrato_id:      Number(id),
-          dias_atraso:      diasAtraso,
-          valor_avarias:    valorAvarias + valorExtravios,
-          caucao_devolvido: caucaoDevolvido,
-          observacoes,
-          itens: itens
-            .filter(item => item.quantidade_devolvida > 0)
-            .map(item => ({
+      const itensDevoolver = itens.filter(item => item.quantidade_devolvida > 0)
+
+      if (itensDevoolver.length > 0) {
+        // Ainda há itens a devolver — registrar devolução
+        const res = await fetch('/api/devolucoes/registrar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contrato_id:      Number(id),
+            dias_atraso:      diasAtraso,
+            valor_avarias:    valorAvarias + valorExtravios,
+            caucao_devolvido: caucaoDevolvido,
+            observacoes,
+            itens: itensDevoolver.map(item => ({
               contrato_item_id:     item.id,
               patrimonio_id:        item.patrimonio_id ?? null,
               produto_id:           item.produto_id,
@@ -187,12 +194,31 @@ export default function EncerrarContratoPage() {
                 ? Number(item.taxa_limpeza_avulsa) * Number(item.quantidade_devolvida)
                 : 0,
             })),
-        }),
-      })
-      const result = await res.json()
-      if (!result.ok) { setErro('Erro: ' + result.error); setSaving(false); return }
-      router.push(`/contratos/${id}?aba=devolucoes`)
-    } catch (e: any) { setErro('Erro: ' + e.message); setSaving(false) }
+          }),
+        })
+        const result = await res.json()
+        if (!result.ok) { setErro(result.error); setSaving(false); return }
+        // Se tudo foi devolvido, o encerrar também ocorre na API de devolução
+        router.push(`/contratos/${id}?aba=devolucoes`)
+      } else {
+        // Todos os itens já foram devolvidos — ir direto ao encerramento
+        const res = await fetch('/api/contratos/encerrar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contrato_id: Number(id) }),
+        })
+        const result = await res.json()
+        if (result.precisa_devolucao) {
+          setErro(result.error); setSaving(false); return
+        }
+        if (result.fatura_gerada || result.precisa_pagamento) {
+          setErro(result.error + ' Volte à tela do contrato e acesse a aba Financeiro.')
+          setSaving(false); return
+        }
+        if (!result.ok) { setErro(result.error); setSaving(false); return }
+        router.push(`/contratos/${id}?aba=financeiro`)
+      }
+    } catch (e: any) { setErro('Erro inesperado: ' + e.message); setSaving(false) }
   }
 
   // ── Helpers de update ─────────────────────────────────────────────────────
