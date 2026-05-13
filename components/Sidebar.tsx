@@ -17,6 +17,7 @@ const nav = [
   { href:'/templates',               icon:'📋', label:'Templates',              section:'DOCUMENTOS' },
   { href:'/usuarios',                icon:'👤', label:'Usuários',               section:'SISTEMA' },
   { href:'/parametros',              icon:'⚙️', label:'Parâmetros',             section:null },
+  { href:'/system/logs', icon:'🪵', label:'Logs do Sistema', section:null },
 ]
 
 export default function Sidebar({ user }: { user: any }) {

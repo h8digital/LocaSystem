@@ -1,3 +1,4 @@
+import { syslog } from '@/lib/syslog'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 export const runtime = 'nodejs'
@@ -51,7 +52,10 @@ export async function POST(req: NextRequest) {
         tipo:    'PF',
         ativo:   1,
       }).select('id').maybeSingle()
-      if (insErr) return NextResponse.json({ ok:false, error:'Erro ao criar cliente: ' + insErr.message })
+      if (insErr) {
+      await syslog('api/cotacoes/rapida', 'Erro ao criar cliente', { detalhe: insErr.message, contexto: { nome: cliente.nome } })
+      return NextResponse.json({ ok:false, error:'Erro ao criar cliente: ' + insErr.message })
+    }
       clienteId = novo?.id ?? null
     }
     if (!clienteId) return NextResponse.json({ ok: false, error: 'Erro ao registrar cliente.' })
@@ -91,10 +95,14 @@ export async function POST(req: NextRequest) {
       desconto:     0,
       acrescimo:    0,
       total:        subtotal,
+      usuario_id:   null,
       observacoes:  `Cotação rápida. Cliente: ${cliente.nome}${cliente.cidade ? ' — ' + cliente.cidade : ''}`,
     }).select('id,numero').maybeSingle()
 
-    if (cotErr) return NextResponse.json({ ok: false, error: 'Erro ao criar cotação: ' + cotErr.message })
+    if (cotErr) {
+      await syslog('api/cotacoes/rapida', 'Erro ao criar cotação', { detalhe: cotErr.message, contexto: { clienteId } })
+      return NextResponse.json({ ok: false, error: 'Erro ao criar cotação: ' + cotErr.message })
+    }
     if (!cotacao) return NextResponse.json({ ok: false, error: 'Cotação não retornou dados.' })
 
     // ── Inserir itens ──────────────────────────────────────────────────────
@@ -262,6 +270,10 @@ export async function POST(req: NextRequest) {
     })
 
   } catch (e: any) {
+    await syslog('api/cotacoes/rapida', e.message ?? 'Erro inesperado', {
+      nivel: 'error',
+      detalhe: e.stack ?? String(e),
+    })
     return NextResponse.json({ ok: false, error: e.message })
   }
 }
