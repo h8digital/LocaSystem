@@ -28,7 +28,11 @@ export default function EquipamentoDetalhe() {
   const [produto,   setProduto]   = useState<any>(null)
   const [pats,      setPats]      = useState<any[]>([])
   const [movs,      setMovs]      = useState<any[]>([])
-  const [contratos, setContratos] = useState<any[]>([])
+  const [contratos,  setContratos]  = useState<any[]>([])
+  const [acessorios, setAcessorios] = useState<any[]>([])
+  const [formAcess,  setFormAcess]  = useState({ nome:'', descricao:'', quantidade:1, obrigatorio:true })
+  const [salvandoAcc,setSalvandoAcc]= useState(false)
+  const [erroAcc,    setErroAcc]    = useState('')
   const [loading,   setLoading]   = useState(true)
   const [aba,       setAba]       = useState<Aba>('inventario')
 
