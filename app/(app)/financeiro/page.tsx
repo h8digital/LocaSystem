@@ -13,14 +13,19 @@ function FatMenu({ row, onEditar, onRecibo, onFatura, onExcluir }: any) {
   const [open, setOpen]   = useState(false)
   const [pos,  setPos]    = useState<any>({})
   const [mounted, setMounted] = useState(false)
-  const btnRef = useRef<HTMLButtonElement>(null)
+  const btnRef  = useRef<HTMLButtonElement>(null)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { setMounted(true) }, [])
 
+  // Fechar ao clicar FORA do botão E fora do menu
+  // CRÍTICO: verificar menuRef também — senão o mousedown fecha antes do click executar
   useEffect(() => {
     if (!open) return
     const close = (e: MouseEvent) => {
-      if (btnRef.current && !btnRef.current.contains(e.target as Node)) setOpen(false)
+      const dentroBtn  = btnRef.current?.contains(e.target as Node)
+      const dentroMenu = menuRef.current?.contains(e.target as Node)
+      if (!dentroBtn && !dentroMenu) setOpen(false)
     }
     document.addEventListener('mousedown', close)
     return () => document.removeEventListener('mousedown', close)
@@ -61,12 +66,14 @@ function FatMenu({ row, onEditar, onRecibo, onFatura, onExcluir }: any) {
         ⋮
       </button>
       {open && mounted && createPortal(
-        <div style={{ position:'fixed', top: pos.top, right: pos.right, zIndex:99999,
+        <div ref={menuRef} style={{ position:'fixed', top: pos.top, right: pos.right, zIndex:99999,
           background:'#1e293b', border:'1px solid rgba(255,255,255,0.15)',
           borderRadius:'var(--r-lg)', boxShadow:'0 8px 32px rgba(0,0,0,0.7)',
           minWidth:180, overflow:'hidden' }}>
           {itens.map(a => (
-            <button key={a.l} onClick={() => { a.fn(); setOpen(false) }}
+            <button key={a.l}
+              onMouseDown={e => e.stopPropagation()}
+              onClick={() => { setOpen(false); a.fn() }}
               style={{ display:'flex', alignItems:'center', gap:8, width:'100%',
                 padding:'9px 16px', background:'transparent', border:'none',
                 color: a.danger ? 'var(--c-danger)' : 'rgba(255,255,255,0.82)',
@@ -152,18 +159,21 @@ export default function FinanceiroPage() {
     if (fVencAte) q = q.lte('data_vencimento', fVencAte)
     if (fPagDe)   q = q.gte('data_pagamento', fPagDe)
     if (fPagAte)  q = q.lte('data_pagamento', fPagAte)
-    if (busca) {
-      const { data: cts } = await supabase.from('clientes').select('id').ilike('nome', `%${busca}%`)
-      const ctIds = (cts ?? []).map((c:any) => c.id)
-      if (ctIds.length > 0) {
-        q = q.or(`numero.ilike.%${busca}%,descricao.ilike.%${busca}%`)
-      } else {
-        q = q.or(`numero.ilike.%${busca}%,descricao.ilike.%${busca}%`)
-      }
+    const { data: rawData } = await q.limit(500)
+    let resultado = rawData ?? []
+
+    // Filtro client-side por nome do cliente (busca livre)
+    if (busca.trim()) {
+      const b = busca.trim().toLowerCase()
+      resultado = resultado.filter((f: any) =>
+        (f.numero ?? '').toLowerCase().includes(b) ||
+        (f.descricao ?? '').toLowerCase().includes(b) ||
+        ((f.contratos as any)?.clientes?.nome ?? '').toLowerCase().includes(b) ||
+        ((f.contratos as any)?.numero ?? '').toLowerCase().includes(b)
+      )
     }
 
-    const { data } = await q.limit(300)
-    setFaturas(data ?? [])
+    setFaturas(resultado)
     setLoading(false)
   }, [busca, fStatus, fTipo, fVencDe, fVencAte, fPagDe, fPagAte])
 
@@ -352,9 +362,9 @@ export default function FinanceiroPage() {
         <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'flex-end' }}>
           {/* Busca */}
           <div style={{ flex:'1 1 200px', minWidth:180 }}>
-            <div style={{ fontSize:'var(--fs-xs)', color:'rgba(255,255,255,0.4)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:5 }}>Buscar</div>
+            <div style={{ fontSize:'var(--fs-xs)', color:'rgba(255,255,255,0.4)', textTransform:'uppercase', letterSpacing:'.05em', marginBottom:5 }}>Nº / Descrição / Cliente</div>
             <input value={busca} onChange={e=>setBusca(e.target.value)}
-              className={inputCls} placeholder="Nº ou descrição..." style={{ width:'100%' }} />
+              className={inputCls} placeholder="Número, descrição ou nome do cliente..." style={{ width:'100%' }} />
           </div>
 
           {/* Status */}

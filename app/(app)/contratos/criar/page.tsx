@@ -89,21 +89,13 @@ export default function CriarContratoPage() {
   const [itemPatrimonioNome,setItemPatrimonioNome]=useState('')
   const [itemQtd,          setItemQtd]          = useState(1)
   const [itemPreco,        setItemPreco]        = useState(0)
-  // ── Acessórios ──────────────────────────────────────────────────────────────
-  const [modoAcess,      setModoAcess]      = useState(false)
-  const [acessDescricao, setAcessDescricao] = useState('')
-  const [acessQtd,       setAcessQtd]       = useState(1)
-  const [acessPreco,     setAcessPreco]     = useState(0)
-  const [acessProdId,    setAcessProdId]    = useState<number|null>(null)
-  const [acessProdNome,  setAcessProdNome]  = useState('')
-  const [patrimonios,      setPatrimonios]      = useState<any[]>([])
   const [loadingPats,      setLoadingPats]      = useState(false)
 
   const F = (k:string) => ({ value:form[k]??'', onChange:(e:any)=>setForm((f:any)=>({...f,[k]:e.target.value})) })
   const dias = form.data_inicio && form.data_fim
     ? Math.max(1, Math.ceil((new Date(form.data_fim).getTime()-new Date(form.data_inicio).getTime())/86400000))
     : 1
-  const subtotal       = itens.filter(i=>i.tipo_item!=='acessorio').reduce((s,i)=>s+Number(i.total),0)
+  const subtotal       = itens.reduce((s,i)=>s+Number(i.total),0)
   const totalLimpeza   = itens.reduce((s,i)=>s+Number(i.valor_limpeza||0),0)
   const total          = subtotal - Number(form.desconto) + Number(form.acrescimo) + Number(form.frete) + totalLimpeza
   const comissaoVal    = total * Number(form.comissao_percentual) / 100
@@ -204,30 +196,6 @@ export default function CriarContratoPage() {
     setItemQtd(1); setItemPreco(0); setPatrimonios([])
   }
 
-  function adicionarAcessorio() {
-    if (!acessDescricao.trim() && !acessProdId) { setErro('Informe a descrição do acessório.'); return }
-    if (acessPreco <= 0) { setErro('Informe o valor do acessório.'); return }
-    setErro('')
-    const desc = acessDescricao.trim() || acessProdNome
-    setItens(prev => [...prev, {
-      produto_id:        acessProdId,
-      produto_nome:      desc,
-      patrimonio_id:     null,
-      patrimonio_num:    null,
-      quantidade:        acessQtd,
-      preco_unitario:    acessPreco,
-      total:             acessPreco * acessQtd,
-      tipo_item:         'acessorio',
-      descricao_livre:   acessDescricao.trim() || null,
-      _descricaoCobranca: `${acessQtd}x ${fmt.money(acessPreco)}`,
-      preco_diario:      0,
-      custo_reposicao:   0,
-      prazo_entrega_dias: 0,
-      _produto:          null,
-    }])
-    setAcessDescricao(''); setAcessQtd(1); setAcessPreco(0)
-    setAcessProdId(null); setAcessProdNome(''); setModoAcess(false)
-  }
 
   // ── Validação por passo ───────────────────────────────────────────────────
   function validar():string {
@@ -429,27 +397,9 @@ export default function CriarContratoPage() {
       {passo===3 && (
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
 
-          {/* ── TOGGLE MODO ──────────────────────────────────────────────── */}
-          <div style={{ display:'flex', gap:0, border:'1px solid var(--border)',
-            borderRadius:'var(--r-md)', overflow:'hidden', alignSelf:'flex-start' }}>
-            {[
-              { v:false, l:'📦 Equipamento de Locação' },
-              { v:true,  l:'🔧 Acessório / Produto Avulso' },
-            ].map(opt => (
-              <button key={String(opt.v)} onClick={() => { setModoAcess(opt.v); setErro('') }}
-                style={{ padding:'8px 18px', border:'none', cursor:'pointer',
-                  fontWeight: modoAcess===opt.v ? 700 : 400,
-                  fontSize:'var(--fs-md)',
-                  background: modoAcess===opt.v ? 'var(--c-primary)' : 'var(--bg-card)',
-                  color: modoAcess===opt.v ? '#fff' : 'var(--t-muted)',
-                  transition:'all .15s' }}>
-                {opt.l}
-              </button>
-            ))}
-          </div>
 
           {/* ── FORMULÁRIO: EQUIPAMENTO ──────────────────────────────────── */}
-          {!modoAcess && (
+          {true && (
             <div className="ds-card" style={{ padding:'14px 16px' }}>
               <div className="ds-section-title">Adicionar Equipamento de Locação</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:10, alignItems:'flex-end' }}>
@@ -544,70 +494,17 @@ export default function CriarContratoPage() {
             </div>
           )}
 
-          {/* ── FORMULÁRIO: ACESSÓRIO ─────────────────────────────────────── */}
-          {modoAcess && (
-            <div className="ds-card" style={{ padding:'14px 16px', border:'2px solid var(--c-warning,#f59e0b)' }}>
-              <div className="ds-section-title" style={{ color:'var(--c-warning-text,#92400e)' }}>
-                🔧 Adicionar Acessório / Produto Avulso
-              </div>
-              <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginBottom:12 }}>
-                Itens cobrados junto à locação (ex: brocas, EPIs, consumíveis). Não geram devolução.
-              </div>
-              <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr 1fr auto', gap:10, alignItems:'flex-end' }}>
-                <FormField label="Descrição do acessório" required>
-                  <input
-                    value={acessDescricao}
-                    onChange={e=>setAcessDescricao(e.target.value)}
-                    className={inputCls}
-                    placeholder="Ex: Broca 10mm, EPI, Taxa de frete..."
-                    autoFocus
-                  />
-                </FormField>
-                <FormField label="Quantidade">
-                  <input type="number" min="1" value={acessQtd}
-                    onChange={e=>setAcessQtd(Number(e.target.value))}
-                    className={inputCls} />
-                </FormField>
-                <FormField label="Valor unitário (R$)">
-                  <div style={{ position:'relative' }}>
-                    <span style={{ position:'absolute', left:9, top:'50%', transform:'translateY(-50%)',
-                      color:'var(--t-muted)', fontSize:'var(--fs-md)', pointerEvents:'none' }}>R$</span>
-                    <input type="number" step="0.01" min="0" value={acessPreco||''}
-                      onChange={e=>setAcessPreco(Number(e.target.value))}
-                      className={inputCls} style={{ paddingLeft:30 }} />
-                  </div>
-                </FormField>
-                <div style={{ paddingBottom:1 }}>
-                  <Btn onClick={adicionarAcessorio}
-                    disabled={!acessDescricao.trim() || acessPreco<=0}
-                    size="sm"
-                    style={{ background:'var(--c-warning,#f59e0b)', borderColor:'var(--c-warning,#f59e0b)' }}>
-                    + Adicionar
-                  </Btn>
-                </div>
-              </div>
-              {acessPreco>0 && acessDescricao && (
-                <div style={{ marginTop:10, background:'#fef3c718', border:'1px solid #f59e0b',
-                  borderRadius:'var(--r-sm)', padding:'8px 14px',
-                  display:'flex', justifyContent:'space-between', fontSize:'var(--fs-md)' }}>
-                  <span style={{ color:'#92400e' }}>{acessQtd}× {acessDescricao}</span>
-                  <span style={{ fontWeight:800, color:'#92400e' }}>{fmt.money(acessPreco*acessQtd)}</span>
-                </div>
-              )}
-            </div>
-          )}
-
           {/* ── LISTA DE ITENS ────────────────────────────────────────────── */}
           {itens.length>0 && (
             <div className="ds-card" style={{ overflow:'hidden' }}>
               {/* Locação */}
-              {itens.filter(i=>i.tipo_item!=='acessorio').length > 0 && (
+              {itens.length > 0 && (
                 <>
                   <div style={{ padding:'10px 14px', background:'var(--bg-header)', borderBottom:'1px solid var(--border)',
                     fontWeight:700, fontSize:'var(--fs-md)', display:'flex', justifyContent:'space-between' }}>
-                    <span>📦 Equipamentos de Locação ({itens.filter(i=>i.tipo_item!=='acessorio').length})</span>
+                    <span>📦 Equipamentos de Locação ({itens.length})</span>
                     <span style={{ color:'var(--c-primary)', fontWeight:800 }}>
-                      {fmt.money(itens.filter(i=>i.tipo_item!=='acessorio').reduce((s,i)=>s+i.total,0))}
+                      {fmt.money(itens.reduce((s,i)=>s+i.total,0))}
                     </span>
                   </div>
                   <table style={{ width:'100%', borderCollapse:'collapse' }}>
@@ -616,7 +513,7 @@ export default function CriarContratoPage() {
                       <Th right>Qtd</Th><Th right>Preço</Th><Th right>Total</Th><Th></Th>
                     </tr></thead>
                     <tbody>
-                      {itens.map((item,i) => item.tipo_item==='acessorio' ? null : (
+                      {itens.map((item,i) => (
                         <tr key={i}>
                           <td style={{ padding:'9px 12px', fontWeight:500, borderBottom:'1px solid var(--border)' }}>
                             <div>{item.produto_nome}</div>
@@ -657,36 +554,6 @@ export default function CriarContratoPage() {
                 </>
               )}
 
-              {/* Acessórios */}
-              {itens.filter(i=>i.tipo_item==='acessorio').length > 0 && (
-                <>
-                  <div style={{ padding:'10px 14px', background:'#fef3c730', borderTop:'1px solid var(--border)', borderBottom:'1px solid var(--border)',
-                    fontWeight:700, fontSize:'var(--fs-md)', display:'flex', justifyContent:'space-between' }}>
-                    <span>🔧 Acessórios / Avulsos ({itens.filter(i=>i.tipo_item==='acessorio').length})</span>
-                    <span style={{ color:'#92400e', fontWeight:800 }}>
-                      {fmt.money(itens.filter(i=>i.tipo_item==='acessorio').reduce((s,i)=>s+i.total,0))}
-                    </span>
-                  </div>
-                  <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                    <thead><tr>
-                      <Th>Descrição</Th><Th right>Qtd</Th><Th right>Unit.</Th><Th right>Total</Th><Th></Th>
-                    </tr></thead>
-                    <tbody>
-                      {itens.map((item,i) => item.tipo_item!=='acessorio' ? null : (
-                        <tr key={i} style={{ background:'#fffbeb' }}>
-                          <td style={{ padding:'9px 12px', fontWeight:500, borderBottom:'1px solid var(--border)' }}>{item.produto_nome}</td>
-                          <td style={{ padding:'9px 12px', textAlign:'right', borderBottom:'1px solid var(--border)' }}>{item.quantidade}</td>
-                          <td style={{ padding:'9px 12px', textAlign:'right', borderBottom:'1px solid var(--border)', fontFamily:'var(--font-mono)' }}>{fmt.money(item.preco_unitario)}</td>
-                          <td style={{ padding:'9px 12px', textAlign:'right', fontWeight:700, color:'#92400e', borderBottom:'1px solid var(--border)', fontFamily:'var(--font-mono)' }}>{fmt.money(item.total)}</td>
-                          <td style={{ padding:'9px 12px', borderBottom:'1px solid var(--border)' }}>
-                            <button onClick={()=>setItens(prev=>prev.filter((_,j)=>j!==i))} className="tbl-btn del" title="Remover">×</button>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </>
-              )}
 
               {/* Total geral */}
               <div style={{ padding:'10px 16px', display:'flex', justifyContent:'flex-end',
