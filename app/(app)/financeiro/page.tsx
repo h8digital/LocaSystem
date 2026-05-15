@@ -8,80 +8,122 @@ const FORMAS = ['pix','dinheiro','cartao_credito','cartao_debito','boleto','tran
 const fmtForma = (v: string) => v?.replace(/_/g,' ').replace(/\b\w/g,(c:string)=>c.toUpperCase()) ?? '—'
 const fmtTipo  = (v: string) => v?.replace(/_/g,' ').replace(/\b\w/g,(c:string)=>c.toUpperCase()) ?? '—'
 
-// ── Componente: menu ⋮ com portal ────────────────────────────────────────────
-function FatMenu({ row, onEditar, onRecibo, onFatura, onExcluir }: any) {
-  const [open, setOpen]   = useState(false)
-  const [pos,  setPos]    = useState<any>({})
+// ── Menu ⋮ do financeiro ──────────────────────────────────────────────────────
+// Usa dupla proteção: menuRef para não fechar ao clicar no menu,
+// e onMouseDown stopPropagation para não fechar antes do click
+function FatMenu({ onEditar, onRecibo, onFatura, onExcluir }: {
+  onEditar:  () => void
+  onRecibo:  () => void
+  onFatura:  () => void
+  onExcluir: () => void
+}) {
+  const [open,    setOpen]    = useState(false)
+  const [pos,     setPos]     = useState({ top: 0, right: 0 })
   const [mounted, setMounted] = useState(false)
   const btnRef  = useRef<HTMLButtonElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => { setMounted(true) }, [])
 
-  // Fechar ao clicar FORA do botão E fora do menu
-  // CRÍTICO: verificar menuRef também — senão o mousedown fecha antes do click executar
   useEffect(() => {
     if (!open) return
-    const close = (e: MouseEvent) => {
-      const dentroBtn  = btnRef.current?.contains(e.target as Node)
-      const dentroMenu = menuRef.current?.contains(e.target as Node)
-      if (!dentroBtn && !dentroMenu) setOpen(false)
+    function onDown(e: MouseEvent) {
+      const t = e.target as Node
+      if (!btnRef.current?.contains(t) && !menuRef.current?.contains(t)) {
+        setOpen(false)
+      }
     }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
+    document.addEventListener('mousedown', onDown)
+    return () => document.removeEventListener('mousedown', onDown)
+  }, [open])
+
+  useEffect(() => {
+    if (!open) return
+    function onKey(e: KeyboardEvent) { if (e.key === 'Escape') setOpen(false) }
+    document.addEventListener('keydown', onKey)
+    return () => document.removeEventListener('keydown', onKey)
   }, [open])
 
   function toggle() {
     if (!btnRef.current) return
     if (open) { setOpen(false); return }
-    const r    = btnRef.current.getBoundingClientRect()
-    const viewH = window.innerHeight
-    const viewW = window.innerWidth
-    const menuH = 160
-    const openAbove = viewH - r.bottom < menuH && r.top > menuH
+    const r = btnRef.current.getBoundingClientRect()
+    const vH = window.innerHeight
+    const vW = window.innerWidth
+    const acima = vH - r.bottom < 180 && r.top > 180
     setPos({
-      top:   openAbove ? r.top - menuH - 4 : r.bottom + 4,
-      right: viewW - r.right,
+      top:   acima ? r.top - 180 - 4 : r.bottom + 4,
+      right: vW - r.right,
     })
     setOpen(true)
   }
 
-  const itens = [
-    { l: '✏️ Editar Fatura',     fn: onEditar },
-    { l: '🖨️ Imprimir Recibo',  fn: onRecibo },
-    { l: '📄 Imprimir Fatura',   fn: onFatura },
-    { l: '🗑️ Excluir',           fn: onExcluir, danger: true },
+  function executar(fn: () => void) {
+    setOpen(false)
+    // pequeno delay para garantir que o menu fecha antes da ação
+    setTimeout(() => { try { fn() } catch(e) { console.error('FatMenu erro:', e) } }, 50)
+  }
+
+  const acoes = [
+    { label: '✏️ Editar Fatura',    fn: onEditar,  danger: false },
+    { label: '🖨️ Imprimir Recibo', fn: onRecibo,  danger: false },
+    { label: '📄 Imprimir Fatura',  fn: onFatura,  danger: false },
+    { label: '🗑️ Excluir',          fn: onExcluir, danger: true  },
   ]
 
   return (
     <>
-      <button ref={btnRef} onClick={toggle}
-        style={{ background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.12)',
-          borderRadius:'var(--r-sm)', width:28, height:28, cursor:'pointer',
-          color:'rgba(255,255,255,0.5)', fontWeight:700, fontSize:15,
-          display:'flex', alignItems:'center', justifyContent:'center',
-          transition:'all .15s' }}
-        onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.background='rgba(255,255,255,0.12)'}}
-        onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.background='rgba(255,255,255,0.07)'}}>
+      <button
+        ref={btnRef}
+        onClick={toggle}
+        title="Mais ações"
+        style={{
+          background: open ? 'rgba(129,140,248,0.2)' : 'rgba(255,255,255,0.07)',
+          border: `1px solid ${open ? 'rgba(129,140,248,0.4)' : 'rgba(255,255,255,0.12)'}`,
+          borderRadius: 'var(--r-sm)', width: 28, height: 28,
+          cursor: 'pointer', color: open ? '#a5b4fc' : 'rgba(255,255,255,0.5)',
+          fontWeight: 700, fontSize: 16, display: 'flex',
+          alignItems: 'center', justifyContent: 'center',
+          transition: 'all .15s', fontFamily: 'var(--font-sans)',
+        }}>
         ⋮
       </button>
+
       {open && mounted && createPortal(
-        <div ref={menuRef} style={{ position:'fixed', top: pos.top, right: pos.right, zIndex:99999,
-          background:'#1e293b', border:'1px solid rgba(255,255,255,0.15)',
-          borderRadius:'var(--r-lg)', boxShadow:'0 8px 32px rgba(0,0,0,0.7)',
-          minWidth:180, overflow:'hidden' }}>
-          {itens.map(a => (
-            <button key={a.l}
+        <div
+          ref={menuRef}
+          style={{
+            position: 'fixed', top: pos.top, right: pos.right,
+            zIndex: 99999, minWidth: 190,
+            background: '#1e293b',
+            border: '1px solid rgba(255,255,255,0.15)',
+            borderRadius: 'var(--r-lg)',
+            boxShadow: '0 8px 32px rgba(0,0,0,0.8), 0 2px 8px rgba(0,0,0,0.5)',
+            overflow: 'hidden',
+          }}>
+          {acoes.map(a => (
+            <button
+              key={a.label}
               onMouseDown={e => e.stopPropagation()}
-              onClick={() => { setOpen(false); a.fn() }}
-              style={{ display:'flex', alignItems:'center', gap:8, width:'100%',
-                padding:'9px 16px', background:'transparent', border:'none',
-                color: a.danger ? 'var(--c-danger)' : 'rgba(255,255,255,0.82)',
-                fontSize:'var(--fs-md)', fontFamily:'var(--font-sans)',
-                cursor:'pointer', textAlign:'left', transition:'background .12s' }}
-              onMouseEnter={e=>{(e.currentTarget as HTMLButtonElement).style.background = a.danger ? 'rgba(248,113,113,0.12)' : 'rgba(129,140,248,0.15)'}}
-              onMouseLeave={e=>{(e.currentTarget as HTMLButtonElement).style.background='transparent'}}>
-              {a.l}
+              onClick={() => executar(a.fn)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                width: '100%', padding: '10px 16px',
+                background: 'transparent', border: 'none',
+                color: a.danger ? 'var(--c-danger)' : 'rgba(255,255,255,0.85)',
+                fontSize: 'var(--fs-md)', fontFamily: 'var(--font-sans)',
+                cursor: 'pointer', textAlign: 'left',
+                transition: 'background .12s',
+                borderBottom: '1px solid rgba(255,255,255,0.05)',
+              }}
+              onMouseEnter={e => {
+                (e.currentTarget as HTMLButtonElement).style.background =
+                  a.danger ? 'rgba(248,113,113,0.15)' : 'rgba(129,140,248,0.15)'
+              }}
+              onMouseLeave={e => {
+                (e.currentTarget as HTMLButtonElement).style.background = 'transparent'
+              }}>
+              {a.label}
             </button>
           ))}
         </div>,
@@ -90,6 +132,7 @@ function FatMenu({ row, onEditar, onRecibo, onFatura, onExcluir }: any) {
     </>
   )
 }
+
 
 export default function FinanceiroPage() {
   const [faturas,  setFaturas]  = useState<any[]>([])
