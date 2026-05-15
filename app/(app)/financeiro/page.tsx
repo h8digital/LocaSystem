@@ -12,10 +12,11 @@ const fmtTipo  = (v: string) => v?.replace(/_/g,' ').replace(/\b\w/g,(c:string)=
 // Usa dupla proteção: menuRef para não fechar ao clicar no menu,
 // e onMouseDown stopPropagation para não fechar antes do click
 function FatMenu({ onEditar, onRecibo, onFatura, onExcluir }: {
-  onEditar:  () => void
-  onRecibo:  () => void
-  onFatura:  () => void
-  onExcluir: () => void
+  onEditar:  () => void | Promise<void>
+  onRecibo:  () => void | Promise<void>
+  onFatura:  () => void | Promise<void>
+  onExcluir: () => void | Promise<void>
+  row?:      any
 }) {
   const [open,    setOpen]    = useState(false)
   const [pos,     setPos]     = useState({ top: 0, right: 0 })
