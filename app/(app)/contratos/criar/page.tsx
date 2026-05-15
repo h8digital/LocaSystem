@@ -89,6 +89,7 @@ export default function CriarContratoPage() {
   const [itemPatrimonioNome,setItemPatrimonioNome]=useState('')
   const [itemQtd,          setItemQtd]          = useState(1)
   const [itemPreco,        setItemPreco]        = useState(0)
+  const [patrimonios,      setPatrimonios]      = useState<any[]>([])
   const [loadingPats,      setLoadingPats]      = useState(false)
 
   const F = (k:string) => ({ value:form[k]??'', onChange:(e:any)=>setForm((f:any)=>({...f,[k]:e.target.value})) })
