@@ -8,37 +8,72 @@ import { QuickCreateCliente, QuickCreateProduto } from '@/components/quick-creat
 
 // ─── Stepper ─────────────────────────────────────────────────────────────────
 const PASSOS = [
-  { n:1, label:'Cliente e Período' },
-  { n:2, label:'Local de Uso'      },
-  { n:3, label:'Equipamentos'      },
-  { n:4, label:'Revisão e Valores' },
+  { n:1, label:'Cliente e Período', icon:'👤' },
+  { n:2, label:'Local de Entrega',  icon:'📍' },
+  { n:3, label:'Equipamentos',      icon:'🔧' },
+  { n:4, label:'Revisão e Valores', icon:'✅' },
 ]
 
 function Stepper({ passo }: { passo: number }) {
   return (
-    <div style={{ display:'flex', alignItems:'flex-start', marginBottom:28 }}>
+    <div style={{
+      display:'flex', alignItems:'center',
+      background:'rgba(255,255,255,0.04)',
+      border:'1px solid rgba(255,255,255,0.08)',
+      borderRadius:'var(--r-lg)',
+      padding:'16px 24px',
+      marginBottom:28,
+      gap:0,
+    }}>
       {PASSOS.map((p, idx) => {
         const ativo     = passo === p.n
         const concluido = passo > p.n
         return (
           <div key={p.n} style={{ display:'flex', alignItems:'center', flex: idx < PASSOS.length - 1 ? 1 : 'none' }}>
-            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:6, minWidth:80 }}>
+            {/* Step */}
+            <div style={{ display:'flex', alignItems:'center', gap:12, flexShrink:0 }}>
+              {/* Círculo */}
               <div style={{
-                width:36, height:36, borderRadius:'50%', display:'flex', alignItems:'center',
-                justifyContent:'center', fontWeight:700, fontSize:'var(--fs-md)', flexShrink:0,
-                background: concluido ? 'var(--c-success)' : ativo ? 'var(--c-primary)' : 'var(--bg-header)',
-                color:      concluido ? '#fff'             : ativo ? '#fff'              : 'var(--t-muted)',
-                border:     `2px solid ${concluido ? 'var(--c-success)' : ativo ? 'var(--c-primary)' : 'var(--border)'}`,
-                transition: 'all 250ms',
-              }}>{concluido ? '✓' : p.n}</div>
-              <div style={{
-                fontSize:'var(--fs-sm)', fontWeight: ativo ? 700 : 400, whiteSpace:'nowrap', textAlign:'center',
-                color: ativo ? 'var(--c-primary)' : concluido ? 'var(--c-success)' : 'var(--t-muted)',
-              }}>{p.label}</div>
+                width:40, height:40, borderRadius:'50%', display:'flex', alignItems:'center',
+                justifyContent:'center', fontWeight:800, fontSize:15, flexShrink:0,
+                background: concluido
+                  ? 'rgba(52,211,153,0.2)'
+                  : ativo
+                    ? 'linear-gradient(135deg,#6366f1,#818cf8)'
+                    : 'rgba(255,255,255,0.06)',
+                color:   concluido ? '#34d399' : ativo ? '#fff' : 'rgba(255,255,255,0.25)',
+                border:  `2px solid ${concluido ? 'rgba(52,211,153,0.5)' : ativo ? '#6366f1' : 'rgba(255,255,255,0.10)'}`,
+                boxShadow: ativo ? '0 0 16px rgba(99,102,241,0.4)' : 'none',
+                transition: 'all 300ms',
+              }}>
+                {concluido ? '✓' : p.icon}
+              </div>
+              {/* Label */}
+              <div style={{ display:'flex', flexDirection:'column', gap:1 }}>
+                <div style={{
+                  fontSize:11, fontWeight:600, letterSpacing:'0.06em', textTransform:'uppercase',
+                  color: ativo ? 'rgba(255,255,255,0.4)' : 'rgba(255,255,255,0.2)',
+                }}>
+                  {`Passo ${p.n}`}
+                </div>
+                <div style={{
+                  fontSize:13, fontWeight: ativo ? 700 : 500, whiteSpace:'nowrap',
+                  color: concluido ? '#34d399' : ativo ? '#fff' : 'rgba(255,255,255,0.35)',
+                  transition:'color 300ms',
+                }}>
+                  {p.label}
+                </div>
+              </div>
             </div>
+            {/* Linha conectora */}
             {idx < PASSOS.length - 1 && (
-              <div style={{ flex:1, height:2, margin:'0 8px', marginBottom:22,
-                background: concluido ? 'var(--c-success)' : 'var(--border)', transition:'background 300ms' }} />
+              <div style={{
+                flex:1, height:1, margin:'0 16px',
+                background: concluido
+                  ? 'rgba(52,211,153,0.4)'
+                  : 'rgba(255,255,255,0.08)',
+                transition:'background 400ms',
+              }} />
             )}
           </div>
         )
@@ -243,14 +278,34 @@ export default function CriarContratoPage() {
     <div style={{ maxWidth:800, margin:'0 auto', paddingBottom:60 }}>
 
       {/* Cabeçalho */}
-      <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:24 }}>
-        <button onClick={()=>router.back()}
-          style={{ width:32, height:32, display:'flex', alignItems:'center', justifyContent:'center',
-            background:'var(--bg-header)', border:'1px solid var(--border)', borderRadius:'var(--r-md)',
-            cursor:'pointer', color:'var(--t-secondary)', fontSize:16, flexShrink:0 }}>←</button>
-        <div>
-          <h1 style={{ margin:0, fontSize:'var(--fs-lg)', fontWeight:700, color:'var(--t-primary)' }}>Novo Contrato</h1>
-          <div style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)', marginTop:2 }}>Contrato de locação de equipamentos</div>
+      {/* Cabeçalho */}
+      <div style={{
+        display:'flex', alignItems:'center', justifyContent:'space-between',
+        marginBottom:28, gap:16,
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:14 }}>
+          <button onClick={()=>router.back()} style={{
+            width:40, height:40, borderRadius:'var(--r-md)', flexShrink:0,
+            background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.12)',
+            cursor:'pointer', color:'rgba(255,255,255,0.6)', fontSize:20,
+            display:'flex', alignItems:'center', justifyContent:'center',
+            transition:'all .15s',
+          }}>←</button>
+          <div>
+            <h1 style={{ margin:0, fontSize:22, fontWeight:700, color:'rgba(255,255,255,0.95)', letterSpacing:'-0.3px', lineHeight:1.2 }}>
+              Novo Contrato de Locação
+            </h1>
+            <div style={{ fontSize:13, color:'rgba(255,255,255,0.4)', marginTop:4 }}>
+              Preencha as {PASSOS.length} etapas para criar o contrato
+            </div>
+          </div>
+        </div>
+        <div style={{
+          padding:'6px 16px', borderRadius:99, flexShrink:0,
+          background:'rgba(129,140,248,0.15)', border:'1px solid rgba(129,140,248,0.3)',
+          fontSize:12, fontWeight:700, color:'#a5b4fc',
+        }}>
+          Etapa {passo} de {PASSOS.length}
         </div>
       </div>
 
@@ -262,8 +317,8 @@ export default function CriarContratoPage() {
           PASSO 1 — CLIENTE E PERÍODO
       ══════════════════════════════════════════════════════════ */}
       {passo===1 && (
-        <div className="ds-card" style={{ padding:20, display:'flex', flexDirection:'column', gap:16 }}>
-          <div className="ds-section-title">Dados do Cliente</div>
+        <div style={{ background:'rgba(255,255,255,0.05)', backdropFilter:'blur(12px)', border:'1px solid rgba(255,255,255,0.10)', borderRadius:'var(--r-lg)', padding:'28px 32px', display:'flex', flexDirection:'column', gap:22 }}>
+          <div style={{ fontSize:16, fontWeight:700, color:'rgba(255,255,255,0.9)', marginBottom:2 }}>Dados do Cliente</div>
           <LookupField
             label="Cliente" required placeholder="Pesquisar cliente..."
             value={clienteId} displayValue={clienteNome}
@@ -322,9 +377,9 @@ export default function CriarContratoPage() {
           PASSO 2 — LOCAL DE USO
       ══════════════════════════════════════════════════════════ */}
       {passo===2 && (
-        <div className="ds-card" style={{ padding:20, display:'flex', flexDirection:'column', gap:16 }}>
+        <div style={{ background:'rgba(255,255,255,0.05)', backdropFilter:'blur(12px)', border:'1px solid rgba(255,255,255,0.10)', borderRadius:'var(--r-lg)', padding:'28px 32px', display:'flex', flexDirection:'column', gap:22 }}>
           <div>
-            <div className="ds-section-title">Local de Uso dos Equipamentos</div>
+            <div style={{ fontSize:16, fontWeight:700, color:'rgba(255,255,255,0.9)', marginBottom:6 }}>Local de Entrega dos Equipamentos</div>
             <div style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)', marginTop:4 }}>
               Selecione o endereço de entrega ou deixe em branco para definir depois.
             </div>
@@ -396,13 +451,12 @@ export default function CriarContratoPage() {
           PASSO 3 — EQUIPAMENTOS
       ══════════════════════════════════════════════════════════ */}
       {passo===3 && (
-        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+        <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
 
-
-          {/* ── FORMULÁRIO: EQUIPAMENTO ──────────────────────────────────── */}
+          {/* ── FORMULÁRIO: EQUIPAMENTO ─────────────────────────────── */}
           {true && (
-            <div className="ds-card" style={{ padding:'14px 16px' }}>
-              <div className="ds-section-title">Adicionar Equipamento de Locação</div>
+            <div style={{ background:'rgba(255,255,255,0.05)', backdropFilter:'blur(12px)', border:'1px solid rgba(255,255,255,0.10)', borderRadius:'var(--r-lg)', padding:'24px 28px' }}>
+              <div style={{ fontSize:15, fontWeight:700, color:'rgba(255,255,255,0.9)', marginBottom:12 }}>Adicionar Equipamento de Locação</div>
               <div style={{ display:'grid', gridTemplateColumns:'1fr auto auto', gap:10, alignItems:'flex-end' }}>
                 <LookupField
                   label="Produto / Equipamento" required placeholder="Pesquisar equipamento..."
@@ -571,7 +625,7 @@ export default function CriarContratoPage() {
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
 
           {/* Resumo geral */}
-          <div className="ds-card" style={{ overflow:'hidden' }}>
+          <div style={{ background:'rgba(255,255,255,0.05)', backdropFilter:'blur(12px)', border:'1px solid rgba(255,255,255,0.10)', borderRadius:'var(--r-lg)', overflow:'hidden' }}>
             <div style={{ padding:'12px 16px', background:'var(--bg-header)', borderBottom:'1px solid var(--border)', fontWeight:700 }}>
               Resumo do Contrato
             </div>
@@ -593,8 +647,8 @@ export default function CriarContratoPage() {
           </div>
 
           {/* Ajustes financeiros */}
-          <div className="ds-card" style={{ padding:'16px 20px' }}>
-            <div className="ds-section-title">Ajustes Financeiros</div>
+          <div style={{ background:'rgba(255,255,255,0.05)', backdropFilter:'blur(12px)', border:'1px solid rgba(255,255,255,0.10)', borderRadius:'var(--r-lg)', padding:'24px 28px' }}>
+            <div style={{ fontSize:16, fontWeight:700, color:'rgba(255,255,255,0.9)', marginBottom:16 }}>Ajustes Financeiros</div>
             <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
               {[
                 { l:'Desconto (R$)',    f:'desconto' },
@@ -726,16 +780,68 @@ export default function CriarContratoPage() {
       )}
 
       {/* ── Navegação ─────────────────────────────────────────────────────── */}
-      <div style={{ display:'flex', justifyContent:'space-between', marginTop:24, gap:12 }}>
-        <Btn variant="secondary"
-          onClick={passo===1 ? ()=>router.back() : voltar}
-          style={{ minWidth:120 }}>
-          {passo===1 ? 'Cancelar' : '← Voltar'}
-        </Btn>
-        {passo<4
-          ? <Btn onClick={avancar} style={{ minWidth:160 }}>Próximo →</Btn>
-          : <Btn loading={saving} onClick={salvar} style={{ minWidth:200 }}>Salvar Contrato</Btn>
-        }
+      <div style={{
+        display:'flex', justifyContent:'space-between', alignItems:'center',
+        marginTop:28, gap:12,
+        padding:'20px 24px',
+        background:'rgba(255,255,255,0.03)',
+        border:'1px solid rgba(255,255,255,0.08)',
+        borderRadius:'var(--r-lg)',
+      }}>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <button
+            onClick={passo===1 ? ()=>router.back() : voltar}
+            style={{
+              padding:'10px 20px', borderRadius:'var(--r-md)', cursor:'pointer',
+              background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.12)',
+              color:'rgba(255,255,255,0.7)', fontSize:14, fontWeight:500,
+              fontFamily:'var(--font-sans)', transition:'all .15s',
+              display:'flex', alignItems:'center', gap:6,
+            }}>
+            {passo===1 ? '✕ Cancelar' : '← Voltar'}
+          </button>
+          {passo > 1 && (
+            <span style={{ fontSize:12, color:'rgba(255,255,255,0.25)' }}>
+              Etapa {passo-1} concluída
+            </span>
+          )}
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          {/* Bolinhas de progresso */}
+          <div style={{ display:'flex', gap:6 }}>
+            {PASSOS.map(p => (
+              <div key={p.n} style={{
+                width: passo===p.n ? 20 : 6, height:6, borderRadius:99,
+                background: passo>p.n ? '#34d399' : passo===p.n ? '#818cf8' : 'rgba(255,255,255,0.12)',
+                transition:'all 300ms',
+              }}/>
+            ))}
+          </div>
+          {passo<4
+            ? <button onClick={avancar} style={{
+                padding:'11px 28px', borderRadius:'var(--r-md)', cursor:'pointer',
+                background:'linear-gradient(135deg,#6366f1,#818cf8)',
+                border:'none', color:'#fff', fontSize:14, fontWeight:700,
+                fontFamily:'var(--font-sans)', transition:'all .15s',
+                boxShadow:'0 0 20px rgba(99,102,241,0.35)',
+                display:'flex', alignItems:'center', gap:8,
+              }}>
+                Próximo
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+              </button>
+            : <button onClick={salvar} disabled={saving} style={{
+                padding:'11px 28px', borderRadius:'var(--r-md)', cursor:'pointer',
+                background: saving ? 'rgba(99,102,241,0.5)' : 'linear-gradient(135deg,#34d399,#10b981)',
+                border:'none', color:'#fff', fontSize:14, fontWeight:700,
+                fontFamily:'var(--font-sans)', transition:'all .15s',
+                boxShadow:'0 0 20px rgba(52,211,153,0.3)',
+                display:'flex', alignItems:'center', gap:8,
+                opacity: saving ? .7 : 1,
+              }}>
+                {saving ? 'Salvando...' : '✓ Salvar Contrato'}
+              </button>
+          }
+        </div>
       </div>
     </div>
   )
