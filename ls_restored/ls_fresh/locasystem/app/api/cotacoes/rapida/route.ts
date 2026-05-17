@@ -165,6 +165,14 @@ export async function POST(req: NextRequest) {
     }).join('')
 
     // ── Linha de TOTAL por período ──────────────────────────────────────────
+    // Cabeçalhos de período — só os que algum produto tem
+    const periodosUsados = periodos.filter(per =>
+      itensFull.some((item: any) => Number(item.produto[per.campo] ?? 0) > 0)
+    )
+    const thPeriodos = periodosUsados
+      .map(per => `<th style="padding:6px 8px;background:#1e40af;color:#fff;text-align:right;white-space:nowrap;font-size:8pt">${per.label}</th>`)
+      .join('')
+
     const linhaTotal = `
       <tr style="background:#eff6ff;border-top:2px solid #1e40af">
         <td style="padding:7px 8px;border:1px solid #dbeafe;font-weight:800;color:#1e3a8a;font-size:8.5pt" colspan="2">
@@ -179,13 +187,6 @@ export async function POST(req: NextRequest) {
         }).join('')}
       </tr>`
 
-    // Cabeçalhos de período — só os que algum produto tem
-    const periodosUsados = periodos.filter(per =>
-      itensFull.some((item: any) => Number(item.produto[per.campo] ?? 0) > 0)
-    )
-    const thPeriodos = periodosUsados
-      .map(per => `<th style="padding:6px 8px;background:#1e40af;color:#fff;text-align:right;white-space:nowrap;font-size:8pt">${per.label}</th>`)
-      .join('')
 
     const html = `<!DOCTYPE html>
 <html lang="pt-BR"><head><meta charset="UTF-8"/>
