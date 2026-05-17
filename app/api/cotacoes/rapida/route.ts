@@ -137,9 +137,19 @@ export async function POST(req: NextRequest) {
     // Para cada produto, montar os preços apenas dos períodos com valor > 0
     const linhasItens = itensFull.map((item: any) => {
       const prod  = item.produto
+      const qtd   = Number(item.quantidade)
+
+      // Para cada período: mostra unitário e total (unitário × qtd)
       const precosCols = periodos
         .filter(per => Number(prod[per.campo] ?? 0) > 0)
-        .map(per => `<td style="padding:5px 8px;border:1px solid #e5e7eb;text-align:right;white-space:nowrap">${fmtM(Number(prod[per.campo]))}</td>`)
+        .map(per => {
+          const unit  = Number(prod[per.campo])
+          const total = unit * qtd
+          return `<td style="padding:5px 8px;border:1px solid #e5e7eb;text-align:right;white-space:nowrap;line-height:1.5">
+            <div style="font-size:7pt;color:#6b7280">${fmtM(unit)} × ${qtd}</div>
+            <div style="font-weight:700;color:#111;font-size:8.5pt">${fmtM(total)}</div>
+          </td>`
+        })
         .join('')
 
       return `
@@ -149,10 +159,25 @@ export async function POST(req: NextRequest) {
             ${prod.marca ? `<span style="font-weight:400;color:#6b7280;font-size:8pt"> · ${prod.marca}</span>` : ''}
             ${prod.categorias?.nome ? `<br><span style="font-weight:400;color:#9ca3af;font-size:7.5pt">${prod.categorias.nome}</span>` : ''}
           </td>
-          <td style="padding:6px 8px;border:1px solid #e5e7eb;text-align:center">${item.quantidade}</td>
+          <td style="padding:6px 8px;border:1px solid #e5e7eb;text-align:center;font-weight:700">${qtd}</td>
           ${precosCols}
         </tr>`
     }).join('')
+
+    // ── Linha de TOTAL por período ──────────────────────────────────────────
+    const linhaTotal = `
+      <tr style="background:#eff6ff;border-top:2px solid #1e40af">
+        <td style="padding:7px 8px;border:1px solid #dbeafe;font-weight:800;color:#1e3a8a;font-size:8.5pt" colspan="2">
+          TOTAL GERAL DA COTAÇÃO
+        </td>
+        ${periodosUsados.map(per => {
+          const soma = itensFull.reduce((s: number, item: any) => {
+            const unit = Number(item.produto[per.campo] ?? 0)
+            return s + unit * Number(item.quantidade)
+          }, 0)
+          return `<td style="padding:7px 8px;border:1px solid #dbeafe;text-align:right;font-weight:800;color:#1e3a8a;font-size:9pt;white-space:nowrap">${fmtM(soma)}</td>`
+        }).join('')}
+      </tr>`
 
     // Cabeçalhos de período — só os que algum produto tem
     const periodosUsados = periodos.filter(per =>
@@ -229,6 +254,7 @@ export async function POST(req: NextRequest) {
     </thead>
     <tbody>
       ${linhasItens}
+      ${linhaTotal}
     </tbody>
   </table>
 </div>
