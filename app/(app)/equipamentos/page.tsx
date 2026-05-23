@@ -633,18 +633,20 @@ export default function EquipamentosPage() {
             {/* ── PAINEL DE PREÇOS RÁPIDO ─────────────────────────────────── */}
             {precoPainel && (
               <div
-                style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.45)',
-                  zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
-                onClick={() => setPrecoPainel(null)}
+              <div
+                style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)',
+                  backdropFilter:'blur(6px)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
               >
                 <div
-                  style={{ background:'var(--bg-card)', borderRadius:'var(--r-lg)',
-                    width:'100%', maxWidth:680, boxShadow:'var(--shadow-lg)',
+                  style={{ background:'#1a2235', border:'1px solid rgba(255,255,255,0.12)',
+                    borderRadius:'var(--r-lg)', width:'100%', maxWidth:680,
+                    boxShadow:'0 24px 64px rgba(0,0,0,0.8), 0 4px 16px rgba(0,0,0,0.5)',
                     display:'flex', flexDirection:'column', maxHeight:'90vh', overflow:'hidden' }}
                   onClick={e => e.stopPropagation()}
                 >
                   {/* Header */}
-                  <div style={{ padding:'16px 20px', borderBottom:'1px solid var(--border)',
+                  <div style={{ padding:'18px 24px', borderBottom:'1px solid rgba(255,255,255,0.08)',
+                    background:'rgba(255,255,255,0.04)',
                     display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                     <div>
                       <div style={{ fontWeight:800, fontSize:'var(--fs-lg)', color:'var(--t-primary)' }}>
@@ -656,8 +658,11 @@ export default function EquipamentosPage() {
                       </div>
                     </div>
                     <button onClick={() => setPrecoPainel(null)}
-                      style={{ background:'none', border:'none', cursor:'pointer',
-                        fontSize:22, color:'var(--t-muted)', lineHeight:1, padding:'0 4px' }}>
+                      style={{ width:32, height:32, borderRadius:'var(--r-md)', cursor:'pointer',
+                        fontSize:18, color:'rgba(255,255,255,0.5)', lineHeight:1,
+                        background:'rgba(255,255,255,0.07)', border:'1px solid rgba(255,255,255,0.12)',
+                        display:'flex', alignItems:'center', justifyContent:'center',
+                        transition:'all .15s' }}>
                       ×
                     </button>
                   </div>
@@ -675,9 +680,9 @@ export default function EquipamentosPage() {
                         return (
                           <div key={per.id} style={{
                             padding:'12px 14px', borderRadius:'var(--r-md)',
-                            background: val > 0 ? 'var(--c-primary-light,#e0f2fe)' : 'var(--bg-header)',
-                            border:`1px solid ${val > 0 ? 'var(--c-primary)' : 'var(--border)'}`,
-                            borderLeft:`3px solid ${val > 0 ? 'var(--c-primary)' : 'var(--border)'}`,
+                            background: val > 0 ? 'rgba(129,140,248,0.15)' : 'rgba(255,255,255,0.04)',
+                            border:`1px solid ${val > 0 ? 'rgba(129,140,248,0.4)' : 'rgba(255,255,255,0.08)'}`,
+                            borderLeft:`3px solid ${val > 0 ? '#818cf8' : 'rgba(255,255,255,0.15)'}`,
                           }}>
                             <div style={{ fontSize:'var(--fs-xs)', fontWeight:700, color:'var(--t-muted)',
                               textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:4 }}>
@@ -686,7 +691,7 @@ export default function EquipamentosPage() {
                             </div>
                             <div style={{ fontWeight:800, fontSize:'var(--fs-lg)',
                               fontFamily:'var(--font-mono)',
-                              color: val > 0 ? 'var(--c-primary)' : 'var(--t-light)' }}>
+                              color: val > 0 ? '#a5b4fc' : 'rgba(255,255,255,0.2)' }}>
                               {val > 0 ? fmt.money(val) : '—'}
                             </div>
                             {val > 0 && per.dias > 1 && (
@@ -702,17 +707,17 @@ export default function EquipamentosPage() {
                       {Number(precoPainel.custo_reposicao) > 0 && (
                         <div style={{
                           padding:'12px 14px', borderRadius:'var(--r-md)',
-                          background:'var(--c-warning-light,#fef3c7)',
-                          border:'1px solid var(--c-warning,#f59e0b)',
-                          borderLeft:'3px solid var(--c-warning,#f59e0b)',
+                          background:'rgba(251,191,36,0.12)',
+                          border:'1px solid rgba(251,191,36,0.35)',
+                          borderLeft:'3px solid #fbbf24',
                         }}>
                           <div style={{ fontSize:'var(--fs-xs)', fontWeight:700,
-                            color:'var(--c-warning-text,#92400e)',
+                            color:'#fcd34d',
                             textTransform:'uppercase', letterSpacing:'0.05em', marginBottom:4 }}>
                             Custo Reposição
                           </div>
                           <div style={{ fontWeight:800, fontSize:'var(--fs-lg)',
-                            fontFamily:'var(--font-mono)', color:'var(--c-warning-text,#92400e)' }}>
+                            fontFamily:'var(--font-mono)', color:'#fbbf24' }}>
                             {fmt.money(precoPainel.custo_reposicao)}
                           </div>
                         </div>
@@ -727,20 +732,22 @@ export default function EquipamentosPage() {
                   </div>
 
                   {/* Footer */}
-                  <div style={{ padding:'12px 20px', borderTop:'1px solid var(--border)',
-                    display:'flex', justifyContent:'flex-end', background:'var(--bg-header)' }}>
+                  <div style={{ padding:'14px 24px', borderTop:'1px solid rgba(255,255,255,0.08)',
+                    display:'flex', justifyContent:'flex-end', gap:8,
+                    background:'rgba(255,255,255,0.03)' }}>
                     <button
                       onClick={() => { setPrecoPainel(null); abrir(precoPainel) }}
-                      style={{ padding:'7px 16px', borderRadius:'var(--r-md)',
-                        border:'1px solid var(--border)', background:'var(--bg-card)',
-                        cursor:'pointer', fontSize:'var(--fs-sm)', color:'var(--t-secondary)',
-                        marginRight:8, fontWeight:500 }}>
+                      style={{ padding:'8px 16px', borderRadius:'var(--r-md)',
+                        border:'1px solid rgba(255,255,255,0.12)', background:'rgba(255,255,255,0.07)',
+                        cursor:'pointer', fontSize:'var(--fs-sm)', color:'rgba(255,255,255,0.7)',
+                        fontWeight:500 }}>
                       ✏️ Editar Preços
                     </button>
                     <button onClick={() => setPrecoPainel(null)}
-                      style={{ padding:'7px 20px', borderRadius:'var(--r-md)',
-                        border:'none', background:'var(--c-primary)', color:'#fff',
-                        cursor:'pointer', fontSize:'var(--fs-sm)', fontWeight:700 }}>
+                      style={{ padding:'8px 20px', borderRadius:'var(--r-md)',
+                        border:'none', background:'linear-gradient(135deg,#6366f1,#818cf8)',
+                        color:'#fff', cursor:'pointer', fontSize:'var(--fs-sm)', fontWeight:700,
+                        boxShadow:'0 0 14px rgba(99,102,241,0.35)' }}>
                       Fechar
                     </button>
                   </div>
