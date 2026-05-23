@@ -1,5 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback, useRef } from 'react'
+import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { supabase, fmt } from '@/lib/supabase'
 import { Btn, FormField, inputCls, selectCls, textareaCls, SlidePanel } from '@/components/ui'
@@ -95,6 +96,8 @@ export default function EquipamentosPage() {
 
   // ── Painel de preços rápido (hover) ───────────────────────────────────────
   const [precoPainel, setPrecoPainel] = useState<any>(null)
+  const [portalMounted, setPortalMounted] = useState(false)
+  useEffect(() => { setPortalMounted(true) }, [])
 
   // ── Fotos ──────────────────────────────────────────────────────────────────
   const [fotos,      setFotos]      = useState<any[]>([])
@@ -631,10 +634,10 @@ export default function EquipamentosPage() {
             </table>
 
             {/* ── PAINEL DE PREÇOS RÁPIDO ─────────────────────────────────── */}
-            {precoPainel && (
+            {precoPainel && portalMounted && createPortal(
               <div
                 style={{ position:'fixed', inset:0, background:'rgba(0,0,0,0.65)',
-                  backdropFilter:'blur(6px)', zIndex:1000, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
+                  backdropFilter:'blur(6px)', zIndex:99999, display:'flex', alignItems:'center', justifyContent:'center', padding:20 }}
               >
                 <div
                   style={{ background:'#1a2235', border:'1px solid rgba(255,255,255,0.12)',
@@ -751,7 +754,8 @@ export default function EquipamentosPage() {
                     </button>
                   </div>
                 </div>
-              </div>
+              </div>,
+              document.body
             )}
 
             {/* ── PAGINAÇÃO ───────────────────────────────────────────────── */}
