@@ -1,6 +1,6 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { supabase, fmt } from '@/lib/supabase'
 import { Btn, Badge, inputCls } from '@/components/ui'
 import { calcularPrecoItem, calcularDias, type PrecosProduto } from '@/lib/calcularCobranca'
@@ -49,7 +49,9 @@ export default function EquipamentoDetalhe() {
   const [erroSite,     setErroSite]     = useState('')
   const [okSite,       setOkSite]       = useState(false)
   const [loading,   setLoading]   = useState(true)
-  const [aba,       setAba]       = useState<Aba>('inventario')
+  const searchParams = useSearchParams()
+  const abaInicial = (searchParams.get('aba') as Aba) ?? 'inventario'
+  const [aba, setAba] = useState<Aba>(abaInicial)
 
   // ── Filtros do inventário ────────────────────────────────────────────────
   const [busca,   setBusca]   = useState('')

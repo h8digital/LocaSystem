@@ -618,6 +618,14 @@ export default function EquipamentosPage() {
                             🏷️
                           </button>
                         )}
+                        {/* Publicar no Site — disponível para TODOS os produtos */}
+                        <button onClick={() => router.push(`/equipamentos/${p.id}?aba=site`)} title="Configurar publicação no site"
+                          style={{ padding:'5px 10px', borderRadius:'var(--r-sm)',
+                            border:'1px solid rgba(99,102,241,0.5)', background:'rgba(99,102,241,0.08)',
+                            cursor:'pointer', fontSize:'var(--fs-sm)', color:'#818cf8',
+                            fontWeight:600, display:'flex', alignItems:'center', gap:4 }}>
+                          🌐
+                        </button>
                         {/* Inativar */}
                         <button onClick={() => inativar(p.id, p.nome)} title="Inativar produto"
                           style={{ padding:'5px 10px', borderRadius:'var(--r-sm)',

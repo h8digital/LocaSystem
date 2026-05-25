@@ -104,6 +104,11 @@ export default function ParametrosPage() {
     ])
     const map: Record<string,string> = {}
     p?.forEach(x => { map[x.chave] = x.valor ?? '' })
+
+    // Carregar configurações do site
+    const { data: siteConf } = await supabase.from('site_config').select('chave,valor')
+    ;(siteConf ?? []).forEach((r: any) => { map[r.chave] = r.valor ?? '' })
+
     setParams(map); setPeriodos(per??[]); setCategorias(cat??[])
     setTiposEnd(te??[]); setLocais(lo??[])
     // Carregar tabelas de preço
