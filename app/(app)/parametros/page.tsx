@@ -846,40 +846,40 @@ export default function ParametrosPage() {
 
                 <div style={{ display:'flex', flexDirection:'column', gap:14, marginTop:16 }}>
                   <FormField label="Título principal">
-                    <input className={inp} value={getParam('hero_titulo')}
+                    <input className={inpSm} value={getParam('hero_titulo')}
                       onChange={e => setParam('hero_titulo', e.target.value)}
                       placeholder="EQUIPAMENTOS PRONTOS PARA SUA OBRA" />
                   </FormField>
                   <FormField label="Subtítulo">
-                    <textarea className={inp} rows={3} value={getParam('hero_subtitulo')}
+                    <textarea className={inpSm} rows={3} value={getParam('hero_subtitulo')}
                       onChange={e => setParam('hero_subtitulo', e.target.value)}
                       placeholder="Descrição que aparece abaixo do título..." style={{ resize:'vertical' }} />
                   </FormField>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                     <FormField label="Texto botão principal">
-                      <input className={inp} value={getParam('hero_cta_texto')}
+                      <input className={inpSm} value={getParam('hero_cta_texto')}
                         onChange={e => setParam('hero_cta_texto', e.target.value)}
                         placeholder="Ver Equipamentos" />
                     </FormField>
                     <FormField label="Texto botão WhatsApp">
-                      <input className={inp} value={getParam('hero_cta2_texto')}
+                      <input className={inpSm} value={getParam('hero_cta2_texto')}
                         onChange={e => setParam('hero_cta2_texto', e.target.value)}
                         placeholder="Falar no WhatsApp" />
                     </FormField>
                   </div>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
                     <FormField label="Stat — Equipamentos">
-                      <input className={inp} value={getParam('stat_equipamentos')}
+                      <input className={inpSm} value={getParam('stat_equipamentos')}
                         onChange={e => setParam('stat_equipamentos', e.target.value)}
                         placeholder="54+" />
                     </FormField>
                     <FormField label="Stat — Categorias">
-                      <input className={inp} value={getParam('stat_categorias')}
+                      <input className={inpSm} value={getParam('stat_categorias')}
                         onChange={e => setParam('stat_categorias', e.target.value)}
                         placeholder="10" />
                     </FormField>
                     <FormField label="Stat — Prazo">
-                      <input className={inp} value={getParam('stat_prazo')}
+                      <input className={inpSm} value={getParam('stat_prazo')}
                         onChange={e => setParam('stat_prazo', e.target.value)}
                         placeholder="2h" />
                     </FormField>
@@ -929,18 +929,18 @@ export default function ParametrosPage() {
                 <div className="ds-section-title">👥 Página: Quem Somos</div>
                 <div style={{ display:'flex', flexDirection:'column', gap:14, marginTop:16 }}>
                   <FormField label="Texto da história">
-                    <textarea className={inp} rows={4} value={getParam('quem_somos_historia')}
+                    <textarea className={inpSm} rows={4} value={getParam('quem_somos_historia')}
                       onChange={e => setParam('quem_somos_historia', e.target.value)}
                       placeholder="Conte a história da empresa..." style={{ resize:'vertical' }} />
                   </FormField>
                   <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                     <FormField label="Missão">
-                      <textarea className={inp} rows={3} value={getParam('quem_somos_missao')}
+                      <textarea className={inpSm} rows={3} value={getParam('quem_somos_missao')}
                         onChange={e => setParam('quem_somos_missao', e.target.value)}
                         placeholder="Nossa missão é..." style={{ resize:'vertical' }} />
                     </FormField>
                     <FormField label="Visão">
-                      <textarea className={inp} rows={3} value={getParam('quem_somos_visao')}
+                      <textarea className={inpSm} rows={3} value={getParam('quem_somos_visao')}
                         onChange={e => setParam('quem_somos_visao', e.target.value)}
                         placeholder="Nossa visão é..." style={{ resize:'vertical' }} />
                     </FormField>
@@ -953,17 +953,17 @@ export default function ParametrosPage() {
                 <div className="ds-section-title">📬 Contato e Rodapé</div>
                 <div style={{ display:'flex', flexDirection:'column', gap:14, marginTop:16 }}>
                   <FormField label="Subtítulo da página de contato">
-                    <input className={inp} value={getParam('contato_subtitulo')}
+                    <input className={inpSm} value={getParam('contato_subtitulo')}
                       onChange={e => setParam('contato_subtitulo', e.target.value)}
                       placeholder="Respondemos em até 2 horas úteis..." />
                   </FormField>
                   <FormField label="Texto do rodapé">
-                    <input className={inp} value={getParam('rodape_texto')}
+                    <input className={inpSm} value={getParam('rodape_texto')}
                       onChange={e => setParam('rodape_texto', e.target.value)}
                       placeholder="Soluções completas em locação..." />
                   </FormField>
                   <FormField label="Prazo de resposta exibido no site">
-                    <input className={inp} value={getParam('prazo_resposta')}
+                    <input className={inpSm} value={getParam('prazo_resposta')}
                       onChange={e => setParam('prazo_resposta', e.target.value)}
                       placeholder="2 horas úteis" />
                   </FormField>
