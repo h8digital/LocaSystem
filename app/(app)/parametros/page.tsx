@@ -118,17 +118,17 @@ export default function ParametrosPage() {
     if (error) { alert('Erro ao enviar imagem: ' + error.message); setUploadandoHero(false); return }
     const { data: urlData } = supabase.storage.from('produto-fotos').getPublicUrl(path)
     await supabase.from('site_config').update({ valor: urlData.publicUrl }).eq('chave', 'hero_bg_url')
-    setParametros(prev => prev.map(p => p.chave === 'hero_bg_url' ? { ...p, valor: urlData.publicUrl } : p))
+    setParams(prev => ({ ...prev, hero_bg_url: urlData.publicUrl }))
     setUploadandoHero(false)
     alert('✅ Imagem do hero atualizada!')
   }
 
   function getParam(chave: string) {
-    return parametros.find(p => p.chave === chave)?.valor ?? ''
+    return params[chave] ?? ''
   }
 
-  async function setParam(chave: string, valor: string) {
-    setParametros(prev => prev.map(p => p.chave === chave ? { ...p, valor } : p))
+  function setParam(chave: string, valor: string) {
+    setParams(prev => ({ ...prev, [chave]: valor }))
   }
 
   async function salvarSite() {
@@ -140,9 +140,9 @@ export default function ParametrosPage() {
       'stat_equipamentos','stat_categorias','stat_prazo',
     ]
     for (const chave of chaves) {
-      const valor = getParam(chave)
+      const valor = params[chave] ?? ''
       await supabase.from('site_config')
-        .upsert({ chave, valor }, { onConflict:'chave' })
+        .upsert({ chave, valor }, { onConflict: 'chave' })
     }
     setSalvandoSite(false); setOkSite(true)
     setTimeout(() => setOkSite(false), 3000)
