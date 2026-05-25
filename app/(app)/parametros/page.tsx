@@ -36,6 +36,9 @@ export default function ParametrosPage() {
   const [saving,     setSaving]     = useState(false)
   const [aba,        setAba]        = useState<string>('empresa')
   const [uploadandoLogo, setUploadandoLogo] = useState(false)
+  const [uploadandoHero, setUploadandoHero] = useState(false)
+  const [salvandoSite,   setSalvandoSite]   = useState(false)
+  const [okSite,         setOkSite]         = useState(false)
   const [tabelas,       setTabelas]       = useState<any[]>([])
   const [formTabela,    setFormTabela]    = useState({ nome:'', descricao:'', padrao:false })
   const [salvandoTab,   setSalvandoTab]   = useState(false)
@@ -68,6 +71,7 @@ export default function ParametrosPage() {
     { key:'tabelas',    label:'Tabelas de Preço'       },
     { key:'locais',     label:'Locais de Armazenagem' },
     { key:'contratos',  label:'Contratos' },
+    { key:'site',       label:'🌐 Site Kanoff' },
   ]
 
   const CAMPOS_EMPRESA = [
@@ -104,6 +108,44 @@ export default function ParametrosPage() {
     setTiposEnd(te??[]); setLocais(lo??[])
     // Carregar tabelas de preço
     fetch('/api/tabelas-preco').then(r=>r.json()).then(d=>{ if(d.ok) setTabelas(d.data) })
+  }
+
+  async function uploadHero(file: File) {
+    setUploadandoHero(true)
+    const ext  = file.name.split('.').pop()
+    const path = `site/hero-bg.${ext}`
+    const { error } = await supabase.storage.from('produto-fotos').upload(path, file, { upsert:true })
+    if (error) { alert('Erro ao enviar imagem: ' + error.message); setUploadandoHero(false); return }
+    const { data: urlData } = supabase.storage.from('produto-fotos').getPublicUrl(path)
+    await supabase.from('site_config').update({ valor: urlData.publicUrl }).eq('chave', 'hero_bg_url')
+    setParametros(prev => prev.map(p => p.chave === 'hero_bg_url' ? { ...p, valor: urlData.publicUrl } : p))
+    setUploadandoHero(false)
+    alert('✅ Imagem do hero atualizada!')
+  }
+
+  function getParam(chave: string) {
+    return parametros.find(p => p.chave === chave)?.valor ?? ''
+  }
+
+  async function setParam(chave: string, valor: string) {
+    setParametros(prev => prev.map(p => p.chave === chave ? { ...p, valor } : p))
+  }
+
+  async function salvarSite() {
+    setSalvandoSite(true); setOkSite(false)
+    const chaves = [
+      'hero_titulo','hero_subtitulo','hero_cta_texto','hero_cta2_texto',
+      'quem_somos_historia','quem_somos_missao','quem_somos_visao',
+      'contato_subtitulo','rodape_texto','prazo_resposta',
+      'stat_equipamentos','stat_categorias','stat_prazo',
+    ]
+    for (const chave of chaves) {
+      const valor = getParam(chave)
+      await supabase.from('site_config')
+        .upsert({ chave, valor }, { onConflict:'chave' })
+    }
+    setSalvandoSite(false); setOkSite(true)
+    setTimeout(() => setOkSite(false), 3000)
   }
 
   async function salvar() {
@@ -793,6 +835,160 @@ export default function ParametrosPage() {
             <input value={formLoc.descricao} onChange={e=>setFormLoc(f=>({...f,descricao:e.target.value}))}
               className={inpSm} placeholder="Localização adicional ou observações (opcional)"/>
           </FormField>
+
+          {/* ═══ SITE KANOFF ═══════════════════════════════════════════════════ */}
+          {aba === 'site' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
+
+              {/* Hero Section */}
+              <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
+                <div className="ds-section-title">🎯 Hero — Seção Principal</div>
+
+                <div style={{ display:'flex', flexDirection:'column', gap:14, marginTop:16 }}>
+                  <FormField label="Título principal">
+                    <input className={inp} value={getParam('hero_titulo')}
+                      onChange={e => setParam('hero_titulo', e.target.value)}
+                      placeholder="EQUIPAMENTOS PRONTOS PARA SUA OBRA" />
+                  </FormField>
+                  <FormField label="Subtítulo">
+                    <textarea className={inp} rows={3} value={getParam('hero_subtitulo')}
+                      onChange={e => setParam('hero_subtitulo', e.target.value)}
+                      placeholder="Descrição que aparece abaixo do título..." style={{ resize:'vertical' }} />
+                  </FormField>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                    <FormField label="Texto botão principal">
+                      <input className={inp} value={getParam('hero_cta_texto')}
+                        onChange={e => setParam('hero_cta_texto', e.target.value)}
+                        placeholder="Ver Equipamentos" />
+                    </FormField>
+                    <FormField label="Texto botão WhatsApp">
+                      <input className={inp} value={getParam('hero_cta2_texto')}
+                        onChange={e => setParam('hero_cta2_texto', e.target.value)}
+                        placeholder="Falar no WhatsApp" />
+                    </FormField>
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
+                    <FormField label="Stat — Equipamentos">
+                      <input className={inp} value={getParam('stat_equipamentos')}
+                        onChange={e => setParam('stat_equipamentos', e.target.value)}
+                        placeholder="54+" />
+                    </FormField>
+                    <FormField label="Stat — Categorias">
+                      <input className={inp} value={getParam('stat_categorias')}
+                        onChange={e => setParam('stat_categorias', e.target.value)}
+                        placeholder="10" />
+                    </FormField>
+                    <FormField label="Stat — Prazo">
+                      <input className={inp} value={getParam('stat_prazo')}
+                        onChange={e => setParam('stat_prazo', e.target.value)}
+                        placeholder="2h" />
+                    </FormField>
+                  </div>
+
+                  {/* Upload imagem de background */}
+                  <FormField label="Imagem de Background do Hero">
+                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                      {getParam('hero_bg_url') && (
+                        <div style={{ position:'relative', borderRadius:'var(--r-md)', overflow:'hidden', height:120 }}>
+                          <img src={getParam('hero_bg_url')} alt="Hero BG"
+                            style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                          <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                            <span style={{ color:'#fff', fontSize:12 }}>Background atual</span>
+                          </div>
+                        </div>
+                      )}
+                      <div style={{ display:'flex', gap:8, alignItems:'center' }}>
+                        <label style={{
+                          display:'inline-flex', alignItems:'center', gap:8,
+                          padding:'8px 16px', borderRadius:'var(--r-md)', cursor:'pointer',
+                          background:'rgba(129,140,248,0.15)', border:'1px solid rgba(129,140,248,0.35)',
+                          color:'#a5b4fc', fontSize:'var(--fs-md)', fontWeight:600,
+                        }}>
+                          {uploadandoHero ? '⏳ Enviando...' : '📸 Enviar imagem'}
+                          <input type="file" accept="image/*" style={{ display:'none' }}
+                            onChange={e => { const f = e.target.files?.[0]; if (f) uploadHero(f) }}
+                            disabled={uploadandoHero} />
+                        </label>
+                        {getParam('hero_bg_url') && (
+                          <button onClick={() => setParam('hero_bg_url', '')}
+                            style={{ padding:'8px 12px', borderRadius:'var(--r-md)', background:'rgba(248,113,113,0.1)', border:'1px solid rgba(248,113,113,0.3)', color:'#f87171', fontSize:'var(--fs-sm)', cursor:'pointer' }}>
+                            Remover
+                          </button>
+                        )}
+                      </div>
+                      <div style={{ fontSize:11, color:'var(--t-muted)' }}>
+                        Deixe vazio para usar o efeito de partículas animadas. Recomendado: 1920×1080px, JPG ou WebP.
+                      </div>
+                    </div>
+                  </FormField>
+                </div>
+              </div>
+
+              {/* Quem Somos */}
+              <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
+                <div className="ds-section-title">👥 Página: Quem Somos</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:14, marginTop:16 }}>
+                  <FormField label="Texto da história">
+                    <textarea className={inp} rows={4} value={getParam('quem_somos_historia')}
+                      onChange={e => setParam('quem_somos_historia', e.target.value)}
+                      placeholder="Conte a história da empresa..." style={{ resize:'vertical' }} />
+                  </FormField>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                    <FormField label="Missão">
+                      <textarea className={inp} rows={3} value={getParam('quem_somos_missao')}
+                        onChange={e => setParam('quem_somos_missao', e.target.value)}
+                        placeholder="Nossa missão é..." style={{ resize:'vertical' }} />
+                    </FormField>
+                    <FormField label="Visão">
+                      <textarea className={inp} rows={3} value={getParam('quem_somos_visao')}
+                        onChange={e => setParam('quem_somos_visao', e.target.value)}
+                        placeholder="Nossa visão é..." style={{ resize:'vertical' }} />
+                    </FormField>
+                  </div>
+                </div>
+              </div>
+
+              {/* Contato e Rodapé */}
+              <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
+                <div className="ds-section-title">📬 Contato e Rodapé</div>
+                <div style={{ display:'flex', flexDirection:'column', gap:14, marginTop:16 }}>
+                  <FormField label="Subtítulo da página de contato">
+                    <input className={inp} value={getParam('contato_subtitulo')}
+                      onChange={e => setParam('contato_subtitulo', e.target.value)}
+                      placeholder="Respondemos em até 2 horas úteis..." />
+                  </FormField>
+                  <FormField label="Texto do rodapé">
+                    <input className={inp} value={getParam('rodape_texto')}
+                      onChange={e => setParam('rodape_texto', e.target.value)}
+                      placeholder="Soluções completas em locação..." />
+                  </FormField>
+                  <FormField label="Prazo de resposta exibido no site">
+                    <input className={inp} value={getParam('prazo_resposta')}
+                      onChange={e => setParam('prazo_resposta', e.target.value)}
+                      placeholder="2 horas úteis" />
+                  </FormField>
+                </div>
+              </div>
+
+              {/* Salvar */}
+              {okSite && (
+                <div style={{ background:'rgba(52,211,153,0.1)', border:'1px solid rgba(52,211,153,0.3)', borderRadius:'var(--r-md)', padding:'10px 16px', fontSize:'var(--fs-md)', color:'#34d399' }}>
+                  ✅ Configurações do site salvas com sucesso!
+                </div>
+              )}
+              <div style={{ display:'flex', justifyContent:'flex-end' }}>
+                <button onClick={salvarSite} disabled={salvandoSite}
+                  style={{ padding:'10px 28px', borderRadius:'var(--r-md)', border:'none',
+                    background: salvandoSite ? 'rgba(99,102,241,0.5)' : 'linear-gradient(135deg,#6366f1,#818cf8)',
+                    color:'#fff', fontSize:'var(--fs-md)', fontWeight:700, cursor:'pointer',
+                    fontFamily:'var(--font-sans)', display:'flex', alignItems:'center', gap:8,
+                    opacity: salvandoSite ? .7 : 1 }}>
+                  {salvandoSite ? 'Salvando...' : '🌐 Salvar Configurações do Site'}
+                </button>
+              </div>
+            </div>
+          )}
+
         </div>
       </SlidePanel>
 
