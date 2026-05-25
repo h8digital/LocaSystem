@@ -6,7 +6,7 @@ import { Btn, Badge, inputCls } from '@/components/ui'
 import { calcularPrecoItem, calcularDias, type PrecosProduto } from '@/lib/calcularCobranca'
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
-type Aba = 'inventario' | 'historico' | 'contratos' | 'precos' | 'acessorios'
+type Aba = 'inventario' | 'historico' | 'contratos' | 'precos' | 'acessorios' | 'site'
 
 const STATUS_COLOR: Record<string, string> = {
   disponivel: 'var(--c-success,#16a34a)',
@@ -33,6 +33,21 @@ export default function EquipamentoDetalhe() {
   const [formAcess,  setFormAcess]  = useState({ nome:'', descricao:'', quantidade:1, obrigatorio:true })
   const [salvandoAcc,setSalvandoAcc]= useState(false)
   const [erroAcc,    setErroAcc]    = useState('')
+
+  // ── Campos de publicação no site ────────────────────────────────────────────
+  const [siteData, setSiteData] = useState({
+    publicado_site:  false,
+    destaque_home:   false,
+    slug:            '',
+    titulo_site:     '',
+    descricao_site:  '',
+    seo_title:       '',
+    seo_description: '',
+    ordem_site:      0,
+  })
+  const [salvandoSite, setSalvandoSite] = useState(false)
+  const [erroSite,     setErroSite]     = useState('')
+  const [okSite,       setOkSite]       = useState(false)
   const [loading,   setLoading]   = useState(true)
   const [aba,       setAba]       = useState<Aba>('inventario')
 
@@ -65,6 +80,19 @@ export default function EquipamentoDetalhe() {
         .order('created_at', { ascending: false }),
     ])
     setProduto(prod)
+    // Carregar campos de publicação no site
+    if (prod) {
+      setSiteData({
+        publicado_site:  prod.publicado_site  ?? false,
+        destaque_home:   prod.destaque_home   ?? false,
+        slug:            prod.slug            ?? '',
+        titulo_site:     prod.titulo_site     ?? '',
+        descricao_site:  prod.descricao_site  ?? '',
+        seo_title:       prod.seo_title       ?? '',
+        seo_description: prod.seo_description ?? '',
+        ordem_site:      prod.ordem_site      ?? 0,
+      })
+    }
     setPats(patsData ?? [])
     setMovs(movsData ?? [])
     setContratos((ciData ?? []).filter((ci: any) => ci.contratos))
@@ -112,6 +140,35 @@ export default function EquipamentoDetalhe() {
     { l: 'Semestral',     v: produto.preco_semestral,        d: 180 },
     { l: 'Custo Repos.',  v: produto.custo_reposicao,        d: 0   },
   ]
+
+  async function salvarSite() {
+    setSalvandoSite(true); setErroSite(''); setOkSite(false)
+    let slug = siteData.slug.trim()
+    if (!slug && siteData.titulo_site.trim()) {
+      slug = siteData.titulo_site.trim()
+        .toLowerCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9\s-]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-')
+    }
+    const { error } = await supabase.from('produtos').update({
+      publicado_site:  siteData.publicado_site,
+      destaque_home:   siteData.destaque_home,
+      slug:            slug || null,
+      titulo_site:     siteData.titulo_site.trim() || null,
+      descricao_site:  siteData.descricao_site.trim() || null,
+      seo_title:       siteData.seo_title.trim() || null,
+      seo_description: siteData.seo_description.trim() || null,
+      ordem_site:      Number(siteData.ordem_site) || 0,
+    }).eq('id', Number(id))
+    if (error) { setErroSite(error.message); setSalvandoSite(false); return }
+    if (slug) setSiteData(s => ({ ...s, slug }))
+    setOkSite(true)
+    setSalvandoSite(false)
+    setTimeout(() => setOkSite(false), 3000)
+  }
+
 
   return (
     <div style={{ maxWidth: 1100, margin: '0 auto' }}>
@@ -163,6 +220,7 @@ export default function EquipamentoDetalhe() {
           ['contratos',  `📄 Contratos (${contratos.length})`],
           ['precos',     '💰 Tabela de Preços'],
           ['acessorios', `🔩 Acessórios (${acessorios.length})`],
+          ['site',       '🌐 Publicação no Site'],
         ] as const).map(([k, l]) => (
           <button key={k} onClick={() => setAba(k as Aba)}
             style={{
@@ -638,6 +696,171 @@ export default function EquipamentoDetalhe() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+
+      {/* ── ABA: PUBLICAÇÃO NO SITE ─────────────────────────────────────── */}
+      {aba === 'site' && (
+        <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+
+          {/* Status de publicação */}
+          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+
+            {/* Publicar no site */}
+            <div style={{ background:'var(--bg-card)', border:`2px solid ${siteData.publicado_site ? 'rgba(52,211,153,0.5)' : 'var(--border)'}`, borderRadius:'var(--r-lg)', padding:20, cursor:'pointer', transition:'all .2s' }}
+              onClick={() => setSiteData(s => ({ ...s, publicado_site: !s.publicado_site }))}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                <div style={{ fontSize:24 }}>🌐</div>
+                <div style={{
+                  width:44, height:24, borderRadius:12, position:'relative', transition:'all .2s',
+                  background: siteData.publicado_site ? 'var(--c-success)' : 'rgba(255,255,255,0.15)',
+                }}>
+                  <div style={{
+                    position:'absolute', top:3, width:18, height:18, borderRadius:'50%', background:'#fff', transition:'all .2s',
+                    left: siteData.publicado_site ? 23 : 3,
+                    boxShadow:'0 1px 4px rgba(0,0,0,0.3)',
+                  }} />
+                </div>
+              </div>
+              <div style={{ fontWeight:700, color:'var(--t-primary)', fontSize:'var(--fs-base)' }}>Publicar no Site</div>
+              <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginTop:4 }}>
+                {siteData.publicado_site ? '✅ Visível no catálogo público' : '⏸️ Oculto no site'}
+              </div>
+            </div>
+
+            {/* Destaque na home */}
+            <div style={{ background:'var(--bg-card)', border:`2px solid ${siteData.destaque_home ? 'rgba(251,191,36,0.5)' : 'var(--border)'}`, borderRadius:'var(--r-lg)', padding:20, cursor:'pointer', transition:'all .2s' }}
+              onClick={() => setSiteData(s => ({ ...s, destaque_home: !s.destaque_home }))}>
+              <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:8 }}>
+                <div style={{ fontSize:24 }}>⭐</div>
+                <div style={{
+                  width:44, height:24, borderRadius:12, position:'relative', transition:'all .2s',
+                  background: siteData.destaque_home ? '#fbbf24' : 'rgba(255,255,255,0.15)',
+                }}>
+                  <div style={{
+                    position:'absolute', top:3, width:18, height:18, borderRadius:'50%', background:'#fff', transition:'all .2s',
+                    left: siteData.destaque_home ? 23 : 3,
+                    boxShadow:'0 1px 4px rgba(0,0,0,0.3)',
+                  }} />
+                </div>
+              </div>
+              <div style={{ fontWeight:700, color:'var(--t-primary)', fontSize:'var(--fs-base)' }}>Destaque na Home</div>
+              <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginTop:4 }}>
+                {siteData.destaque_home ? '⭐ Aparece nos destaques da home' : '○ Não aparece nos destaques'}
+              </div>
+            </div>
+          </div>
+
+          {/* Dados de publicação */}
+          <div style={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
+            <div style={{ fontSize:15, fontWeight:700, color:'var(--t-primary)', marginBottom:16 }}>📝 Dados de Publicação</div>
+
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 120px', gap:12 }}>
+                <div>
+                  <div className="ds-label">Título no site</div>
+                  <input className="ds-input" value={siteData.titulo_site}
+                    onChange={e => setSiteData(s => ({ ...s, titulo_site: e.target.value }))}
+                    placeholder={produto?.nome ?? 'Nome público do equipamento'} />
+                  <div style={{ fontSize:11, color:'var(--t-muted)', marginTop:4 }}>Se vazio, usa o nome do cadastro</div>
+                </div>
+                <div>
+                  <div className="ds-label">Ordem</div>
+                  <input type="number" className="ds-input" value={siteData.ordem_site}
+                    onChange={e => setSiteData(s => ({ ...s, ordem_site: Number(e.target.value) }))}
+                    placeholder="0" min={0} />
+                  <div style={{ fontSize:11, color:'var(--t-muted)', marginTop:4 }}>Menor = primeiro</div>
+                </div>
+              </div>
+
+              <div>
+                <div className="ds-label">Slug (URL amigável)</div>
+                <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+                  <span style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', whiteSpace:'nowrap' }}>
+                    /equipamentos/
+                  </span>
+                  <input className="ds-input" value={siteData.slug}
+                    onChange={e => setSiteData(s => ({ ...s, slug: e.target.value.toLowerCase().replace(/\s+/g,'-').replace(/[^a-z0-9-]/g,'') }))}
+                    placeholder="andaime-tubular-1m" />
+                </div>
+                <div style={{ fontSize:11, color:'var(--t-muted)', marginTop:4 }}>Gerado automaticamente se vazio</div>
+              </div>
+
+              <div>
+                <div className="ds-label">Descrição para o site</div>
+                <textarea className="ds-textarea" value={siteData.descricao_site}
+                  onChange={e => setSiteData(s => ({ ...s, descricao_site: e.target.value }))}
+                  rows={3}
+                  placeholder="Descrição que aparece para o cliente final no site. Pode ser diferente da descrição interna." />
+              </div>
+            </div>
+          </div>
+
+          {/* SEO */}
+          <div style={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
+            <div style={{ fontSize:15, fontWeight:700, color:'var(--t-primary)', marginBottom:4 }}>🔍 SEO — Google</div>
+            <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginBottom:16 }}>Controla como o equipamento aparece nos resultados de busca</div>
+
+            <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+              <div>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:5 }}>
+                  <span className="ds-label" style={{ margin:0 }}>Título SEO</span>
+                  <span style={{ fontSize:11, color: siteData.seo_title.length > 60 ? 'var(--c-danger)' : 'var(--t-muted)' }}>
+                    {siteData.seo_title.length}/60
+                  </span>
+                </div>
+                <input className="ds-input" value={siteData.seo_title} maxLength={70}
+                  onChange={e => setSiteData(s => ({ ...s, seo_title: e.target.value }))}
+                  placeholder={`${produto?.nome ?? 'Equipamento'} — Locação em Sapucaia do Sul | Kanoff Soluções`} />
+              </div>
+              <div>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:5 }}>
+                  <span className="ds-label" style={{ margin:0 }}>Meta Description</span>
+                  <span style={{ fontSize:11, color: siteData.seo_description.length > 160 ? 'var(--c-danger)' : 'var(--t-muted)' }}>
+                    {siteData.seo_description.length}/160
+                  </span>
+                </div>
+                <textarea className="ds-textarea" value={siteData.seo_description} maxLength={170} rows={2}
+                  onChange={e => setSiteData(s => ({ ...s, seo_description: e.target.value }))}
+                  placeholder={`Alugue ${produto?.nome ?? 'equipamento'} na Kanoff Soluções. Cotação online rápida, entrega e retirada em Sapucaia do Sul e região.`} />
+              </div>
+
+              {/* Preview Google */}
+              {(siteData.seo_title || siteData.seo_description) && (
+                <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'var(--r-md)', padding:'12px 16px' }}>
+                  <div style={{ fontSize:11, color:'var(--t-muted)', marginBottom:8, textTransform:'uppercase', letterSpacing:'.05em' }}>Preview Google</div>
+                  <div style={{ fontSize:13, color:'#8ab4f8', marginBottom:2 }}>
+                    {siteData.seo_title || (produto?.nome ?? 'Título do equipamento')}
+                  </div>
+                  <div style={{ fontSize:11, color:'#34a853' }}>
+                    kanoffsolucoes.com.br/equipamentos/{siteData.slug || 'slug'}
+                  </div>
+                  <div style={{ fontSize:12, color:'rgba(255,255,255,0.6)', marginTop:4, lineHeight:1.5 }}>
+                    {siteData.seo_description || 'Meta description aparecerá aqui...'}
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Salvar */}
+          {erroSite && <div className="ds-alert-error">{erroSite}</div>}
+          {okSite && (
+            <div style={{ background:'rgba(52,211,153,0.1)', border:'1px solid rgba(52,211,153,0.3)', borderRadius:'var(--r-md)', padding:'10px 16px', fontSize:'var(--fs-md)', color:'#34d399' }}>
+              ✅ Configurações do site salvas com sucesso!
+            </div>
+          )}
+          <div style={{ display:'flex', justifyContent:'flex-end' }}>
+            <button onClick={salvarSite} disabled={salvandoSite}
+              style={{ padding:'10px 28px', borderRadius:'var(--r-md)', border:'none',
+                background: salvandoSite ? 'rgba(99,102,241,0.5)' : 'linear-gradient(135deg,#6366f1,#818cf8)',
+                color:'#fff', fontSize:'var(--fs-md)', fontWeight:700, cursor:'pointer',
+                fontFamily:'var(--font-sans)', display:'flex', alignItems:'center', gap:8,
+                opacity: salvandoSite ? .7 : 1 }}>
+              {salvandoSite ? 'Salvando...' : '🌐 Salvar Configurações do Site'}
+            </button>
+          </div>
         </div>
       )}
 

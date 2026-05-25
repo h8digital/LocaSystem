@@ -18,3 +18,5 @@ export const inputCls    = 'ds-input'
 export const selectCls   = 'ds-select'
 export const textareaCls = 'ds-textarea'
 export { default as PageShell } from './PageShell'
+
+export { default as Modal } from './Modal'
