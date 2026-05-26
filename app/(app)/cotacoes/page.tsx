@@ -1,4 +1,4 @@
-// build: 2026-05-26 01:37:21 UTC
+// build: 2026-05-26 02:27:50
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { supabase, fmt } from '@/lib/supabase'
@@ -94,7 +94,7 @@ export default function CotacoesPage() {
 
     // Tabela — com filtros
     let q = supabase.from('cotacoes')
-      .select('id,numero,status,data_emissao,data_validade,data_inicio,data_fim,total,contrato_id,visualizacoes,clientes(nome),usuarios(nome),periodos_locacao(nome)')
+      .select('id,numero,status,data_emissao,data_validade,data_inicio,data_fim,data_necessidade,total,contrato_id,visualizacoes,origem,periodo_nome,clientes(nome),usuarios(nome),periodos_locacao(nome)')
       .order('created_at', { ascending: false })
 
     if (fStatus)     q = q.eq('status', fStatus)
@@ -347,6 +347,7 @@ export default function CotacoesPage() {
                 <Th>Validade</Th>
                 <Th>Início</Th>
                 <Th>Fim</Th>
+                <Th>📅 Precisa para</Th>
                 <Th right>Total</Th>
                 <Th>Visualiz.</Th>
                 <Th>Status</Th>
@@ -394,6 +395,15 @@ export default function CotacoesPage() {
                     </Td>
                     <Td muted>{fmt.date(row.data_inicio) || '—'}</Td>
                     <Td muted>{fmt.date(row.data_fim) || '—'}</Td>
+                    <Td>
+                      {row.data_necessidade
+                        ? <span style={{ fontSize:'var(--fs-sm)', fontWeight:600,
+                            color:'#fbbf24', display:'flex', alignItems:'center', gap:4 }}>
+                            📅 {fmt.date(row.data_necessidade)}
+                          </span>
+                        : <span style={{ color:'rgba(255,255,255,0.2)', fontSize:'var(--fs-sm)' }}>—</span>
+                      }
+                    </Td>
                     <Td right>
                       <span style={{ fontWeight:700, color:'rgba(255,255,255,0.88)' }}>
                         {fmt.money(row.total)}

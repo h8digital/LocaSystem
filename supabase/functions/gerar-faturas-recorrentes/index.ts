@@ -1,5 +1,4 @@
-// build: 2026-05-26 01:37:21 UTC
-// Edge Function: gerar-faturas-recorrentes
+// build: 2026-05-26 02:27:50
 // Deve ser chamada via cron job diariamente (ex: às 6h)
 // Verifica contratos recorrentes ativos cujo dia_vencimento == hoje
 // e gera a fatura do mês se ainda não existir para a competência atual

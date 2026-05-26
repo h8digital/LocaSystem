@@ -1,5 +1,4 @@
-// build: 2026-05-26 01:37:21 UTC
-// Estado vazio padrão
+// build: 2026-05-26 02:27:50
 interface EmptyStateProps {
   icon?: string
   title: string
