@@ -1,4 +1,4 @@
-// build: 2026-05-26 12:49:03
+// build: 2026-05-26 13:47:26
 'use client'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
