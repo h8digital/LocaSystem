@@ -1,4 +1,4 @@
-// build: 2026-05-26 02:27:50
+// build: 2026-05-26 12:49:03
 'use client'
 import Notificacoes from '@/components/ui/Notificacoes'
 import Link from 'next/link'
@@ -62,8 +62,16 @@ export default function Sidebar({ user }: { user: any }) {
       {/* Navegação */}
       <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
         {nav.map((item) => {
-          const isActive = pathname === item.href ||
-            (item.href !== '/dashboard' && pathname.startsWith(item.href + '/'))
+          // Um item é ativo se:
+          // 1. O pathname é exatamente igual ao href, OU
+          // 2. O pathname começa com href+'/' E não existe outro item no nav
+          //    cujo href é exatamente igual ao pathname (para evitar pai+filho ativos juntos)
+          const isExactMatch  = pathname === item.href
+          const hasExactChild = nav.some(other => other.href === pathname && other.href !== item.href)
+          const isActive = isExactMatch ||
+            (item.href !== '/dashboard' &&
+             pathname.startsWith(item.href + '/') &&
+             !hasExactChild)
 
           return (
             <div key={item.href}>

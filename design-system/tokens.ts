@@ -1,4 +1,4 @@
-// build: 2026-05-26 02:27:50
+// build: 2026-05-26 12:49:03
 /**
  * LocaSystem Design System — Tokens TypeScript
  * Use estes valores ao criar estilos inline (style={{}})
