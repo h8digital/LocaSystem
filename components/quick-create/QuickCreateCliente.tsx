@@ -1,3 +1,4 @@
+// build: 2026-05-26 01:22:45 UTC
 'use client'
 import { validarDoc } from '@/lib/validators'
 import { useState, useEffect } from 'react'

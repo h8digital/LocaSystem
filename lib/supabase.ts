@@ -1,3 +1,4 @@
+// build: 2026-05-26 01:22:45 UTC
 import { createClient } from '@supabase/supabase-js'
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!

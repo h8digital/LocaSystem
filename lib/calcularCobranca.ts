@@ -1,3 +1,4 @@
+// build: 2026-05-26 01:22:45 UTC
 /**
  * Motor de Cobrança Proporcional — LocaSystem
  *

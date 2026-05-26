@@ -1,3 +1,4 @@
+// build: 2026-05-26 01:22:45 UTC
 import { syslog } from '@/lib/syslog'
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
