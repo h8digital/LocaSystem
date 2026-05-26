@@ -775,6 +775,25 @@ export default function ParametrosPage() {
                 </div>
               </div>
 
+              {/* URL do contrato padrão — para QR Code */}
+              <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
+                <div className="ds-section-title">🔗 Link do Contrato Padrão (QR Code)</div>
+                <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginBottom:12, marginTop:8 }}>
+                  URL pública onde o cliente pode consultar o contrato de locação padrão da Kanoff. Este link é gerado como QR Code nos documentos.
+                </div>
+                <FormField label="URL do Contrato Padrão">
+                  <input
+                    value={params['url_contrato_padrao'] ?? ''}
+                    onChange={e => setParams(p => ({ ...p, url_contrato_padrao: e.target.value }))}
+                    className={inpSm}
+                    placeholder="https://www.kanoffsolucoes.com.br/contrato"
+                  />
+                </FormField>
+                <div style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)', marginTop:6 }}>
+                  Após salvar, o QR Code nos contratos apontará para esta URL. Recomendamos usar a página pública do site.
+                </div>
+              </div>
+
             </div>
           )}
 

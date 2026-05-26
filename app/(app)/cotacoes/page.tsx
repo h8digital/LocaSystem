@@ -67,13 +67,15 @@ export default function CotacoesPage() {
   const [fValidDe,     setFValidDe]    = useState('')
   const [fValidAte,    setFValidAte]   = useState('')
 
+  const [novasSite, setNovasSite] = useState(0)
+
   const load = useCallback(async () => {
     setLoading(true)
     const hoje = new Date().toISOString().split('T')[0]
 
     // KPIs — sem filtros
     const { data: todas } = await supabase.from('cotacoes')
-      .select('status, total, data_validade')
+      .select('status, total, data_validade, origem')
     const lt = todas ?? []
     setKpis({
       total:          lt.length,
@@ -87,6 +89,7 @@ export default function CotacoesPage() {
       valor_aprovado: lt.filter(c => c.status === 'aprovada').reduce((s,c) => s + Number(c.total ?? 0), 0),
       valor_aguardando: lt.filter(c => c.status === 'aguardando').reduce((s,c) => s + Number(c.total ?? 0), 0),
     })
+    setNovasSite(lt.filter((cotItem: any) => cotItem.origem === 'site' && cotItem.status === 'aguardando').length)
 
     // Tabela — com filtros
     let q = supabase.from('cotacoes')
@@ -194,7 +197,11 @@ export default function CotacoesPage() {
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
 
-      <PageHeader title="📋 Cotações" subtitle="Propostas comerciais para clientes"
+      <PageHeader title="📋 Cotações" subtitle={
+          novasSite > 0
+            ? `Propostas comerciais — 🌐 ${novasSite} nova${novasSite > 1 ? 's' : ''} do site aguardando resposta`
+            : 'Propostas comerciais para clientes'
+        }
         actions={<div style={{display:'flex',gap:8}}>
           <button onClick={() => router.push('/cotacoes/rapida')}
             style={{ padding:'7px 14px', borderRadius:'var(--r-md)',
@@ -358,6 +365,14 @@ export default function CotacoesPage() {
 
                     <Td mono>
                       <span style={{ fontWeight:700, color:'#818cf8' }}>{row.numero}</span>
+                      {row.origem === 'site' && (
+                        <span style={{ marginLeft:6, fontSize:10, fontWeight:700, padding:'2px 6px',
+                          borderRadius:4, background:'rgba(251,191,36,0.15)',
+                          border:'1px solid rgba(251,191,36,0.4)', color:'#fbbf24',
+                          verticalAlign:'middle' }}>
+                          🌐 SITE
+                        </span>
+                      )}
                     </Td>
                     <Td>
                       <span style={{ fontWeight:500, color:'rgba(255,255,255,0.88)' }}>
