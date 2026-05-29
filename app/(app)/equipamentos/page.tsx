@@ -1,4 +1,4 @@
-// build: 2026-05-26 13:47:26
+// build: 2026-05-29 17:55:15
 'use client'
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
@@ -859,7 +859,7 @@ export default function EquipamentosPage() {
           {([
             ['info',      '📋 Informações'],
             ['precos',    '💰 Preços'],
-            ...(editId ? [['fotos', `🖼️ Fotos${fotos.length>0?' ('+fotos.length+')':''}`]] : []),
+            // Fotos movidas para a aba 🌐 Internet em /equipamentos/[id]?aba=internet
             ...(editId && Number(form.controla_patrimonio)===1
               ? [['inventario', `🏷️ Inventário${patsPanel.length>0?' ('+patsPanel.length+')':''}`]]
               : []),

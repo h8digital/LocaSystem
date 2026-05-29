@@ -1,4 +1,4 @@
-// build: 2026-05-26 13:47:26
+// build: 2026-05-29 17:55:15
 // Deve ser chamada via cron job diariamente (ex: às 6h)
 // Verifica contratos recorrentes ativos cujo dia_vencimento == hoje
 // e gera a fatura do mês se ainda não existir para a competência atual

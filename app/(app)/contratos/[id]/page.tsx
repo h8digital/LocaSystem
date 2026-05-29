@@ -1,4 +1,4 @@
-// build: 2026-05-26 13:47:26
+// build: 2026-05-29 17:55:15
 'use client'
 import { useEffect, useState, Suspense } from 'react'
 import { calcularPrecoItem, calcularDias, type PrecosProduto } from '@/lib/calcularCobranca'

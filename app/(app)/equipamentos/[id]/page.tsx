@@ -1,4 +1,4 @@
-// build: 2026-05-26 13:47:26
+// build: 2026-05-29 17:55:15
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
@@ -7,7 +7,7 @@ import { Btn, Badge, inputCls } from '@/components/ui'
 import { calcularPrecoItem, calcularDias, type PrecosProduto } from '@/lib/calcularCobranca'
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
-type Aba = 'inventario' | 'historico' | 'contratos' | 'precos' | 'acessorios' | 'site'
+type Aba = 'inventario' | 'historico' | 'contratos' | 'precos' | 'acessorios' | 'internet'
 
 const STATUS_COLOR: Record<string, string> = {
   disponivel: 'var(--c-success,#16a34a)',
@@ -49,6 +49,10 @@ export default function EquipamentoDetalhe() {
   const [salvandoSite, setSalvandoSite] = useState(false)
   const [erroSite,     setErroSite]     = useState('')
   const [okSite,       setOkSite]       = useState(false)
+
+  // ── Fotos (agora dentro da aba Internet) ─────────────────────────────────
+  const [fotos,      setFotos]      = useState<any[]>([])
+  const [uploadando, setUploadando] = useState(false)
   const [loading,   setLoading]   = useState(true)
   const searchParams = useSearchParams()
   const abaInicial = (searchParams.get('aba') as Aba) ?? 'inventario'
@@ -96,6 +100,10 @@ export default function EquipamentoDetalhe() {
         ordem_site:      prod.ordem_site      ?? 0,
       })
     }
+    // Carregar fotos
+    const { data: fs } = await supabase.from('produto_fotos')
+      .select('*').eq('produto_id', Number(id)).order('ordem')
+    setFotos(fs ?? [])
     setPats(patsData ?? [])
     setMovs(movsData ?? [])
     setContratos((ciData ?? []).filter((ci: any) => ci.contratos))
@@ -143,6 +151,51 @@ export default function EquipamentoDetalhe() {
     { l: 'Semestral',     v: produto.preco_semestral,        d: 180 },
     { l: 'Custo Repos.',  v: produto.custo_reposicao,        d: 0   },
   ]
+
+  async function uploadFotoInternet(file: File) {
+    setUploadando(true)
+    const ext  = file.name.split('.').pop()
+    const path = `produtos/${id}/${Date.now()}.${ext}`
+    const { error: upErr } = await supabase.storage
+      .from('produto-fotos').upload(path, file, { upsert: false })
+    if (upErr) { alert('Erro no upload: ' + upErr.message); setUploadando(false); return }
+    const { data: { publicUrl } } = supabase.storage.from('produto-fotos').getPublicUrl(path)
+    const isPrimeira = fotos.length === 0
+    await supabase.from('produto_fotos').insert({
+      produto_id:    Number(id),
+      url:           publicUrl,
+      storage_path:  path,
+      principal:     isPrimeira,
+      ordem:         fotos.length,
+    })
+    const { data: fs } = await supabase.from('produto_fotos')
+      .select('*').eq('produto_id', Number(id)).order('ordem')
+    setFotos(fs ?? [])
+    setUploadando(false)
+  }
+
+  async function excluirFotoInternet(foto: any) {
+    if (!confirm('Excluir esta foto?')) return
+    if (foto.storage_path) {
+      await supabase.storage.from('produto-fotos').remove([foto.storage_path])
+    }
+    await supabase.from('produto_fotos').delete().eq('id', foto.id)
+    const restantes = fotos.filter(f => f.id !== foto.id)
+    if (foto.principal && restantes.length > 0) {
+      await supabase.from('produto_fotos').update({ principal: true }).eq('id', restantes[0].id)
+    }
+    const { data: fs } = await supabase.from('produto_fotos')
+      .select('*').eq('produto_id', Number(id)).order('ordem')
+    setFotos(fs ?? [])
+  }
+
+  async function marcarPrincipalInternet(foto: any) {
+    await supabase.from('produto_fotos').update({ principal: false }).eq('produto_id', Number(id))
+    await supabase.from('produto_fotos').update({ principal: true }).eq('id', foto.id)
+    const { data: fs } = await supabase.from('produto_fotos')
+      .select('*').eq('produto_id', Number(id)).order('ordem')
+    setFotos(fs ?? [])
+  }
 
   async function salvarSite() {
     setSalvandoSite(true); setErroSite(''); setOkSite(false)
@@ -223,7 +276,7 @@ export default function EquipamentoDetalhe() {
           ['contratos',  `📄 Contratos (${contratos.length})`],
           ['precos',     '💰 Tabela de Preços'],
           ['acessorios', `🔩 Acessórios (${acessorios.length})`],
-          ['site',       '🌐 Publicação no Site'],
+          ['internet',   `🌐 Internet (${fotos.length > 0 ? fotos.length + ' foto' + (fotos.length>1?'s':'') + ' · ' : ''}site)`],
         ] as const).map(([k, l]) => (
           <button key={k} onClick={() => setAba(k as Aba)}
             style={{
@@ -704,8 +757,60 @@ export default function EquipamentoDetalhe() {
 
 
       {/* ── ABA: PUBLICAÇÃO NO SITE ─────────────────────────────────────── */}
-      {aba === 'site' && (
+      {aba === 'internet' && (
         <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+
+
+          {/* ── FOTOS ──────────────────────────────────────────────────────── */}
+          <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
+            <div style={{ fontSize:15, fontWeight:700, color:'var(--t-primary)', marginBottom:16 }}>🖼️ Fotos do Equipamento</div>
+            <div style={{ border:'2px dashed var(--border)', borderRadius:'var(--r-lg)',
+              padding:'20px', textAlign:'center', cursor:'pointer', transition:'all .15s',
+              background: uploadando ? 'var(--bg-header)' : 'var(--bg-card)', marginBottom:16 }}
+              onDragOver={e => e.preventDefault()}
+              onDrop={e => { e.preventDefault(); const f=e.dataTransfer.files[0]; if(f) uploadFotoInternet(f) }}
+              onClick={() => document.getElementById('foto-input-internet')?.click()}>
+              <input id="foto-input-internet" type="file" accept="image/*" style={{ display:'none' }}
+                onChange={e => { const f=e.target.files?.[0]; if(f) uploadFotoInternet(f); e.currentTarget.value='' }} />
+              {uploadando
+                ? <div style={{ color:'var(--t-muted)' }}>Enviando...</div>
+                : <div>
+                    <div style={{ fontSize:28, marginBottom:6 }}>🖼️</div>
+                    <div style={{ fontWeight:600, fontSize:'var(--fs-base)', color:'var(--t-primary)', marginBottom:2 }}>Clique ou arraste aqui</div>
+                    <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)' }}>JPG, PNG, WEBP — máx. 5MB</div>
+                  </div>
+              }
+            </div>
+            {fotos.length === 0
+              ? <div style={{ textAlign:'center', padding:'12px', color:'var(--t-muted)' }}>Nenhuma foto cadastrada.</div>
+              : <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10 }}>
+                  {fotos.map((foto:any) => (
+                    <div key={foto.id} style={{ position:'relative', borderRadius:'var(--r-md)',
+                      overflow:'hidden', border: foto.principal ? '2px solid var(--c-primary)' : '1px solid var(--border)',
+                      aspectRatio:'4/3', background:'var(--bg-header)' }}>
+                      <img src={foto.url} alt="" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                      {foto.principal && (
+                        <div style={{ position:'absolute', top:4, left:4, padding:'1px 6px',
+                          background:'var(--c-primary)', color:'#fff', borderRadius:99, fontSize:10, fontWeight:700 }}>★ Principal</div>
+                      )}
+                      <div style={{ position:'absolute', bottom:0, left:0, right:0,
+                        background:'rgba(0,0,0,0.6)', display:'flex', gap:4, padding:'5px 6px' }}>
+                        {!foto.principal && (
+                          <button onClick={() => marcarPrincipalInternet(foto)}
+                            style={{ flex:1, padding:'3px', borderRadius:'var(--r-sm)', border:'none',
+                              background:'rgba(255,255,255,0.15)', color:'#fff', fontSize:10, cursor:'pointer', fontWeight:600 }}>
+                            ★ Principal
+                          </button>
+                        )}
+                        <button onClick={() => excluirFotoInternet(foto)}
+                          style={{ padding:'3px 7px', borderRadius:'var(--r-sm)', border:'none',
+                            background:'rgba(220,38,38,0.7)', color:'#fff', fontSize:10, cursor:'pointer' }}>🗑</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+            }
+          </div>
 
           {/* Status de publicação */}
           <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>

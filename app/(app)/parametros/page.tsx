@@ -1,4 +1,4 @@
-// build: 2026-05-26 13:47:26
+// build: 2026-05-29 17:55:15
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -114,6 +114,28 @@ export default function ParametrosPage() {
     setTiposEnd(te??[]); setLocais(lo??[])
     // Carregar tabelas de preço
     fetch('/api/tabelas-preco').then(r=>r.json()).then(d=>{ if(d.ok) setTabelas(d.data) })
+  }
+
+  async function uploadContrato(file: File) {
+    if (!file.name.toLowerCase().endsWith('.pdf')) {
+      alert('Por favor, selecione um arquivo PDF.'); return
+    }
+    const maxMB = 10
+    if (file.size > maxMB * 1024 * 1024) {
+      alert(`Arquivo muito grande. Máximo ${maxMB}MB.`); return
+    }
+    const path = 'site/contrato-locacao.pdf'
+    const { error } = await supabase.storage
+      .from('produto-fotos').upload(path, file, { upsert: true, contentType: 'application/pdf' })
+    if (error) { alert('Erro ao enviar PDF: ' + error.message); return }
+    const { data: urlData } = supabase.storage.from('produto-fotos').getPublicUrl(path)
+    const url = urlData.publicUrl
+    await supabase.from('site_config')
+      .upsert({ chave: 'url_contrato_padrao', valor: url }, { onConflict: 'chave' })
+    await supabase.from('parametros')
+      .upsert({ chave: 'url_contrato_padrao', valor: url }, { onConflict: 'chave' })
+    setParams(prev => ({ ...prev, url_contrato_padrao: url }))
+    alert('✅ Contrato enviado com sucesso! A página /contrato do site já está atualizada.')
   }
 
   async function uploadHero(file: File) {
@@ -790,8 +812,36 @@ export default function ParametrosPage() {
                     placeholder="https://www.kanoffsolucoes.com.br/contrato"
                   />
                 </FormField>
+
+                {/* Upload do PDF do contrato */}
+                <div style={{ marginTop:8 }}>
+                  <div style={{ fontSize:'var(--fs-sm)', fontWeight:600, color:'var(--t-secondary)', marginBottom:8 }}>
+                    Ou faça upload do PDF diretamente:
+                  </div>
+                  <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                    <label style={{ display:'inline-flex', alignItems:'center', gap:8,
+                      padding:'9px 18px', borderRadius:'var(--r-md)', cursor:'pointer',
+                      background:'rgba(99,102,241,0.15)', border:'1px solid rgba(99,102,241,0.4)',
+                      color:'#a5b4fc', fontSize:'var(--fs-md)', fontWeight:600, transition:'all .2s' }}>
+                      📄 Enviar PDF do Contrato
+                      <input type="file" accept=".pdf,application/pdf" style={{ display:'none' }}
+                        onChange={e => { const f = e.target.files?.[0]; if (f) uploadContrato(f) }} />
+                    </label>
+                    {params['url_contrato_padrao'] && (
+                      <a href={params['url_contrato_padrao']} target="_blank" rel="noreferrer"
+                        style={{ fontSize:'var(--fs-sm)', color:'var(--c-primary)', textDecoration:'underline' }}>
+                        Ver contrato atual ↗
+                      </a>
+                    )}
+                  </div>
+                  <div style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)', marginTop:6 }}>
+                    PDF máx. 10MB. Após o upload, a URL é preenchida automaticamente e o site é atualizado.
+                  </div>
+                </div>
+
                 <div style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)', marginTop:6 }}>
-                  Após salvar, o QR Code nos contratos apontará para esta URL. Recomendamos usar a página pública do site.
+                  O QR Code nos contratos impressos apontará para:{' '}
+                  <strong>kanoffsolucoes.com.br/contrato</strong>
                 </div>
               </div>
 
