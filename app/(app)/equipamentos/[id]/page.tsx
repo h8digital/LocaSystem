@@ -1,4 +1,4 @@
-// build: 2026-05-29 17:55:15
+// build: 2026-05-29 18:10:30
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
@@ -195,6 +195,29 @@ export default function EquipamentoDetalhe() {
     const { data: fs } = await supabase.from('produto_fotos')
       .select('*').eq('produto_id', Number(id)).order('ordem')
     setFotos(fs ?? [])
+  }
+
+  // Gerar slug a partir do texto
+  function gerarSlug(texto: string) {
+    return texto.trim()
+      .toLowerCase()
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9\s-]/g, '')
+      .replace(/\s+/g, '-')
+      .replace(/-+/g, '-')
+      .replace(/^-|-$/g, '')
+  }
+
+  // Quando o título muda: atualiza o slug SE ele ainda não foi editado manualmente
+  function onTituloChange(titulo: string) {
+    setSiteData(s => ({
+      ...s,
+      titulo_site: titulo,
+      // Só atualiza o slug automaticamente se ele estava vazio ou era igual ao slug do título anterior
+      slug: s.slug === '' || s.slug === gerarSlug(s.titulo_site)
+        ? gerarSlug(titulo)
+        : s.slug
+    }))
   }
 
   async function salvarSite() {
@@ -869,9 +892,11 @@ export default function EquipamentoDetalhe() {
                 <div>
                   <div className="ds-label">Título no site</div>
                   <input className="ds-input" value={siteData.titulo_site}
-                    onChange={e => setSiteData(s => ({ ...s, titulo_site: e.target.value }))}
+                    onChange={e => onTituloChange(e.target.value)}
                     placeholder={produto?.nome ?? 'Nome público do equipamento'} />
-                  <div style={{ fontSize:11, color:'var(--t-muted)', marginTop:4 }}>Se vazio, usa o nome do cadastro</div>
+                  <div style={{ fontSize:11, color:'var(--t-muted)', marginTop:4 }}>
+                    O slug é gerado automaticamente a partir do título
+                  </div>
                 </div>
                 <div>
                   <div className="ds-label">Ordem</div>
@@ -934,21 +959,28 @@ export default function EquipamentoDetalhe() {
                   placeholder={`Alugue ${produto?.nome ?? 'equipamento'} na Kanoff Soluções. Cotação online rápida, entrega e retirada em Sapucaia do Sul e região.`} />
               </div>
 
-              {/* Preview Google */}
-              {(siteData.seo_title || siteData.seo_description) && (
-                <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'var(--r-md)', padding:'12px 16px' }}>
-                  <div style={{ fontSize:11, color:'var(--t-muted)', marginBottom:8, textTransform:'uppercase', letterSpacing:'.05em' }}>Preview Google</div>
-                  <div style={{ fontSize:13, color:'#8ab4f8', marginBottom:2 }}>
-                    {siteData.seo_title || (produto?.nome ?? 'Título do equipamento')}
-                  </div>
-                  <div style={{ fontSize:11, color:'#34a853' }}>
-                    kanoffsolucoes.com.br/equipamentos/{siteData.slug || 'slug'}
-                  </div>
-                  <div style={{ fontSize:12, color:'rgba(255,255,255,0.6)', marginTop:4, lineHeight:1.5 }}>
-                    {siteData.seo_description || 'Meta description aparecerá aqui...'}
-                  </div>
+              {/* Preview Google — sempre visível mostrando o que o Google vai exibir */}
+              <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.08)', borderRadius:'var(--r-md)', padding:'12px 16px' }}>
+                <div style={{ fontSize:11, color:'var(--t-muted)', marginBottom:8, textTransform:'uppercase', letterSpacing:'.05em' }}>
+                  Preview Google — {siteData.seo_title ? 'usando valor preenchido' : 'usando valor padrão (se vazio)'}
                 </div>
-              )}
+                <div style={{ fontSize:13, color:'#8ab4f8', marginBottom:2 }}>
+                  {siteData.seo_title ||
+                    `${siteData.titulo_site || produto?.nome || 'Equipamento'} — Locação em Sapucaia do Sul | Kanoff Soluções`}
+                </div>
+                <div style={{ fontSize:11, color:'#34a853' }}>
+                  kanoffsolucoes.com.br/equipamentos/{siteData.slug || gerarSlug(siteData.titulo_site || produto?.nome || 'equipamento')}
+                </div>
+                <div style={{ fontSize:12, color:'rgba(255,255,255,0.6)', marginTop:4, lineHeight:1.5 }}>
+                  {siteData.seo_description ||
+                    `Alugue ${siteData.titulo_site || produto?.nome || 'este equipamento'} na Kanoff Soluções. Cotação online rápida, entrega e retirada em Sapucaia do Sul e região.`}
+                </div>
+                {!siteData.seo_title && (
+                  <div style={{ fontSize:10, color:'rgba(251,191,36,0.7)', marginTop:6 }}>
+                    ℹ️ Deixando os campos SEO vazios, esses valores padrão serão usados automaticamente
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 
