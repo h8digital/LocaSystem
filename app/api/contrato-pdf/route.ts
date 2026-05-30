@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 export const runtime = 'nodejs'
 
+// Usa service role se disponível, senão anon key (bucket tem RLS permissivo)
 const sb = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
@@ -20,6 +21,9 @@ export async function POST(req: NextRequest) {
 
     const path = 'contrato-locacao.pdf'
     const bytes = await file.arrayBuffer()
+
+    // Remover arquivo anterior se existir
+    await sb.storage.from('documentos').remove([path])
 
     const { error: upErr } = await sb.storage
       .from('documentos')
