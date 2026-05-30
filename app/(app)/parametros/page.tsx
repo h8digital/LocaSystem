@@ -120,21 +120,15 @@ export default function ParametrosPage() {
     if (!file.name.toLowerCase().endsWith('.pdf')) {
       alert('Por favor, selecione um arquivo PDF.'); return
     }
-    const maxMB = 10
-    if (file.size > maxMB * 1024 * 1024) {
-      alert(`Arquivo muito grande. Máximo ${maxMB}MB.`); return
+    if (file.size > 15 * 1024 * 1024) {
+      alert('Arquivo muito grande. Máximo 15MB.'); return
     }
-    const path = 'site/contrato-locacao.pdf'
-    const { error } = await supabase.storage
-      .from('produto-fotos').upload(path, file, { upsert: true, contentType: 'application/pdf' })
-    if (error) { alert('Erro ao enviar PDF: ' + error.message); return }
-    const { data: urlData } = supabase.storage.from('produto-fotos').getPublicUrl(path)
-    const url = urlData.publicUrl
-    await supabase.from('site_config')
-      .upsert({ chave: 'url_contrato_padrao', valor: url }, { onConflict: 'chave' })
-    await supabase.from('parametros')
-      .upsert({ chave: 'url_contrato_padrao', valor: url }, { onConflict: 'chave' })
-    setParams(prev => ({ ...prev, url_contrato_padrao: url }))
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch('/api/contrato-pdf', { method: 'POST', body: fd })
+    const data = await res.json()
+    if (!data.ok) { alert('Erro ao enviar PDF: ' + data.error); return }
+    setParams(prev => ({ ...prev, url_contrato_padrao: data.url }))
     alert('✅ Contrato enviado com sucesso! A página /contrato do site já está atualizada.')
   }
 
