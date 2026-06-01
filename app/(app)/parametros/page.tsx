@@ -1,8 +1,8 @@
-// build: 2026-05-29 18:10:30
+// build: 2026-06-01
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Btn, PageHeader, Tabs, FormField, inputCls, textareaCls, Badge, SlidePanel } from '@/components/ui'
+import { Btn, PageHeader, FormField, inputCls, textareaCls, Badge, SlidePanel } from '@/components/ui'
 
 const inpSm = inputCls
 
@@ -12,86 +12,138 @@ const IcoDown  = () => <svg width="11" height="11" viewBox="0 0 24 24" fill="non
 const IcoEdit  = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
 const IcoTrash = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
 
-// ─── Cabeçalho de tabela padronizado ─────────────────────────────────────────
 const TH = ({ children, center, right }: { children?: React.ReactNode; center?: boolean; right?: boolean }) => (
   <th style={{ padding:'9px 14px', fontSize:'var(--fs-md)', fontWeight:700, color:'var(--t-muted)',
     textTransform:'uppercase' as const, letterSpacing:'.04em',
     textAlign: center ? 'center' as const : right ? 'right' as const : 'left' as const,
-    background:'var(--bg-header)', borderBottom:'1px solid var(--border)',
-    borderTop:'1px solid var(--border)' }}>{children}</th>
+    background:'var(--bg-header)', borderBottom:'1px solid var(--border)', borderTop:'1px solid var(--border)' }}>{children}</th>
 )
 const TD = ({ children, center, muted }: { children?: React.ReactNode; center?: boolean; muted?: boolean }) => (
   <td style={{ padding:'10px 14px', borderBottom:'1px solid var(--border)',
     textAlign: center ? 'center' as const : 'left' as const,
-    color: muted ? 'var(--t-muted)' : 'var(--t-primary)',
-    fontSize: 'var(--fs-base)' }}>{children}</td>
+    color: muted ? 'var(--t-muted)' : 'var(--t-primary)', fontSize:'var(--fs-base)' }}>{children}</td>
 )
 
+// ─── Componentes de navegação ─────────────────────────────────────────────────
+function NavGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ marginBottom: 4 }}>
+      <div style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.08em',
+        color: 'var(--t-muted)', padding: '12px 16px 6px', opacity: 0.6 }}>{label}</div>
+      {children}
+    </div>
+  )
+}
+
+function NavItem({ id, active, icon, label, onClick }: { id: string; active: boolean; icon: string; label: string; onClick: () => void }) {
+  return (
+    <button onClick={onClick} style={{
+      width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+      padding: '9px 16px', border: 'none', borderRadius: 'var(--r-sm)', cursor: 'pointer',
+      fontSize: 'var(--fs-base)', fontWeight: active ? 600 : 400, textAlign: 'left',
+      background: active ? 'rgba(var(--c-primary-rgb,99,102,241),0.12)' : 'transparent',
+      color: active ? 'var(--c-primary)' : 'var(--t-secondary)',
+      transition: 'all 0.15s',
+    }}>
+      <span style={{ fontSize: 16, lineHeight: 1 }}>{icon}</span>
+      <span>{label}</span>
+      {active && <div style={{ marginLeft:'auto', width:3, height:16, borderRadius:2, background:'var(--c-primary)' }} />}
+    </button>
+  )
+}
+
+function SubTabs({ tabs, active, onChange }: { tabs:{key:string;label:string}[]; active:string; onChange:(k:string)=>void }) {
+  return (
+    <div style={{ display:'flex', gap:2, borderBottom:'1px solid var(--border)', marginBottom:24 }}>
+      {tabs.map(t => (
+        <button key={t.key} onClick={() => onChange(t.key)} style={{
+          padding:'8px 16px', border:'none', cursor:'pointer', fontSize:'var(--fs-md)',
+          fontWeight: active===t.key ? 600 : 400,
+          color: active===t.key ? 'var(--c-primary)' : 'var(--t-muted)',
+          background:'transparent',
+          borderBottom: active===t.key ? '2px solid var(--c-primary)' : '2px solid transparent',
+          marginBottom:-1, transition:'all 0.15s',
+        }}>{t.label}</button>
+      ))}
+    </div>
+  )
+}
+
+function Section({ title, hint, children }: { title: string; hint?: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <div style={{ marginBottom: hint ? 4 : 16 }}>
+        <div className="ds-section-title">{title}</div>
+        {hint && <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginBottom:16, marginTop:4 }}>{hint}</div>}
+      </div>
+      {children}
+    </div>
+  )
+}
+
+function InfoBox({ type='info', children }: { type?:'info'|'warning'|'success'; children: React.ReactNode }) {
+  const styles: Record<string, {bg:string;border:string;color:string}> = {
+    info:    { bg:'var(--c-info-light)',    border:'var(--c-info)',    color:'var(--c-info-text)'    },
+    warning: { bg:'var(--c-warning-light)', border:'var(--c-warning)', color:'var(--c-warning-text)' },
+    success: { bg:'rgba(52,211,153,0.1)',   border:'rgba(52,211,153,0.3)', color:'#34d399'          },
+  }
+  const s = styles[type]
+  return (
+    <div style={{ background:s.bg, border:`1px solid ${s.border}`, borderRadius:'var(--r-md)',
+      padding:'10px 14px', fontSize:'var(--fs-md)', color:s.color }}>{children}</div>
+  )
+}
+
+// ─── Campos fixos ─────────────────────────────────────────────────────────────
+const CAMPOS_EMPRESA = [
+  { k:'empresa_nome',     l:'Razão Social',         full:true,  mono:false },
+  { k:'empresa_cnpj',     l:'CNPJ',                 full:false, mono:true  },
+  { k:'empresa_ie',       l:'Inscrição Estadual',   full:false, mono:true  },
+  { k:'empresa_telefone', l:'Telefone / WhatsApp',  full:false, mono:false },
+  { k:'empresa_whatsapp', l:'Número WhatsApp (DDI)', full:false, mono:true },
+  { k:'empresa_email',    l:'E-mail',               full:true,  mono:false },
+  { k:'empresa_facebook', l:'Facebook (URL)',       full:true,  mono:false },
+  { k:'empresa_instagram',l:'Instagram (URL)',      full:true,  mono:false },
+]
 
 export default function ParametrosPage() {
-  const [params,     setParams]     = useState<Record<string,string>>({})
-  const [periodos,   setPeriodos]   = useState<any[]>([])
-  const [categorias, setCategorias] = useState<any[]>([])
-  const [tiposEnd,   setTiposEnd]   = useState<any[]>([])
-  const [locais,     setLocais]     = useState<any[]>([])
-  const [saving,     setSaving]     = useState(false)
-  const [aba,        setAba]        = useState<string>('empresa')
-  const [uploadandoLogo, setUploadandoLogo] = useState(false)
-  const [uploadandoHero, setUploadandoHero] = useState(false)
-  const [salvandoSite,   setSalvandoSite]   = useState(false)
-  const [okSite,         setOkSite]         = useState(false)
-  const [tabelas,       setTabelas]       = useState<any[]>([])
-  const [formTabela,    setFormTabela]    = useState({ nome:'', descricao:'', padrao:false })
-  const [salvandoTab,   setSalvandoTab]   = useState(false)
-  const [erroLogo,       setErroLogo]       = useState('')
+  const [params,      setParams]      = useState<Record<string,string>>({})
+  const [periodos,    setPeriodos]    = useState<any[]>([])
+  const [categorias,  setCategorias]  = useState<any[]>([])
+  const [tiposEnd,    setTiposEnd]    = useState<any[]>([])
+  const [locais,      setLocais]      = useState<any[]>([])
+  const [tabelas,     setTabelas]     = useState<any[]>([])
+  const [saving,      setSaving]      = useState(false)
+  const [savingSite,  setSavingSite]  = useState(false)
+  const [okSite,      setOkSite]      = useState(false)
+  const [okERP,       setOkERP]       = useState(false)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
+  const [uploadingHero, setUploadingHero] = useState(false)
+  const [erroLogo,    setErroLogo]    = useState('')
+  const [formTabela,  setFormTabela]  = useState({ nome:'', descricao:'', padrao:false })
+  const [salvandoTab, setSalvandoTab] = useState(false)
 
-  // ── Pesquisa por aba ────────────────────────────────────────────────────────
-  const [buscaCat,  setBuscaCat]  = useState('')
-  const [buscaEnd,  setBuscaEnd]  = useState('')
-  const [buscaLoc,  setBuscaLoc]  = useState('')
+  // Navegação — seção principal e sub-aba do Site
+  const [secao, setSecao]   = useState('empresa')
+  const [subSite, setSubSite] = useState('geral')
 
-  // ── Painéis de edição ───────────────────────────────────────────────────────
-  const [painelCat,  setPainelCat]  = useState(false)
-  const [painelEnd,  setPainelEnd]  = useState(false)
-  const [painelLoc,  setPainelLoc]  = useState(false)
+  // Pesquisa
+  const [buscaCat, setBuscaCat] = useState('')
+  const [buscaEnd, setBuscaEnd] = useState('')
+  const [buscaLoc, setBuscaLoc] = useState('')
+
+  // Painéis
+  const [painelCat, setPainelCat] = useState(false)
+  const [painelEnd, setPainelEnd] = useState(false)
+  const [painelLoc, setPainelLoc] = useState(false)
   const [editandoCat, setEditandoCat] = useState<any>(null)
   const [editandoEnd, setEditandoEnd] = useState<any>(null)
   const [editandoLoc, setEditandoLoc] = useState<any>(null)
   const [formCat,  setFormCat]  = useState({ nome:'' })
   const [formEnd,  setFormEnd]  = useState({ nome:'' })
   const [formLoc,  setFormLoc]  = useState({ nome:'', descricao:'' })
-  const [salvando, setSalvando] = useState(false)
-  const [erroPainel, setErroPainel] = useState('')
-
-  const TABS = [
-    { key:'empresa',    label:'Empresa'              },
-    { key:'financeiro', label:'Financeiro / SPC'     },
-    { key:'periodos',   label:'Períodos'              },
-    { key:'categorias', label:'Categorias'            },
-    { key:'enderecos',  label:'Tipos de Endereço'    },
-    { key:'tabelas',    label:'Tabelas de Preço'       },
-    { key:'locais',     label:'Locais de Armazenagem' },
-    { key:'contratos',  label:'Contratos' },
-    { key:'site',       label:'🌐 Site Kanoff' },
-  ]
-
-  const CAMPOS_EMPRESA = [
-    { k:'empresa_nome',      l:'Nome da Empresa',    full:true,  mono:false },
-    { k:'empresa_cnpj',      l:'CNPJ',               full:false, mono:true  },
-    { k:'empresa_ie',        l:'Inscrição Estadual',  full:false, mono:true  },
-    { k:'empresa_telefone',  l:'Telefone',            full:false, mono:false },
-    { k:'empresa_email',     l:'E-mail',              full:true,  mono:false },
-  ]
-
-  const CAMPOS_FIN = [
-    { k:'multa_atraso_percentual', l:'Multa por Atraso (% ao dia)'          },
-    { k:'juros_atraso_percentual', l:'Juros por Atraso (% ao dia)'          },
-    { k:'dias_aviso_vencimento',   l:'Dias de Aviso Antes do Vencimento'    },
-    { k:'spc_intervalo_dias',      l:'Intervalo Entre Consultas SPC (dias)' },
-    { k:'prefixo_contrato',        l:'Prefixo Número de Contrato'           },
-    { k:'prefixo_fatura',          l:'Prefixo Número de Fatura'             },
-    { k:'moeda_simbolo',           l:'Símbolo da Moeda'                     },
-  ]
+  const [salvando,    setSalvando]    = useState(false)
+  const [erroPainel,  setErroPainel]  = useState('')
 
   useEffect(() => { loadAll() }, [])
 
@@ -104,76 +156,18 @@ export default function ParametrosPage() {
       supabase.from('locais_armazenagem').select('*').order('nome'),
     ])
     const map: Record<string,string> = {}
-    p?.forEach(x => { map[x.chave] = x.valor ?? '' })
-
-    // Carregar configurações do site
+    p?.forEach((x:any) => { map[x.chave] = x.valor ?? '' })
     const { data: siteConf } = await supabase.from('site_config').select('chave,valor')
-    ;(siteConf ?? []).forEach((r: any) => { map[r.chave] = r.valor ?? '' })
-
-    setParams(map); setPeriodos(per??[]); setCategorias(cat??[])
-    setTiposEnd(te??[]); setLocais(lo??[])
-    // Carregar tabelas de preço
+    ;(siteConf ?? []).forEach((r:any) => { map[r.chave] = r.valor ?? '' })
+    setParams(map); setPeriodos(per??[]); setCategorias(cat??[]); setTiposEnd(te??[]); setLocais(lo??[])
     fetch('/api/tabelas-preco').then(r=>r.json()).then(d=>{ if(d.ok) setTabelas(d.data) })
   }
 
-  async function uploadContrato(file: File) {
-    if (!file.name.toLowerCase().endsWith('.pdf')) {
-      alert('Por favor, selecione um arquivo PDF.'); return
-    }
-    if (file.size > 15 * 1024 * 1024) {
-      alert('Arquivo muito grande. Máximo 15MB.'); return
-    }
-    const fd = new FormData()
-    fd.append('file', file)
-    const res = await fetch('/api/contrato-pdf', { method: 'POST', body: fd })
-    const data = await res.json()
-    if (!data.ok) { alert('Erro ao enviar PDF: ' + data.error); return }
-    setParams(prev => ({ ...prev, url_contrato_padrao: data.url }))
-    alert('✅ Contrato enviado com sucesso! A página /contrato do site já está atualizada.')
-  }
+  const getP = (k: string) => params[k] ?? ''
+  const setP = (k: string, v: string) => setParams(prev => ({ ...prev, [k]: v }))
 
-  async function uploadHero(file: File) {
-    setUploadandoHero(true)
-    const ext  = file.name.split('.').pop()
-    const path = `site/hero-bg.${ext}`
-    const { error } = await supabase.storage.from('produto-fotos').upload(path, file, { upsert:true })
-    if (error) { alert('Erro ao enviar imagem: ' + error.message); setUploadandoHero(false); return }
-    const { data: urlData } = supabase.storage.from('produto-fotos').getPublicUrl(path)
-    await supabase.from('site_config').update({ valor: urlData.publicUrl }).eq('chave', 'hero_bg_url')
-    setParams(prev => ({ ...prev, hero_bg_url: urlData.publicUrl }))
-    setUploadandoHero(false)
-    alert('✅ Imagem do hero atualizada!')
-  }
-
-  function getParam(chave: string) {
-    return params[chave] ?? ''
-  }
-
-  function setParam(chave: string, valor: string) {
-    setParams(prev => ({ ...prev, [chave]: valor }))
-  }
-
-  async function salvarSite() {
-    setSalvandoSite(true); setOkSite(false)
-    const chaves = [
-      'hero_titulo','hero_subtitulo','hero_cta_texto','hero_cta2_texto',
-      'quem_somos_historia','quem_somos_missao','quem_somos_visao',
-      'contato_subtitulo','rodape_texto','prazo_resposta',
-      'stat_equipamentos','stat_categorias','stat_prazo',
-      'politica_privacidade',
-      'horario_seg_sex','horario_sabado','horario_domingo',
-      'meta_titulo_home','meta_descricao_home',
-    ]
-    for (const chave of chaves) {
-      const valor = params[chave] ?? ''
-      await supabase.from('site_config')
-        .upsert({ chave, valor }, { onConflict: 'chave' })
-    }
-    setSalvandoSite(false); setOkSite(true)
-    setTimeout(() => setOkSite(false), 3000)
-  }
-
-  async function salvar() {
+  // ── Salvar ERP ────────────────────────────────────────────────────────────
+  async function salvarERP() {
     setSaving(true)
     for (const [chave, valor] of Object.entries(params))
       await supabase.from('parametros').update({ valor }).eq('chave', chave)
@@ -183,11 +177,53 @@ export default function ParametrosPage() {
     for (const [i,t] of tiposEnd.entries())
       if (t.id) await supabase.from('tipos_endereco_cliente')
         .update({ nome:t.nome, ativo:t.ativo?1:0, ordem:i+1 }).eq('id',t.id)
-    setSaving(false)
-    alert('Parâmetros salvos com sucesso!')
+    setSaving(false); setOkERP(true)
+    setTimeout(() => setOkERP(false), 3000)
   }
 
-  // ── Períodos ────────────────────────────────────────────────────────────────
+  // ── Salvar Site ───────────────────────────────────────────────────────────
+  async function salvarSite() {
+    setSavingSite(true); setOkSite(false)
+    const chaves = [
+      'hero_titulo','hero_subtitulo','hero_cta_texto','hero_cta2_texto',
+      'stat_equipamentos','stat_categorias','stat_prazo',
+      'quem_somos_historia','quem_somos_missao','quem_somos_visao',
+      'contato_subtitulo','rodape_texto','prazo_resposta',
+      'horario_seg_sex','horario_sabado','horario_domingo',
+      'meta_titulo_home','meta_descricao_home',
+      'politica_privacidade',
+    ]
+    for (const chave of chaves)
+      await supabase.from('site_config').upsert({ chave, valor: params[chave] ?? '' }, { onConflict:'chave' })
+    setSavingSite(false); setOkSite(true)
+    setTimeout(() => setOkSite(false), 3000)
+  }
+
+  // ── Uploads ───────────────────────────────────────────────────────────────
+  async function uploadContrato(file: File) {
+    if (!file.name.toLowerCase().endsWith('.pdf')) { alert('Selecione um arquivo PDF.'); return }
+    if (file.size > 15*1024*1024) { alert('Arquivo excede 15MB.'); return }
+    const fd = new FormData(); fd.append('file', file)
+    const res = await fetch('/api/contrato-pdf', { method:'POST', body:fd })
+    const data = await res.json()
+    if (!data.ok) { alert('Erro: ' + data.error); return }
+    setP('url_contrato_padrao', data.url)
+    alert('✅ Contrato atualizado no site!')
+  }
+
+  async function uploadHero(file: File) {
+    setUploadingHero(true)
+    const ext  = file.name.split('.').pop()
+    const path = `site/hero-bg.${ext}`
+    const { error } = await supabase.storage.from('produto-fotos').upload(path, file, { upsert:true })
+    if (error) { alert('Erro: ' + error.message); setUploadingHero(false); return }
+    const { data: urlData } = supabase.storage.from('produto-fotos').getPublicUrl(path)
+    await supabase.from('site_config').update({ valor: urlData.publicUrl }).eq('chave', 'hero_bg_url')
+    setP('hero_bg_url', urlData.publicUrl)
+    setUploadingHero(false)
+  }
+
+  // ── Períodos ──────────────────────────────────────────────────────────────
   async function adicionarPeriodo() {
     const { data } = await supabase.from('periodos_locacao')
       .insert({ nome:'Novo Período', dias:30, desconto_percentual:0, ativo:1 }).select().single()
@@ -199,13 +235,8 @@ export default function ParametrosPage() {
     setPeriodos(prev => prev.filter(p => p.id !== id))
   }
 
-  // ── Categorias ──────────────────────────────────────────────────────────────
-  function abrirCat(cat?: any) {
-    setEditandoCat(cat ?? null)
-    setFormCat({ nome: cat?.nome ?? '' })
-    setErroPainel('')
-    setPainelCat(true)
-  }
+  // ── Categorias ────────────────────────────────────────────────────────────
+  function abrirCat(cat?: any) { setEditandoCat(cat??null); setFormCat({ nome:cat?.nome??'' }); setErroPainel(''); setPainelCat(true) }
   async function salvarCat() {
     if (!formCat.nome.trim()) { setErroPainel('Nome é obrigatório.'); return }
     setSalvando(true)
@@ -225,16 +256,11 @@ export default function ParametrosPage() {
   async function removerCat(id:number) {
     if (!confirm('Remover esta categoria?')) return
     await supabase.from('categorias').delete().eq('id',id)
-    setCategorias(prev => prev.filter(c => c.id !== id))
+    setCategorias(prev => prev.filter(c => c.id!==id))
   }
 
-  // ── Tipos de Endereço ───────────────────────────────────────────────────────
-  function abrirEnd(end?: any) {
-    setEditandoEnd(end ?? null)
-    setFormEnd({ nome: end?.nome ?? '' })
-    setErroPainel('')
-    setPainelEnd(true)
-  }
+  // ── Tipos de Endereço ─────────────────────────────────────────────────────
+  function abrirEnd(end?: any) { setEditandoEnd(end??null); setFormEnd({ nome:end?.nome??'' }); setErroPainel(''); setPainelEnd(true) }
   async function salvarEnd() {
     if (!formEnd.nome.trim()) { setErroPainel('Nome é obrigatório.'); return }
     setSalvando(true)
@@ -255,7 +281,7 @@ export default function ParametrosPage() {
   async function removerEnd(id:number) {
     if (!confirm('Remover este tipo de endereço?')) return
     await supabase.from('tipos_endereco_cliente').delete().eq('id',id)
-    setTiposEnd(prev => prev.filter(t => t.id !== id))
+    setTiposEnd(prev => prev.filter(t => t.id!==id))
   }
   function moverEnd(idx:number, dir:-1|1) {
     const arr=[...tiposEnd]; const dest=idx+dir
@@ -263,13 +289,8 @@ export default function ParametrosPage() {
     ;[arr[idx],arr[dest]]=[arr[dest],arr[idx]]; setTiposEnd(arr)
   }
 
-  // ── Locais ──────────────────────────────────────────────────────────────────
-  function abrirLoc(loc?: any) {
-    setEditandoLoc(loc ?? null)
-    setFormLoc({ nome:loc?.nome??'', descricao:loc?.descricao??'' })
-    setErroPainel('')
-    setPainelLoc(true)
-  }
+  // ── Locais ────────────────────────────────────────────────────────────────
+  function abrirLoc(loc?: any) { setEditandoLoc(loc??null); setFormLoc({ nome:loc?.nome??'', descricao:loc?.descricao??'' }); setErroPainel(''); setPainelLoc(true) }
   async function salvarLoc() {
     if (!formLoc.nome.trim()) { setErroPainel('Nome é obrigatório.'); return }
     setSalvando(true)
@@ -289,95 +310,113 @@ export default function ParametrosPage() {
   async function removerLoc(id:number) {
     if (!confirm('Remover este local?')) return
     await supabase.from('locais_armazenagem').delete().eq('id',id)
-    setLocais(prev => prev.filter(l => l.id !== id))
+    setLocais(prev => prev.filter(l => l.id!==id))
   }
 
-  // ── Filtros ─────────────────────────────────────────────────────────────────
-  const catsFiltradas = categorias.filter(c => !buscaCat || c.nome.toLowerCase().includes(buscaCat.toLowerCase()))
+  const catsFiltradas  = categorias.filter(c => !buscaCat || c.nome.toLowerCase().includes(buscaCat.toLowerCase()))
   const endsFiltrados  = tiposEnd.filter(t => !buscaEnd || t.nome.toLowerCase().includes(buscaEnd.toLowerCase()))
   const locaisFiltrados = locais.filter(l => !buscaLoc || l.nome.toLowerCase().includes(buscaLoc.toLowerCase()))
 
+  const isERP  = ['empresa','financeiro','contratos'].includes(secao)
+  const isSite = secao === 'site'
+
   return (
-    <div style={{display:"flex",flexDirection:"column",gap:16}}>
+    <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
       <PageHeader
         title="Parâmetros do Sistema"
         subtitle="Configurações globais do LocaSystem"
-        actions={<Btn loading={saving} onClick={salvar}>Salvar Alterações</Btn>}
+        actions={
+          <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+            {okERP  && <span style={{ fontSize:'var(--fs-sm)', color:'#34d399' }}>✅ Salvo</span>}
+            {okSite && <span style={{ fontSize:'var(--fs-sm)', color:'#34d399' }}>✅ Site atualizado</span>}
+            {isSite
+              ? <Btn loading={savingSite} onClick={salvarSite}>Salvar Site</Btn>
+              : isERP
+                ? <Btn loading={saving} onClick={salvarERP}>Salvar Alterações</Btn>
+                : null
+            }
+          </div>
+        }
       />
 
-      <div className="ds-card" style={{ overflow:'hidden' }}>
-        <Tabs tabs={TABS} active={aba} onChange={setAba} />
+      {/* Layout de duas colunas: nav lateral + conteúdo */}
+      <div style={{ display:'flex', gap:0, minHeight:'calc(100vh - 120px)' }}>
 
-        <div style={{ padding:'24px' }}>
+        {/* ── Navegação lateral ──────────────────────────────────────── */}
+        <div style={{ width:220, flexShrink:0, borderRight:'1px solid var(--border)',
+          background:'var(--bg-header)', padding:'12px 8px', display:'flex', flexDirection:'column', gap:0 }}>
 
-          {/* ═══ EMPRESA ══════════════════════════════════════════════ */}
-          {aba === 'empresa' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
+          <NavGroup label="Configurações">
+            <NavItem id="empresa"    active={secao==='empresa'}    icon="🏢" label="Empresa"    onClick={()=>setSecao('empresa')} />
+            <NavItem id="financeiro" active={secao==='financeiro'} icon="💰" label="Financeiro"  onClick={()=>setSecao('financeiro')} />
+            <NavItem id="contratos"  active={secao==='contratos'}  icon="📄" label="Contratos"  onClick={()=>setSecao('contratos')} />
+            <NavItem id="site"       active={secao==='site'}       icon="🌐" label="Site Kanoff" onClick={()=>setSecao('site')} />
+          </NavGroup>
 
-              {/* ── Logo ─────────────────────────────────────────────── */}
-              <div>
-                <div className="ds-section-title">Logotipo</div>
-                <div style={{ display:'flex', alignItems:'flex-start', gap:20, marginTop:12 }}>
-                  {/* Preview */}
+          <NavGroup label="Cadastros">
+            <NavItem id="periodos"   active={secao==='periodos'}   icon="📅" label="Períodos"          onClick={()=>setSecao('periodos')} />
+            <NavItem id="categorias" active={secao==='categorias'} icon="🏷️"  label="Categorias"        onClick={()=>setSecao('categorias')} />
+            <NavItem id="enderecos"  active={secao==='enderecos'}  icon="📍" label="Tipos de Endereço"  onClick={()=>setSecao('enderecos')} />
+            <NavItem id="locais"     active={secao==='locais'}     icon="🏭" label="Locais de Estoque"  onClick={()=>setSecao('locais')} />
+            <NavItem id="tabelas"    active={secao==='tabelas'}    icon="📊" label="Tabelas de Preço"   onClick={()=>setSecao('tabelas')} />
+          </NavGroup>
+        </div>
+
+        {/* ── Conteúdo ───────────────────────────────────────────────── */}
+        <div style={{ flex:1, padding:'28px 32px', overflow:'auto' }}>
+
+          {/* ══ EMPRESA ══════════════════════════════════════════════════ */}
+          {secao === 'empresa' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:32, maxWidth:760 }}>
+
+              <Section title="Logotipo">
+                <div style={{ display:'flex', alignItems:'flex-start', gap:20 }}>
                   <div style={{ width:120, height:80, border:'1px solid var(--border)', borderRadius:'var(--r-md)',
                     display:'flex', alignItems:'center', justifyContent:'center',
                     background:'var(--bg-header)', flexShrink:0, overflow:'hidden' }}>
                     {params['empresa_logo_url']
                       ? <img src={params['empresa_logo_url']} alt="Logo" style={{ maxWidth:'100%', maxHeight:'100%', objectFit:'contain' }} />
-                      : <span style={{ fontSize:32, color:'var(--t-muted)' }}>🏢</span>
-                    }
+                      : <span style={{ fontSize:32, color:'var(--t-muted)' }}>🏢</span>}
                   </div>
-                  {/* Upload area */}
                   <div style={{ flex:1 }}>
                     <label style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center',
                       gap:6, border:'2px dashed var(--border)', borderRadius:'var(--r-md)', padding:'16px',
-                      cursor:uploadandoLogo?'not-allowed':'pointer', background:'transparent', transition:'border-color 150ms' }}
-                      onMouseEnter={e=>{ if(!uploadandoLogo) e.currentTarget.style.borderColor='var(--c-primary)' }}
+                      cursor:uploadingLogo?'not-allowed':'pointer', background:'transparent', transition:'border-color 150ms' }}
+                      onMouseEnter={e=>{ if(!uploadingLogo) e.currentTarget.style.borderColor='var(--c-primary)' }}
                       onMouseLeave={e=>{ e.currentTarget.style.borderColor='var(--border)' }}>
-                      <input type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml"
-                        style={{ display:'none' }} disabled={uploadandoLogo}
+                      <input type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" style={{ display:'none' }} disabled={uploadingLogo}
                         onChange={async e => {
-                          const file = e.target.files?.[0]
-                          if (!file) return
+                          const file = e.target.files?.[0]; if (!file) return
                           if (file.size > 2*1024*1024) { setErroLogo('Arquivo excede 2MB'); return }
-                          setUploadandoLogo(true); setErroLogo('')
+                          setUploadingLogo(true); setErroLogo('')
                           const fd = new FormData(); fd.append('file', file)
                           const res  = await fetch('/api/empresa-logo', { method:'POST', body:fd })
                           const data = await res.json()
                           if (data.ok) setParams(p => ({ ...p, empresa_logo_url: data.url }))
                           else setErroLogo(data.error)
-                          setUploadandoLogo(false); e.target.value = ''
-                        }}
-                      />
-                      {uploadandoLogo
+                          setUploadingLogo(false); e.target.value = ''
+                        }} />
+                      {uploadingLogo
                         ? <><span style={{ fontSize:24 }}>⏳</span><span style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)' }}>Enviando...</span></>
                         : <><span style={{ fontSize:24 }}>📷</span>
                           <span style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)', textAlign:'center' }}>
                             Clique para enviar logo<br/>
-                            <span style={{ fontSize:'var(--fs-sm)' }}>PNG, JPG, SVG · até 2MB · fundo transparente recomendado</span>
-                          </span></>
-                      }
+                            <span style={{ fontSize:'var(--fs-sm)' }}>PNG, JPG, SVG · até 2MB</span>
+                          </span></>}
                     </label>
                     {erroLogo && <div style={{ color:'var(--c-danger)', fontSize:'var(--fs-sm)', marginTop:4 }}>{erroLogo}</div>}
                     {params['empresa_logo_url'] && (
-                      <button onClick={async()=>{
-                          if(!confirm('Remover o logotipo atual?')) return
-                          await fetch('/api/empresa-logo', { method:'DELETE' })
-                          setParams(p=>({ ...p, empresa_logo_url:'' }))
-                        }}
-                        style={{ marginTop:8, background:'none', border:'none', color:'var(--c-danger)',
-                          fontSize:'var(--fs-sm)', cursor:'pointer', fontWeight:600 }}>
+                      <button onClick={async()=>{ if(!confirm('Remover o logotipo?')) return; await fetch('/api/empresa-logo',{method:'DELETE'}); setParams(p=>({...p,empresa_logo_url:''})) }}
+                        style={{ marginTop:8, background:'none', border:'none', color:'var(--c-danger)', fontSize:'var(--fs-sm)', cursor:'pointer', fontWeight:600 }}>
                         ✕ Remover logo
                       </button>
                     )}
                   </div>
                 </div>
-              </div>
+              </Section>
 
-              {/* ── Dados Principais ─────────────────────────────────── */}
-              <div>
-                <div className="ds-section-title">Dados Principais</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14, marginTop:12 }}>
+              <Section title="Dados da Empresa">
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
                   {CAMPOS_EMPRESA.map((f:any) => (
                     <div key={f.k} style={{ gridColumn: f.full ? 'span 2' : undefined }}>
                       <FormField label={f.l}>
@@ -387,45 +426,33 @@ export default function ParametrosPage() {
                     </div>
                   ))}
                 </div>
-              </div>
+              </Section>
 
-              {/* ── Endereço Desmembrado ──────────────────────────────── */}
-              <div>
-                <div className="ds-section-title">Endereço</div>
-                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:12, marginTop:12 }}>
+              <Section title="Endereço">
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:12 }}>
                   <FormField label="CEP">
-                    <input value={params['empresa_cep']??''} className={inpSm}
+                    <input value={params['empresa_cep']??''} className={inpSm} placeholder="00000-000"
                       onChange={e=>setParams(p=>({...p,empresa_cep:e.target.value}))}
                       onBlur={async e=>{
-                        const cep=e.target.value.replace(/\D/g,'')
-                        if(cep.length!==8) return
-                        const r=await fetch(`https://viacep.com.br/ws/${cep}/json/`)
-                        const d=await r.json()
-                        if(!d.erro) setParams(p=>({...p,
-                          empresa_logradouro: d.logradouro??p.empresa_logradouro,
-                          empresa_bairro:     d.bairro??p.empresa_bairro,
-                          empresa_cidade:     d.localidade??p.empresa_cidade,
-                          empresa_estado:     d.uf??p.empresa_estado,
-                        }))
-                      }}
-                      placeholder="00000-000"
-                    />
+                        const cep=e.target.value.replace(/\D/g,''); if(cep.length!==8) return
+                        const r=await fetch(`https://viacep.com.br/ws/${cep}/json/`); const d=await r.json()
+                        if(!d.erro) setParams(p=>({...p,empresa_logradouro:d.logradouro??p.empresa_logradouro,empresa_bairro:d.bairro??p.empresa_bairro,empresa_cidade:d.localidade??p.empresa_cidade,empresa_estado:d.uf??p.empresa_estado}))
+                      }} />
                   </FormField>
                   <div style={{ gridColumn:'span 2' }}>
                     <FormField label="Logradouro">
-                      <input value={params['empresa_logradouro']??''} className={inpSm}
-                        onChange={e=>setParams(p=>({...p,empresa_logradouro:e.target.value}))}
-                        placeholder="Av. Rubem Berta" />
+                      <input value={params['empresa_logradouro']??''} className={inpSm} placeholder="Av. Rubem Berta"
+                        onChange={e=>setParams(p=>({...p,empresa_logradouro:e.target.value}))} />
                     </FormField>
                   </div>
                   <FormField label="Número">
-                    <input value={params['empresa_numero']??''} className={inpSm}
-                      onChange={e=>setParams(p=>({...p,empresa_numero:e.target.value}))} placeholder="495" />
+                    <input value={params['empresa_numero']??''} className={inpSm} placeholder="495"
+                      onChange={e=>setParams(p=>({...p,empresa_numero:e.target.value}))} />
                   </FormField>
                   <div style={{ gridColumn:'span 2' }}>
                     <FormField label="Complemento">
-                      <input value={params['empresa_complemento']??''} className={inpSm}
-                        onChange={e=>setParams(p=>({...p,empresa_complemento:e.target.value}))} placeholder="Sala 1, 2º Andar..." />
+                      <input value={params['empresa_complemento']??''} className={inpSm} placeholder="Sala 1..."
+                        onChange={e=>setParams(p=>({...p,empresa_complemento:e.target.value}))} />
                     </FormField>
                   </div>
                   <FormField label="Bairro">
@@ -439,174 +466,409 @@ export default function ParametrosPage() {
                     </FormField>
                   </div>
                   <FormField label="Estado (UF)">
-                    <input value={params['empresa_estado']??''} className={inpSm} maxLength={2}
-                      onChange={e=>setParams(p=>({...p,empresa_estado:e.target.value.toUpperCase().slice(0,2)}))}
-                      placeholder="RS" />
+                    <input value={params['empresa_estado']??''} className={inpSm} maxLength={2} placeholder="RS"
+                      onChange={e=>setParams(p=>({...p,empresa_estado:e.target.value.toUpperCase().slice(0,2)}))} />
                   </FormField>
                 </div>
-              </div>
-
+              </Section>
             </div>
           )}
 
+          {/* ══ FINANCEIRO ═══════════════════════════════════════════════ */}
+          {secao === 'financeiro' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:32, maxWidth:700 }}>
 
+              <Section title="Multa e Juros por Atraso no Pagamento"
+                hint="Aplicados ao registrar pagamento de fatura vencida. Padrão legal: multa 2% + juros 1% a.m.">
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                  <FormField label="Multa por atraso (%)">
+                    <input type="number" step="0.01" min="0" max="100"
+                      value={params['multa_pagamento_percentual']??'2.00'}
+                      onChange={e=>setP('multa_pagamento_percentual', e.target.value)} className={inpSm} />
+                  </FormField>
+                  <FormField label="Juros de mora (% ao mês)">
+                    <input type="number" step="0.01" min="0" max="100"
+                      value={params['juros_pagamento_mensal']??'1.00'}
+                      onChange={e=>setP('juros_pagamento_mensal', e.target.value)} className={inpSm} />
+                  </FormField>
+                </div>
+                <InfoBox type="info">
+                  <strong>Exemplo:</strong> Fatura de R$ 1.000,00 vencida há 15 dias →
+                  Multa: R$ {((1000 * Number(params['multa_pagamento_percentual']??2))/100).toFixed(2)} +
+                  Juros: R$ {((1000 * Number(params['juros_pagamento_mensal']??1)/100/30)*15).toFixed(2)} =
+                  Total: R$ {(1000+(1000*Number(params['multa_pagamento_percentual']??2))/100+(1000*Number(params['juros_pagamento_mensal']??1)/100/30)*15).toFixed(2)}
+                </InfoBox>
+              </Section>
 
+              <Section title="Aviso de Vencimento e Consulta SPC">
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                  <FormField label="Dias de aviso antes do vencimento">
+                    <input value={params['dias_aviso_vencimento']??''}
+                      onChange={e=>setP('dias_aviso_vencimento', e.target.value)} className={inpSm} />
+                  </FormField>
+                  <FormField label="Intervalo entre consultas SPC (dias)">
+                    <input value={params['spc_intervalo_dias']??''}
+                      onChange={e=>setP('spc_intervalo_dias', e.target.value)} className={inpSm} />
+                  </FormField>
+                </div>
+                <InfoBox type="info">O sistema alertará quando a última consulta do cliente ultrapassar o intervalo configurado.</InfoBox>
+              </Section>
 
-          {/* ══ TABELAS DE PREÇO ═══════════════════════════════════════════ */}
-          {aba === 'tabelas' && (
-            <div style={{display:'flex',flexDirection:'column',gap:20}}>
-              <div className="ds-section-title">Tabelas de Preço por Segmento</div>
-              <div style={{fontSize:'var(--fs-md)',color:'var(--t-muted)',marginTop:-14}}>
-                Crie tabelas diferenciadas por tipo de cliente (ex: Padrão, Grandes Construtoras, Parceiros).
-                Associe a tabela no cadastro do cliente.
-              </div>
+              <Section title="Numeração de Documentos">
+                <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:14 }}>
+                  <FormField label="Prefixo do Contrato">
+                    <input value={params['prefixo_contrato']??''}
+                      onChange={e=>setP('prefixo_contrato', e.target.value)} className={inpSm} placeholder="CTR-" />
+                  </FormField>
+                  <FormField label="Prefixo da Fatura">
+                    <input value={params['prefixo_fatura']??''}
+                      onChange={e=>setP('prefixo_fatura', e.target.value)} className={inpSm} placeholder="FAT-" />
+                  </FormField>
+                  <FormField label="Símbolo da Moeda">
+                    <input value={params['moeda_simbolo']??''}
+                      onChange={e=>setP('moeda_simbolo', e.target.value)} className={inpSm} placeholder="R$" />
+                  </FormField>
+                </div>
+              </Section>
+            </div>
+          )}
 
-              {/* Nova tabela */}
-              <div style={{background:'var(--bg-header)',border:'1px solid var(--border)',borderRadius:'var(--r-md)',padding:16,display:'flex',gap:10,alignItems:'flex-end',flexWrap:'wrap'}}>
-                <FormField label="Nome da tabela *" style={{flex:'2 1 160px'}}>
-                  <input className={inpSm} value={formTabela.nome}
-                    onChange={e=>setFormTabela(f=>({...f,nome:e.target.value}))}
-                    placeholder="Ex: Tabela Grandes Construtoras" />
+          {/* ══ CONTRATOS ════════════════════════════════════════════════ */}
+          {secao === 'contratos' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:32, maxWidth:700 }}>
+
+              <Section title="Multa por Atraso na Devolução"
+                hint="Cobrada quando o cliente devolve o equipamento após o prazo contratado.">
+                <FormField label="Cobrar multa por devolução em atraso?">
+                  <select value={params['multa_entrega_ativo']??'sim'}
+                    onChange={e=>setP('multa_entrega_ativo', e.target.value)}
+                    className={inpSm} style={{ maxWidth:300 }}>
+                    <option value="sim">Sim — cobrar diária por dia de atraso</option>
+                    <option value="nao">Não — não cobrar multa</option>
+                  </select>
                 </FormField>
-                <FormField label="Descrição" style={{flex:'3 1 200px'}}>
-                  <input className={inpSm} value={formTabela.descricao}
-                    onChange={e=>setFormTabela(f=>({...f,descricao:e.target.value}))}
-                    placeholder="Uso interno" />
-                </FormField>
-                <label style={{display:'flex',alignItems:'center',gap:6,cursor:'pointer',fontSize:'var(--fs-md)',paddingBottom:2}}>
-                  <input type="checkbox" checked={formTabela.padrao}
-                    onChange={e=>setFormTabela(f=>({...f,padrao:e.target.checked}))}
-                    style={{accentColor:'var(--c-primary)'}} />
-                  Tabela padrão
-                </label>
-                <Btn size="sm" loading={salvandoTab} onClick={async()=>{
-                  if (!formTabela.nome.trim()) return
-                  setSalvandoTab(true)
-                  const res  = await fetch('/api/tabelas-preco',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(formTabela)})
-                  const data = await res.json()
-                  if (data.ok) {
-                    setTabelas((p:any[])=>[...p,data.data])
-                    setFormTabela({nome:'',descricao:'',padrao:false})
-                  }
-                  setSalvandoTab(false)
-                }}>+ Criar</Btn>
-              </div>
+              </Section>
 
-              {/* Lista de tabelas */}
-              {tabelas.length === 0
-                ? <div style={{textAlign:'center',padding:24,color:'var(--t-muted)',fontSize:'var(--fs-md)'}}>Nenhuma tabela cadastrada.</div>
-                : <div style={{display:'flex',flexDirection:'column',gap:10}}>
-                    {tabelas.map((t:any)=>(
-                      <div key={t.id} style={{border:'1px solid var(--border)',borderRadius:'var(--r-md)',padding:'12px 16px',
-                        display:'flex',justifyContent:'space-between',alignItems:'center',
-                        background: t.padrao ? 'var(--c-primary-light,#e8f4f8)' : 'transparent'}}>
-                        <div>
-                          <div style={{fontWeight:700,fontSize:'var(--fs-base)',display:'flex',alignItems:'center',gap:8}}>
-                            {t.nome}
-                            {t.padrao && <span style={{fontSize:'var(--fs-xs)',background:'var(--c-primary)',color:'#fff',padding:'2px 8px',borderRadius:'var(--r-sm)',fontWeight:700}}>PADRÃO</span>}
-                          </div>
-                          {t.descricao && <div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)',marginTop:2}}>{t.descricao}</div>}
-                          <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)',marginTop:4}}>
-                            {(t.tabela_preco_regras ?? []).length} regras de preço configuradas
-                          </div>
+              <Section title="Mensagem de Limpeza no Contrato"
+                hint="Exibida antes das assinaturas no contrato impresso. Deixe vazio para não exibir.">
+                <textarea value={params['mensagem_limpeza_contrato']??''}
+                  onChange={e=>setP('mensagem_limpeza_contrato', e.target.value)}
+                  rows={5} className={textareaCls} style={{ resize:'vertical' }}
+                  placeholder="Ex: Solicitamos que os equipamentos sejam devolvidos limpos..." />
+              </Section>
+
+              <Section title="Contrato Padrão (Site e QR Code)"
+                hint="URL pública para consulta do contrato. Gerada como QR Code nos documentos impressos.">
+                <FormField label="URL do Contrato">
+                  <input value={params['url_contrato_padrao']??''}
+                    onChange={e=>setP('url_contrato_padrao', e.target.value)}
+                    className={inpSm} placeholder="https://www.kanoffsolucoes.com.br/contrato" />
+                </FormField>
+                <div style={{ marginTop:16, display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
+                  <label style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'9px 18px',
+                    borderRadius:'var(--r-md)', cursor:'pointer',
+                    background:'rgba(99,102,241,0.15)', border:'1px solid rgba(99,102,241,0.4)',
+                    color:'#a5b4fc', fontSize:'var(--fs-md)', fontWeight:600 }}>
+                    📄 Fazer upload do PDF
+                    <input type="file" accept=".pdf,application/pdf" style={{ display:'none' }}
+                      onChange={e=>{ const f=e.target.files?.[0]; if(f) uploadContrato(f) }} />
+                  </label>
+                  {params['url_contrato_padrao'] && (
+                    <a href={params['url_contrato_padrao']} target="_blank" rel="noreferrer"
+                      style={{ fontSize:'var(--fs-sm)', color:'var(--c-primary)', textDecoration:'underline' }}>
+                      Ver contrato atual ↗
+                    </a>
+                  )}
+                </div>
+                <div style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)', marginTop:8 }}>
+                  PDF máx. 15MB. O upload atualiza a URL automaticamente.
+                </div>
+              </Section>
+            </div>
+          )}
+
+          {/* ══ SITE KANOFF ══════════════════════════════════════════════ */}
+          {secao === 'site' && (
+            <div style={{ maxWidth:820 }}>
+              <SubTabs
+                tabs={[
+                  { key:'geral',   label:'Geral & Horários'  },
+                  { key:'hero',    label:'Hero & Visual'     },
+                  { key:'textos',  label:'Textos do Site'    },
+                  { key:'seo',     label:'SEO & Legal'       },
+                ]}
+                active={subSite}
+                onChange={setSubSite}
+              />
+
+              {/* SUB: GERAL */}
+              {subSite === 'geral' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:28 }}>
+                  <Section title="Horário de Funcionamento" hint="Exibido no rodapé do site. Deixe em branco os dias que não atende.">
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:14 }}>
+                      <FormField label="Segunda a Sexta">
+                        <input className={inpSm} value={getP('horario_seg_sex')}
+                          onChange={e=>setP('horario_seg_sex', e.target.value)} placeholder="Seg–Sex: 08h às 18h" />
+                      </FormField>
+                      <FormField label="Sábado">
+                        <input className={inpSm} value={getP('horario_sabado')}
+                          onChange={e=>setP('horario_sabado', e.target.value)} placeholder="Sáb: 08h às 12h" />
+                      </FormField>
+                      <FormField label="Domingo">
+                        <input className={inpSm} value={getP('horario_domingo')}
+                          onChange={e=>setP('horario_domingo', e.target.value)} placeholder="Fechado" />
+                      </FormField>
+                    </div>
+                  </Section>
+
+                  <Section title="Estatísticas do Hero" hint="Números exibidos na seção principal da home.">
+                    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:14 }}>
+                      <FormField label="Equipamentos"><input className={inpSm} value={getP('stat_equipamentos')} onChange={e=>setP('stat_equipamentos',e.target.value)} placeholder="54+" /></FormField>
+                      <FormField label="Categorias"><input className={inpSm} value={getP('stat_categorias')} onChange={e=>setP('stat_categorias',e.target.value)} placeholder="10" /></FormField>
+                      <FormField label="Prazo de Resposta"><input className={inpSm} value={getP('stat_prazo')} onChange={e=>setP('stat_prazo',e.target.value)} placeholder="2h" /></FormField>
+                    </div>
+                  </Section>
+
+                  <Section title="Tabelas de Preço">
+                    <div style={{ display:'flex', gap:10, alignItems:'flex-end', flexWrap:'wrap', marginBottom:16,
+                      background:'var(--bg-header)', border:'1px solid var(--border)', borderRadius:'var(--r-md)', padding:16 }}>
+                      <FormField label="Nome da tabela *" style={{ flex:'2 1 160px' }}>
+                        <input className={inpSm} value={formTabela.nome}
+                          onChange={e=>setFormTabela(f=>({...f,nome:e.target.value}))} placeholder="Ex: Grandes Construtoras" />
+                      </FormField>
+                      <FormField label="Descrição" style={{ flex:'3 1 200px' }}>
+                        <input className={inpSm} value={formTabela.descricao}
+                          onChange={e=>setFormTabela(f=>({...f,descricao:e.target.value}))} placeholder="Uso interno" />
+                      </FormField>
+                      <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontSize:'var(--fs-md)', paddingBottom:2 }}>
+                        <input type="checkbox" checked={formTabela.padrao}
+                          onChange={e=>setFormTabela(f=>({...f,padrao:e.target.checked}))}
+                          style={{ accentColor:'var(--c-primary)' }} />
+                        Padrão
+                      </label>
+                      <Btn size="sm" loading={salvandoTab} onClick={async()=>{
+                        if (!formTabela.nome.trim()) return; setSalvandoTab(true)
+                        const res=await fetch('/api/tabelas-preco',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(formTabela)})
+                        const data=await res.json()
+                        if(data.ok){setTabelas((p:any[])=>[...p,data.data]);setFormTabela({nome:'',descricao:'',padrao:false})}
+                        setSalvandoTab(false)
+                      }}>+ Criar</Btn>
+                    </div>
+                    {tabelas.length===0
+                      ? <div style={{ textAlign:'center', padding:24, color:'var(--t-muted)', fontSize:'var(--fs-md)' }}>Nenhuma tabela cadastrada.</div>
+                      : <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+                          {tabelas.map((t:any)=>(
+                            <div key={t.id} style={{ border:'1px solid var(--border)', borderRadius:'var(--r-md)', padding:'12px 16px',
+                              display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                              <div>
+                                <div style={{ fontWeight:700, fontSize:'var(--fs-base)', display:'flex', alignItems:'center', gap:8 }}>
+                                  {t.nome}
+                                  {t.padrao && <span style={{ fontSize:'var(--fs-xs)', background:'var(--c-primary)', color:'#fff', padding:'2px 8px', borderRadius:'var(--r-sm)', fontWeight:700 }}>PADRÃO</span>}
+                                </div>
+                                {t.descricao && <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginTop:2 }}>{t.descricao}</div>}
+                              </div>
+                            </div>
+                          ))}
                         </div>
-                        <div style={{display:'flex',gap:8,alignItems:'center'}}>
-                          {!t.padrao && (
-                            <button onClick={async()=>{
-                                await fetch('/api/tabelas-preco',{method:'POST',headers:{'Content-Type':'application/json'},
-                                  body:JSON.stringify({nome:t.nome,descricao:t.descricao,padrao:true})})
-                                fetch('/api/tabelas-preco').then(r=>r.json()).then(d=>{ if(d.ok) setTabelas(d.data) })
-                              }}
-                              style={{background:'none',border:'1px solid var(--border)',borderRadius:'var(--r-sm)',
-                                padding:'4px 10px',cursor:'pointer',fontSize:'var(--fs-sm)',color:'var(--t-muted)'}}>
-                              Tornar padrão
-                            </button>
-                          )}
+                    }
+                  </Section>
+                </div>
+              )}
+
+              {/* SUB: HERO */}
+              {subSite === 'hero' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:28 }}>
+                  <Section title="Textos do Hero">
+                    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+                      <FormField label="Título principal">
+                        <input className={inpSm} value={getP('hero_titulo')}
+                          onChange={e=>setP('hero_titulo',e.target.value)} placeholder="EQUIPAMENTOS PRONTOS PARA SUA OBRA" />
+                      </FormField>
+                      <FormField label="Subtítulo">
+                        <textarea className={inpSm} rows={3} value={getP('hero_subtitulo')}
+                          onChange={e=>setP('hero_subtitulo',e.target.value)}
+                          placeholder="Descrição abaixo do título..." style={{ resize:'vertical' }} />
+                      </FormField>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                        <FormField label="Botão principal">
+                          <input className={inpSm} value={getP('hero_cta_texto')}
+                            onChange={e=>setP('hero_cta_texto',e.target.value)} placeholder="Ver Equipamentos" />
+                        </FormField>
+                        <FormField label="Botão WhatsApp">
+                          <input className={inpSm} value={getP('hero_cta2_texto')}
+                            onChange={e=>setP('hero_cta2_texto',e.target.value)} placeholder="Falar no WhatsApp" />
+                        </FormField>
+                      </div>
+                    </div>
+                  </Section>
+
+                  <Section title="Imagem de Fundo (Background)" hint="Deixe vazio para usar as partículas animadas. Recomendado: 1920×1080px, JPG ou WebP.">
+                    {getP('hero_bg_url') && (
+                      <div style={{ position:'relative', borderRadius:'var(--r-md)', overflow:'hidden', height:140, marginBottom:12 }}>
+                        <img src={getP('hero_bg_url')} alt="Hero BG" style={{ width:'100%', height:'100%', objectFit:'cover' }} />
+                        <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                          <span style={{ color:'#fff', fontSize:13 }}>Fundo atual</span>
                         </div>
                       </div>
-                    ))}
-                  </div>
-              }
-            </div>
-          )}
-          {/* ═══ FINANCEIRO ═══════════════════════════════════════════ */}
-          {aba === 'financeiro' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
-              <div className="ds-section-title">Regras Financeiras e SPC</div>
-              <div className="form-grid-2">
-                {CAMPOS_FIN.map(f => (
-                  <FormField key={f.k} label={f.l}>
-                    <input value={params[f.k]??''} onChange={e=>setParams(p=>({...p,[f.k]:e.target.value}))} className={inpSm}/>
-                  </FormField>
-                ))}
-              </div>
-              <div style={{ background:'var(--c-info-light)', border:'1px solid var(--c-info)', borderRadius:'var(--r-md)', padding:'12px 16px', fontSize:'var(--fs-md)', color:'var(--c-info-text)' }}>
-                <strong>SPC:</strong> O sistema alertará quando a última consulta do cliente ultrapassar o intervalo configurado.
-              </div>
+                    )}
+                    <div style={{ display:'flex', gap:10, alignItems:'center' }}>
+                      <label style={{ display:'inline-flex', alignItems:'center', gap:8, padding:'9px 18px',
+                        borderRadius:'var(--r-md)', cursor:'pointer',
+                        background:'rgba(129,140,248,0.15)', border:'1px solid rgba(129,140,248,0.35)',
+                        color:'#a5b4fc', fontSize:'var(--fs-md)', fontWeight:600 }}>
+                        {uploadingHero ? '⏳ Enviando...' : '📸 Enviar imagem'}
+                        <input type="file" accept="image/*" style={{ display:'none' }}
+                          onChange={e=>{ const f=e.target.files?.[0]; if(f) uploadHero(f) }} disabled={uploadingHero} />
+                      </label>
+                      {getP('hero_bg_url') && (
+                        <button onClick={()=>setP('hero_bg_url','')}
+                          style={{ padding:'9px 16px', borderRadius:'var(--r-md)',
+                            background:'rgba(248,113,113,0.1)', border:'1px solid rgba(248,113,113,0.3)',
+                            color:'#f87171', fontSize:'var(--fs-sm)', cursor:'pointer', fontWeight:600 }}>
+                          Remover imagem
+                        </button>
+                      )}
+                    </div>
+                  </Section>
+                </div>
+              )}
+
+              {/* SUB: TEXTOS */}
+              {subSite === 'textos' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:28 }}>
+                  <Section title="Página: Quem Somos">
+                    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+                      <FormField label="Texto da história">
+                        <textarea className={inpSm} rows={4} value={getP('quem_somos_historia')}
+                          onChange={e=>setP('quem_somos_historia',e.target.value)}
+                          placeholder="Conte a história da empresa..." style={{ resize:'vertical' }} />
+                      </FormField>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                        <FormField label="Missão">
+                          <textarea className={inpSm} rows={3} value={getP('quem_somos_missao')}
+                            onChange={e=>setP('quem_somos_missao',e.target.value)}
+                            placeholder="Nossa missão é..." style={{ resize:'vertical' }} />
+                        </FormField>
+                        <FormField label="Visão">
+                          <textarea className={inpSm} rows={3} value={getP('quem_somos_visao')}
+                            onChange={e=>setP('quem_somos_visao',e.target.value)}
+                            placeholder="Nossa visão é..." style={{ resize:'vertical' }} />
+                        </FormField>
+                      </div>
+                    </div>
+                  </Section>
+
+                  <Section title="Página: Contato">
+                    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+                      <FormField label="Subtítulo">
+                        <input className={inpSm} value={getP('contato_subtitulo')}
+                          onChange={e=>setP('contato_subtitulo',e.target.value)}
+                          placeholder="Respondemos em até 2 horas úteis..." />
+                      </FormField>
+                      <FormField label="Prazo de resposta exibido">
+                        <input className={inpSm} value={getP('prazo_resposta')}
+                          onChange={e=>setP('prazo_resposta',e.target.value)} placeholder="2 horas úteis" />
+                      </FormField>
+                    </div>
+                  </Section>
+
+                  <Section title="Rodapé">
+                    <FormField label="Texto descritivo">
+                      <input className={inpSm} value={getP('rodape_texto')}
+                        onChange={e=>setP('rodape_texto',e.target.value)}
+                        placeholder="Soluções completas em locação..." />
+                    </FormField>
+                  </Section>
+                </div>
+              )}
+
+              {/* SUB: SEO & LEGAL */}
+              {subSite === 'seo' && (
+                <div style={{ display:'flex', flexDirection:'column', gap:28 }}>
+                  <Section title="SEO — Página Inicial" hint="Aparecem nos resultados do Google ao buscar pelo site.">
+                    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+                      <FormField label={`Meta Title (${getP('meta_titulo_home').length}/70 caracteres)`}>
+                        <input className={inpSm} value={getP('meta_titulo_home')}
+                          onChange={e=>setP('meta_titulo_home', e.target.value.slice(0,70))}
+                          placeholder="Kanoff Soluções — Locação de Equipamentos em Sapucaia do Sul" />
+                      </FormField>
+                      <FormField label={`Meta Description (${getP('meta_descricao_home').length}/160 caracteres)`}>
+                        <textarea className={inpSm} rows={3} value={getP('meta_descricao_home')}
+                          onChange={e=>setP('meta_descricao_home', e.target.value.slice(0,160))}
+                          placeholder="Alugue andaimes, betoneiras e equipamentos. Cotação online rápida."
+                          style={{ resize:'vertical' }} />
+                      </FormField>
+                    </div>
+                    <div style={{ marginTop:12 }}>
+                      <InfoBox type="info">
+                        <strong>Preview Google</strong><br/>
+                        <span style={{ color:'#8ab4f8', fontSize:18 }}>{getP('meta_titulo_home') || 'Meta Title aqui'}</span><br/>
+                        <span style={{ color:'#3c4043', fontSize:13 }}>kanoffsolucoes.com.br</span><br/>
+                        <span style={{ fontSize:14 }}>{getP('meta_descricao_home') || 'Meta description aqui...'}</span>
+                      </InfoBox>
+                    </div>
+                  </Section>
+
+                  <Section title="Política de Privacidade"
+                    hint="Conteúdo exibido em kanoffsolucoes.com.br/politica-de-privacidade. Aceita HTML (h2, p, ul, li, strong).">
+                    <textarea className={inpSm} rows={22} value={getP('politica_privacidade')}
+                      onChange={e=>setP('politica_privacidade', e.target.value)}
+                      placeholder="<h2>1. Informações que Coletamos</h2>&#10;<p>...</p>"
+                      style={{ resize:'vertical', fontFamily:'var(--font-mono)', fontSize:12 }} />
+                  </Section>
+                </div>
+              )}
             </div>
           )}
 
-          
-
-          {/* ═══ PERÍODOS ═════════════════════════════════════════════ */}
-          {aba === 'periodos' && (
-            <div style={{display:"flex",flexDirection:"column",gap:16}}>
+          {/* ══ PERÍODOS ═════════════════════════════════════════════════ */}
+          {secao === 'periodos' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:16, maxWidth:720 }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                 <div>
                   <div className="ds-section-title" style={{ marginBottom:4 }}>Períodos de Locação</div>
-                  <div style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)' }}>Usados nos preços dos equipamentos e na criação de contratos.</div>
+                  <div style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)' }}>Usados nos preços dos equipamentos e contratos.</div>
                 </div>
                 <Btn size="sm" onClick={adicionarPeriodo}>+ Novo Período</Btn>
               </div>
               <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><tr>
-                  <TH>Nome</TH><TH>Dias</TH><TH center>Desconto (%)</TH><TH center>Ativo</TH><TH center>Ações</TH>
-                </tr></thead>
+                <thead><tr><TH>Nome</TH><TH>Dias</TH><TH center>Desconto (%)</TH><TH center>Ativo</TH><TH center>Ações</TH></tr></thead>
                 <tbody>
-                  {periodos.length === 0 && <tr><td colSpan={5}><div className="ds-empty"><div className="ds-empty-title">Nenhum período cadastrado.</div></div></td></tr>}
-                  {periodos.map((p, i) => (
-                    <tr key={p.id} style={{ background: i%2===0?'var(--bg-card)':'var(--bg-header)' }}>
-                      <TD><input value={p.nome} onChange={e=>{ const a=[...periodos]; a[i].nome=e.target.value; setPeriodos(a) }} className={inpSm} style={{ minWidth:140 }}/></TD>
-                      <TD><input type="number" min="1" value={p.dias} onChange={e=>{ const a=[...periodos]; a[i].dias=Number(e.target.value); setPeriodos(a) }} className={inpSm} style={{ width:80, textAlign:'center' }}/></TD>
-                      <TD center><input type="number" min="0" max="100" step="0.01" value={p.desconto_percentual} onChange={e=>{ const a=[...periodos]; a[i].desconto_percentual=Number(e.target.value); setPeriodos(a) }} className={inpSm} style={{ width:90, textAlign:'center' }}/></TD>
+                  {periodos.length===0 && <tr><td colSpan={5}><div className="ds-empty"><div className="ds-empty-title">Nenhum período cadastrado.</div></div></td></tr>}
+                  {periodos.map((p,i)=>(
+                    <tr key={p.id} style={{ background:i%2===0?'var(--bg-card)':'var(--bg-header)' }}>
+                      <TD><input value={p.nome} onChange={e=>{const a=[...periodos];a[i].nome=e.target.value;setPeriodos(a)}} className={inpSm} style={{ minWidth:140 }}/></TD>
+                      <TD><input type="number" min="1" value={p.dias} onChange={e=>{const a=[...periodos];a[i].dias=Number(e.target.value);setPeriodos(a)}} className={inpSm} style={{ width:80, textAlign:'center' }}/></TD>
+                      <TD center><input type="number" min="0" max="100" step="0.01" value={p.desconto_percentual} onChange={e=>{const a=[...periodos];a[i].desconto_percentual=Number(e.target.value);setPeriodos(a)}} className={inpSm} style={{ width:90, textAlign:'center' }}/></TD>
                       <TD center>
                         <label style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, cursor:'pointer' }}>
-                          <input type="checkbox" checked={!!p.ativo} onChange={e=>{ const a=[...periodos]; a[i].ativo=e.target.checked?1:0; setPeriodos(a) }} style={{ width:15, height:15, accentColor:'var(--c-primary)', cursor:'pointer' }}/>
+                          <input type="checkbox" checked={!!p.ativo} onChange={e=>{const a=[...periodos];a[i].ativo=e.target.checked?1:0;setPeriodos(a)}} style={{ width:15, height:15, accentColor:'var(--c-primary)', cursor:'pointer' }}/>
                           <span style={{ fontSize:'var(--fs-md)', fontWeight:600, color:p.ativo?'var(--c-success-text)':'var(--t-muted)' }}>{p.ativo?'Ativo':'Inativo'}</span>
                         </label>
                       </TD>
-                      <TD center>
-                        <button onClick={()=>removerPeriodo(p.id)} className="tbl-btn del" title="Remover"><IcoTrash/></button>
-                      </TD>
+                      <TD center><button onClick={()=>removerPeriodo(p.id)} className="tbl-btn del" title="Remover"><IcoTrash/></button></TD>
                     </tr>
                   ))}
                 </tbody>
               </table>
-              <div style={{ background:'var(--c-warning-light)', border:'1px solid var(--c-warning)', borderRadius:'var(--r-md)', padding:'10px 14px', fontSize:'var(--fs-md)', color:'var(--c-warning-text)' }}>
-                Clique em <strong>Salvar Alterações</strong> (botão superior) para confirmar as edições dos períodos.
-              </div>
+              <InfoBox type="warning">Clique em <strong>Salvar Alterações</strong> (botão superior direito) para confirmar.</InfoBox>
             </div>
           )}
 
-          {/* ═══ CATEGORIAS ═══════════════════════════════════════════ */}
-          {aba === 'categorias' && (
-            <div style={{display:"flex",flexDirection:"column",gap:16}}>
-              {/* Barra de ação */}
+          {/* ══ CATEGORIAS ═══════════════════════════════════════════════ */}
+          {secao === 'categorias' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:16, maxWidth:620 }}>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <input value={buscaCat} onChange={e=>setBuscaCat(e.target.value)} className={inpSm}
                   placeholder="Pesquisar categorias..." style={{ flex:1, maxWidth:300 }}/>
                 <Btn size="sm" onClick={()=>abrirCat()}>+ Nova Categoria</Btn>
               </div>
-
-              {/* Tabela */}
               <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><tr>
-                  <TH>Nome</TH><TH center>Status</TH><TH center>Ações</TH>
-                </tr></thead>
+                <thead><tr><TH>Nome</TH><TH center>Status</TH><TH center>Ações</TH></tr></thead>
                 <tbody>
-                  {catsFiltradas.length===0 && <tr><td colSpan={3}><div className="ds-empty"><div className="ds-empty-title">{buscaCat?'Nenhuma categoria encontrada.':'Nenhuma categoria cadastrada.'}</div></div></td></tr>}
-                  {catsFiltradas.map((cat,i) => (
-                    <tr key={cat.id} style={{ background: i%2===0?'var(--bg-card)':'var(--bg-header)' }}>
+                  {catsFiltradas.length===0 && <tr><td colSpan={3}><div className="ds-empty"><div className="ds-empty-title">{buscaCat?'Nenhuma encontrada.':'Nenhuma categoria cadastrada.'}</div></div></td></tr>}
+                  {catsFiltradas.map((cat,i)=>(
+                    <tr key={cat.id} style={{ background:i%2===0?'var(--bg-card)':'var(--bg-header)' }}>
                       <TD><span style={{ fontWeight:500 }}>{cat.nome}</span></TD>
                       <TD center><Badge value={cat.ativo?'ativo':'inativo'} dot/></TD>
                       <TD center>
@@ -627,31 +889,24 @@ export default function ParametrosPage() {
             </div>
           )}
 
-          {/* ═══ TIPOS DE ENDEREÇO ════════════════════════════════════ */}
-          {aba === 'enderecos' && (
-            <div style={{display:"flex",flexDirection:"column",gap:16}}>
-              {/* Barra de ação */}
+          {/* ══ TIPOS DE ENDEREÇO ════════════════════════════════════════ */}
+          {secao === 'enderecos' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:16, maxWidth:620 }}>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <input value={buscaEnd} onChange={e=>setBuscaEnd(e.target.value)} className={inpSm}
-                  placeholder="Pesquisar tipos de endereço..." style={{ flex:1, maxWidth:300 }}/>
+                  placeholder="Pesquisar..." style={{ flex:1, maxWidth:300 }}/>
                 <Btn size="sm" onClick={()=>abrirEnd()}>+ Novo Tipo</Btn>
               </div>
-
-              {/* Tabela */}
               <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><tr>
-                  <TH>Ordem</TH><TH>Nome</TH><TH center>Status</TH><TH center>Ações</TH>
-                </tr></thead>
+                <thead><tr><TH>Ordem</TH><TH>Nome</TH><TH center>Status</TH><TH center>Ações</TH></tr></thead>
                 <tbody>
-                  {endsFiltrados.length===0 && <tr><td colSpan={4}><div className="ds-empty"><div className="ds-empty-title">{buscaEnd?'Nenhum tipo encontrado.':'Nenhum tipo de endereço cadastrado.'}</div></div></td></tr>}
-                  {endsFiltrados.map((t,i) => (
-                    <tr key={t.id} style={{ background: i%2===0?'var(--bg-card)':'var(--bg-header)' }}>
+                  {endsFiltrados.length===0 && <tr><td colSpan={4}><div className="ds-empty"><div className="ds-empty-title">{buscaEnd?'Nenhum encontrado.':'Nenhum tipo cadastrado.'}</div></div></td></tr>}
+                  {endsFiltrados.map((t,i)=>(
+                    <tr key={t.id} style={{ background:i%2===0?'var(--bg-card)':'var(--bg-header)' }}>
                       <TD>
                         <div style={{ display:'flex', flexDirection:'column', gap:2, alignItems:'center', width:28 }}>
-                          <button onClick={()=>moverEnd(tiposEnd.indexOf(t),-1)} disabled={tiposEnd.indexOf(t)===0}
-                            className="tbl-btn" style={{ height:18, padding:'0 4px', opacity:tiposEnd.indexOf(t)===0?0.3:1 }}><IcoUp/></button>
-                          <button onClick={()=>moverEnd(tiposEnd.indexOf(t),1)} disabled={tiposEnd.indexOf(t)===tiposEnd.length-1}
-                            className="tbl-btn" style={{ height:18, padding:'0 4px', opacity:tiposEnd.indexOf(t)===tiposEnd.length-1?0.3:1 }}><IcoDown/></button>
+                          <button onClick={()=>moverEnd(tiposEnd.indexOf(t),-1)} disabled={tiposEnd.indexOf(t)===0} className="tbl-btn" style={{ height:18, padding:'0 4px', opacity:tiposEnd.indexOf(t)===0?0.3:1 }}><IcoUp/></button>
+                          <button onClick={()=>moverEnd(tiposEnd.indexOf(t),1)} disabled={tiposEnd.indexOf(t)===tiposEnd.length-1} className="tbl-btn" style={{ height:18, padding:'0 4px', opacity:tiposEnd.indexOf(t)===tiposEnd.length-1?0.3:1 }}><IcoDown/></button>
                         </div>
                       </TD>
                       <TD><span style={{ fontWeight:500 }}>{t.nome}</span></TD>
@@ -659,11 +914,7 @@ export default function ParametrosPage() {
                       <TD center>
                         <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
                           <button onClick={()=>abrirEnd(t)} className="tbl-btn edit" title="Editar"><IcoEdit/></button>
-                          <button onClick={()=>toggleEnd(t.id,t.ativo)} className="tbl-btn"
-                            title={t.ativo?'Desativar':'Ativar'}
-                            style={{ color:t.ativo?'var(--c-success)':'var(--t-muted)', fontSize:14, padding:'3px 6px' }}>
-                            {t.ativo?'●':'○'}
-                          </button>
+                          <button onClick={()=>toggleEnd(t.id,t.ativo)} className="tbl-btn" title={t.ativo?'Desativar':'Ativar'} style={{ color:t.ativo?'var(--c-success)':'var(--t-muted)', fontSize:14, padding:'3px 6px' }}>{t.ativo?'●':'○'}</button>
                           <button onClick={()=>removerEnd(t.id)} className="tbl-btn del" title="Excluir"><IcoTrash/></button>
                         </div>
                       </TD>
@@ -671,42 +922,31 @@ export default function ParametrosPage() {
                   ))}
                 </tbody>
               </table>
-              <div style={{ background:'var(--c-warning-light)', border:'1px solid var(--c-warning)', borderRadius:'var(--r-md)', padding:'10px 14px', fontSize:'var(--fs-md)', color:'var(--c-warning-text)' }}>
-                Clique em <strong>Salvar Alterações</strong> (botão superior) para confirmar a nova ordem dos tipos.
-              </div>
+              <InfoBox type="warning">Clique em <strong>Salvar Alterações</strong> para confirmar a nova ordem.</InfoBox>
             </div>
           )}
 
-          {/* ═══ LOCAIS DE ARMAZENAGEM ════════════════════════════════ */}
-          {aba === 'locais' && (
-            <div style={{display:"flex",flexDirection:"column",gap:16}}>
-              {/* Barra de ação */}
+          {/* ══ LOCAIS ═══════════════════════════════════════════════════ */}
+          {secao === 'locais' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:16, maxWidth:680 }}>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <input value={buscaLoc} onChange={e=>setBuscaLoc(e.target.value)} className={inpSm}
                   placeholder="Pesquisar locais..." style={{ flex:1, maxWidth:300 }}/>
                 <Btn size="sm" onClick={()=>abrirLoc()}>+ Novo Local</Btn>
               </div>
-
-              {/* Tabela */}
               <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><tr>
-                  <TH>Nome</TH><TH>Descrição</TH><TH center>Status</TH><TH center>Ações</TH>
-                </tr></thead>
+                <thead><tr><TH>Nome</TH><TH>Descrição</TH><TH center>Status</TH><TH center>Ações</TH></tr></thead>
                 <tbody>
-                  {locaisFiltrados.length===0 && <tr><td colSpan={4}><div className="ds-empty"><div className="ds-empty-title">{buscaLoc?'Nenhum local encontrado.':'Nenhum local cadastrado.'}</div></div></td></tr>}
-                  {locaisFiltrados.map((l,i) => (
-                    <tr key={l.id} style={{ background: i%2===0?'var(--bg-card)':'var(--bg-header)' }}>
+                  {locaisFiltrados.length===0 && <tr><td colSpan={4}><div className="ds-empty"><div className="ds-empty-title">{buscaLoc?'Nenhum encontrado.':'Nenhum local cadastrado.'}</div></div></td></tr>}
+                  {locaisFiltrados.map((l,i)=>(
+                    <tr key={l.id} style={{ background:i%2===0?'var(--bg-card)':'var(--bg-header)' }}>
                       <TD><span style={{ fontWeight:500 }}>{l.nome}</span></TD>
-                      <TD muted>{l.descricao || '—'}</TD>
+                      <TD muted>{l.descricao||'—'}</TD>
                       <TD center><Badge value={l.ativo?'ativo':'inativo'} dot/></TD>
                       <TD center>
                         <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
                           <button onClick={()=>abrirLoc(l)} className="tbl-btn edit" title="Editar"><IcoEdit/></button>
-                          <button onClick={()=>toggleLoc(l.id,l.ativo)} className="tbl-btn"
-                            title={l.ativo?'Desativar':'Ativar'}
-                            style={{ color:l.ativo?'var(--c-success)':'var(--t-muted)', fontSize:14, padding:'3px 6px' }}>
-                            {l.ativo?'●':'○'}
-                          </button>
+                          <button onClick={()=>toggleLoc(l.id,l.ativo)} className="tbl-btn" title={l.ativo?'Desativar':'Ativar'} style={{ color:l.ativo?'var(--c-success)':'var(--t-muted)', fontSize:14, padding:'3px 6px' }}>{l.ativo?'●':'○'}</button>
                           <button onClick={()=>removerLoc(l.id)} className="tbl-btn del" title="Excluir"><IcoTrash/></button>
                         </div>
                       </TD>
@@ -717,416 +957,38 @@ export default function ParametrosPage() {
             </div>
           )}
 
-          {aba === 'contratos' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
-              <div className="ds-section-title">Multas e Juros</div>
-
-              {/* Multa por atraso na entrega */}
-              <div className="ds-card" style={{ padding:'16px 20px' }}>
-                <div style={{ fontWeight:700, fontSize:'var(--fs-base)', marginBottom:6 }}>
-                  📦 Multa por Atraso na Entrega do Equipamento
-                </div>
-                <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginBottom:12 }}>
-                  Cobrada quando o cliente devolve após o prazo. Calculada como: <strong>preço diário × quantidade × dias de atraso</strong> — por equipamento.
-                </div>
-                <FormField label="Cobrar multa por atraso na entrega?">
-                  <select
-                    value={params['multa_entrega_ativo'] ?? 'sim'}
-                    onChange={e => setParams(p => ({ ...p, multa_entrega_ativo: e.target.value }))}
-                    className={inpSm} style={{ maxWidth:200 }}>
-                    <option value="sim">Sim — cobrar diária por dia de atraso</option>
-                    <option value="nao">Não — não cobrar multa de entrega</option>
-                  </select>
-                </FormField>
-              </div>
-
-              {/* Multa e juros por atraso no pagamento */}
-              <div className="ds-card" style={{ padding:'16px 20px' }}>
-                <div style={{ fontWeight:700, fontSize:'var(--fs-base)', marginBottom:6 }}>
-                  💳 Multa e Juros por Atraso no Pagamento de Fatura
-                </div>
-                <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginBottom:12 }}>
-                  Aplicados automaticamente ao registrar pagamento de fatura vencida. Padrão legal brasileiro: multa de 2% + juros de 1% ao mês.
-                </div>
-                <div className="form-grid-2">
-                  <FormField label="Multa por atraso (%)" hint="Percentual fixo cobrado uma única vez sobre o saldo devedor">
-                    <input type="number" step="0.01" min="0" max="100"
-                      value={params['multa_pagamento_percentual'] ?? '2.00'}
-                      onChange={e => setParams(p => ({ ...p, multa_pagamento_percentual: e.target.value }))}
-                      className={inpSm} />
-                  </FormField>
-                  <FormField label="Juros de mora (% ao mês)" hint="Aplicado proporcionalmente aos dias de atraso (ex: 1% ao mês = 0,033%/dia)">
-                    <input type="number" step="0.01" min="0" max="100"
-                      value={params['juros_pagamento_mensal'] ?? '1.00'}
-                      onChange={e => setParams(p => ({ ...p, juros_pagamento_mensal: e.target.value }))}
-                      className={inpSm} />
-                  </FormField>
-                </div>
-                <div style={{ background:'var(--c-info-light)', border:'1px solid var(--c-info)',
-                  borderRadius:'var(--r-sm)', padding:'10px 14px', fontSize:'var(--fs-sm)',
-                  color:'var(--c-info-text)', marginTop:12 }}>
-                  <strong>Exemplo:</strong> Fatura de R$ 1.000,00 vencida há 15 dias →
-                  Multa: R$ {((1000 * Number(params['multa_pagamento_percentual'] ?? 2)) / 100).toFixed(2)} +
-                  Juros: R$ {((1000 * Number(params['juros_pagamento_mensal'] ?? 1) / 100 / 30) * 15).toFixed(2)} =
-                  Total: R$ {(1000 + (1000 * Number(params['multa_pagamento_percentual'] ?? 2)) / 100 + (1000 * Number(params['juros_pagamento_mensal'] ?? 1) / 100 / 30) * 15).toFixed(2)}
-                </div>
-              </div>
-
-              <div className="ds-section-title" style={{ marginTop:8 }}>Textos e Mensagens do Contrato</div>
-
-              {/* Mensagem de limpeza */}
-              <div className="ds-card" style={{ padding:'16px 20px' }}>
-                <div style={{ fontWeight:700, fontSize:'var(--fs-base)', marginBottom:6 }}>
-                  🧹 Mensagem de Limpeza dos Equipamentos
-                </div>
-                <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginBottom:12 }}>
-                  Texto exibido no contrato de locação antes das assinaturas. Deixe em branco para não exibir.
-                </div>
-                <textarea
-                  value={params['mensagem_limpeza_contrato'] ?? ''}
-                  onChange={e => setParams(p => ({ ...p, mensagem_limpeza_contrato: e.target.value }))}
-                  rows={5}
-                  className={textareaCls}
-                  placeholder="Ex: Prezados clientes, solicitamos gentilmente que os equipamentos sejam devolvidos limpos..."
-                  style={{ resize:'vertical' }}
-                />
-                <div style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)', marginTop:6 }}>
-                  Este texto aparece em destaque no contrato impresso, logo antes do espaço de assinaturas.
-                </div>
-              </div>
-
-              {/* URL do contrato padrão — para QR Code */}
-              <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
-                <div className="ds-section-title">🔗 Link do Contrato Padrão (QR Code)</div>
-                <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginBottom:12, marginTop:8 }}>
-                  URL pública onde o cliente pode consultar o contrato de locação padrão da Kanoff. Este link é gerado como QR Code nos documentos.
-                </div>
-                <FormField label="URL do Contrato Padrão">
-                  <input
-                    value={params['url_contrato_padrao'] ?? ''}
-                    onChange={e => setParams(p => ({ ...p, url_contrato_padrao: e.target.value }))}
-                    className={inpSm}
-                    placeholder="https://www.kanoffsolucoes.com.br/contrato"
-                  />
-                </FormField>
-
-                {/* Upload do PDF do contrato */}
-                <div style={{ marginTop:8 }}>
-                  <div style={{ fontSize:'var(--fs-sm)', fontWeight:600, color:'var(--t-secondary)', marginBottom:8 }}>
-                    Ou faça upload do PDF diretamente:
-                  </div>
-                  <div style={{ display:'flex', alignItems:'center', gap:12, flexWrap:'wrap' }}>
-                    <label style={{ display:'inline-flex', alignItems:'center', gap:8,
-                      padding:'9px 18px', borderRadius:'var(--r-md)', cursor:'pointer',
-                      background:'rgba(99,102,241,0.15)', border:'1px solid rgba(99,102,241,0.4)',
-                      color:'#a5b4fc', fontSize:'var(--fs-md)', fontWeight:600, transition:'all .2s' }}>
-                      📄 Enviar PDF do Contrato
-                      <input type="file" accept=".pdf,application/pdf" style={{ display:'none' }}
-                        onChange={e => { const f = e.target.files?.[0]; if (f) uploadContrato(f) }} />
-                    </label>
-                    {params['url_contrato_padrao'] && (
-                      <a href={params['url_contrato_padrao']} target="_blank" rel="noreferrer"
-                        style={{ fontSize:'var(--fs-sm)', color:'var(--c-primary)', textDecoration:'underline' }}>
-                        Ver contrato atual ↗
-                      </a>
-                    )}
-                  </div>
-                  <div style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)', marginTop:6 }}>
-                    PDF máx. 10MB. Após o upload, a URL é preenchida automaticamente e o site é atualizado.
-                  </div>
-                </div>
-
-                <div style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)', marginTop:6 }}>
-                  O QR Code nos contratos impressos apontará para:{' '}
-                  <strong>kanoffsolucoes.com.br/contrato</strong>
-                </div>
-              </div>
-
-            </div>
-          )}
-
-
-          {/* ══════════════════════════════════════════════════════════ SITE */}
-          {aba === 'site' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
-
-              {/* Hero */}
-              <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
-                <div className="ds-section-title">🎯 Hero — Seção Principal</div>
-                <div style={{ display:'flex', flexDirection:'column', gap:14, marginTop:16 }}>
-                  <FormField label="Título principal">
-                    <input className={inpSm} value={getParam('hero_titulo')}
-                      onChange={e => setParam('hero_titulo', e.target.value)}
-                      placeholder="EQUIPAMENTOS PRONTOS PARA SUA OBRA" />
-                  </FormField>
-                  <FormField label="Subtítulo">
-                    <textarea className={inpSm} rows={3} value={getParam('hero_subtitulo')}
-                      onChange={e => setParam('hero_subtitulo', e.target.value)}
-                      placeholder="Descrição que aparece abaixo do título..." style={{ resize:'vertical' }} />
-                  </FormField>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                    <FormField label="Texto botão principal">
-                      <input className={inpSm} value={getParam('hero_cta_texto')}
-                        onChange={e => setParam('hero_cta_texto', e.target.value)}
-                        placeholder="Ver Equipamentos" />
-                    </FormField>
-                    <FormField label="Texto botão WhatsApp">
-                      <input className={inpSm} value={getParam('hero_cta2_texto')}
-                        onChange={e => setParam('hero_cta2_texto', e.target.value)}
-                        placeholder="Falar no WhatsApp" />
-                    </FormField>
-                  </div>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:12 }}>
-                    <FormField label="Stat — Equipamentos">
-                      <input className={inpSm} value={getParam('stat_equipamentos')}
-                        onChange={e => setParam('stat_equipamentos', e.target.value)}
-                        placeholder="54+" />
-                    </FormField>
-                    <FormField label="Stat — Categorias">
-                      <input className={inpSm} value={getParam('stat_categorias')}
-                        onChange={e => setParam('stat_categorias', e.target.value)}
-                        placeholder="10" />
-                    </FormField>
-                    <FormField label="Stat — Prazo">
-                      <input className={inpSm} value={getParam('stat_prazo')}
-                        onChange={e => setParam('stat_prazo', e.target.value)}
-                        placeholder="2h" />
-                    </FormField>
-                  </div>
-                  <FormField label="Imagem de Background do Hero">
-                    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                      {getParam('hero_bg_url') && (
-                        <div style={{ position:'relative', borderRadius:'var(--r-md)', overflow:'hidden', height:120 }}>
-                          <img src={getParam('hero_bg_url')} alt="Hero BG"
-                            style={{ width:'100%', height:'100%', objectFit:'cover' }} />
-                          <div style={{ position:'absolute', inset:0, background:'rgba(0,0,0,0.4)', display:'flex', alignItems:'center', justifyContent:'center' }}>
-                            <span style={{ color:'#fff', fontSize:12 }}>Background atual</span>
-                          </div>
-                        </div>
-                      )}
-                      <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-                        <label style={{ display:'inline-flex', alignItems:'center', gap:8,
-                          padding:'8px 16px', borderRadius:'var(--r-md)', cursor:'pointer',
-                          background:'rgba(129,140,248,0.15)', border:'1px solid rgba(129,140,248,0.35)',
-                          color:'#a5b4fc', fontSize:'var(--fs-md)', fontWeight:600 }}>
-                          {uploadandoHero ? '⏳ Enviando...' : '📸 Enviar imagem'}
-                          <input type="file" accept="image/*" style={{ display:'none' }}
-                            onChange={e => { const f = e.target.files?.[0]; if (f) uploadHero(f) }}
-                            disabled={uploadandoHero} />
-                        </label>
-                        {getParam('hero_bg_url') && (
-                          <button onClick={() => setParam('hero_bg_url', '')}
-                            style={{ padding:'8px 12px', borderRadius:'var(--r-md)',
-                              background:'rgba(248,113,113,0.1)', border:'1px solid rgba(248,113,113,0.3)',
-                              color:'#f87171', fontSize:'var(--fs-sm)', cursor:'pointer' }}>
-                            Remover
-                          </button>
-                        )}
-                      </div>
-                      <div style={{ fontSize:11, color:'var(--t-muted)' }}>
-                        Deixe vazio para usar partículas animadas. Recomendado: 1920×1080px, JPG ou WebP.
-                      </div>
-                    </div>
-                  </FormField>
-                </div>
-              </div>
-
-              {/* Quem Somos */}
-              <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
-                <div className="ds-section-title">👥 Página: Quem Somos</div>
-                <div style={{ display:'flex', flexDirection:'column', gap:14, marginTop:16 }}>
-                  <FormField label="Texto da história">
-                    <textarea className={inpSm} rows={4} value={getParam('quem_somos_historia')}
-                      onChange={e => setParam('quem_somos_historia', e.target.value)}
-                      placeholder="Conte a história da empresa..." style={{ resize:'vertical' }} />
-                  </FormField>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                    <FormField label="Missão">
-                      <textarea className={inpSm} rows={3} value={getParam('quem_somos_missao')}
-                        onChange={e => setParam('quem_somos_missao', e.target.value)}
-                        placeholder="Nossa missão é..." style={{ resize:'vertical' }} />
-                    </FormField>
-                    <FormField label="Visão">
-                      <textarea className={inpSm} rows={3} value={getParam('quem_somos_visao')}
-                        onChange={e => setParam('quem_somos_visao', e.target.value)}
-                        placeholder="Nossa visão é..." style={{ resize:'vertical' }} />
-                    </FormField>
-                  </div>
-                </div>
-              </div>
-
-              {/* Contato e Rodapé */}
-              <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
-                <div className="ds-section-title">📬 Contato e Rodapé</div>
-                <div style={{ display:'flex', flexDirection:'column', gap:14, marginTop:16 }}>
-                  <FormField label="Subtítulo da página de contato">
-                    <input className={inpSm} value={getParam('contato_subtitulo')}
-                      onChange={e => setParam('contato_subtitulo', e.target.value)}
-                      placeholder="Respondemos em até 2 horas úteis..." />
-                  </FormField>
-                  <FormField label="Texto do rodapé">
-                    <input className={inpSm} value={getParam('rodape_texto')}
-                      onChange={e => setParam('rodape_texto', e.target.value)}
-                      placeholder="Soluções completas em locação..." />
-                  </FormField>
-                  <FormField label="Prazo de resposta exibido no site">
-                    <input className={inpSm} value={getParam('prazo_resposta')}
-                      onChange={e => setParam('prazo_resposta', e.target.value)}
-                      placeholder="2 horas úteis" />
-                  </FormField>
-                </div>
-              </div>
-
-              {/* Horário de Funcionamento */}
-              <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
-                <div className="ds-section-title">🕐 Horário de Funcionamento</div>
-                <p style={{ color:'var(--t-muted)', fontSize:'var(--fs-sm)', margin:'8px 0 16px' }}>
-                  Exibido no rodapé do site. Deixe em branco os dias que não atende.
-                </p>
-                <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-                  <FormField label="Segunda a Sexta">
-                    <input className={inpSm} value={getParam('horario_seg_sex')}
-                      onChange={e => setParam('horario_seg_sex', e.target.value)}
-                      placeholder="Seg–Sex: 08h às 18h" />
-                  </FormField>
-                  <FormField label="Sábado">
-                    <input className={inpSm} value={getParam('horario_sabado')}
-                      onChange={e => setParam('horario_sabado', e.target.value)}
-                      placeholder="Sáb: 08h às 12h" />
-                  </FormField>
-                  <FormField label="Domingo (deixe vazio se não atende)">
-                    <input className={inpSm} value={getParam('horario_domingo')}
-                      onChange={e => setParam('horario_domingo', e.target.value)}
-                      placeholder="Dom: Fechado" />
-                  </FormField>
-                </div>
-              </div>
-
-              {/* Salvar */}
-              {/* SEO — Meta Title e Meta Description */}
-              <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
-                <div className="ds-section-title">🔍 SEO — Página Inicial</div>
-                <p style={{ color:'var(--t-muted)', fontSize:'var(--fs-sm)', margin:'8px 0 16px' }}>
-                  Aparecem nos resultados do Google ao buscar pelo site.
-                </p>
-                <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-                  <FormField label={`Meta Title (${getParam('meta_titulo_home').length}/70 caracteres)`}>
-                    <input className={inpSm}
-                      value={getParam('meta_titulo_home')}
-                      onChange={e => setParam('meta_titulo_home', e.target.value.slice(0,70))}
-                      placeholder="Kanoff Soluções — Locação de Equipamentos em Sapucaia do Sul" />
-                  </FormField>
-                  <FormField label={`Meta Description (${getParam('meta_descricao_home').length}/160 caracteres)`}>
-                    <textarea className={inpSm} rows={3}
-                      value={getParam('meta_descricao_home')}
-                      onChange={e => setParam('meta_descricao_home', e.target.value.slice(0,160))}
-                      placeholder="Alugue andaimes, betoneiras e equipamentos para construção civil. Cotação online rápida."
-                      style={{ resize:'vertical' }} />
-                  </FormField>
-                </div>
-              </div>
-
-              {/* Política de Privacidade */}
-              <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
-                <div className="ds-section-title">🔒 Política de Privacidade</div>
-                <p style={{ color:'var(--t-muted)', fontSize:'var(--fs-sm)', margin:'8px 0 16px' }}>
-                  Conteúdo exibido em <strong style={{color:'var(--t-base)'}}>kanoffsolucoes.com.br/politica-de-privacidade</strong>. Aceita HTML básico (h2, p, ul, li, strong).
-                </p>
-                <FormField label="Conteúdo (HTML)">
-                  <textarea className={inpSm} rows={20}
-                    value={getParam('politica_privacidade')}
-                    onChange={e => setParam('politica_privacidade', e.target.value)}
-                    placeholder="<h2>1. Informações que Coletamos</h2>&#10;<p>...</p>"
-                    style={{ resize:'vertical', fontFamily:'monospace', fontSize:12 }} />
-                </FormField>
-              </div>
-
-              {/* Botão salvar + feedback */}
-              {okSite && (
-                <div style={{ background:'rgba(52,211,153,0.1)', border:'1px solid rgba(52,211,153,0.3)',
-                  borderRadius:'var(--r-md)', padding:'10px 16px', fontSize:'var(--fs-md)', color:'#34d399' }}>
-                  ✅ Configurações do site salvas com sucesso!
-                </div>
-              )}
-              <div style={{ display:'flex', justifyContent:'flex-end' }}>
-                <button onClick={salvarSite} disabled={salvandoSite}
-                  style={{ padding:'10px 28px', borderRadius:'var(--r-md)', border:'none',
-                    background: salvandoSite ? 'rgba(99,102,241,0.5)' : 'linear-gradient(135deg,#6366f1,#818cf8)',
-                    color:'#fff', fontSize:'var(--fs-md)', fontWeight:700, cursor:'pointer',
-                    fontFamily:'var(--font-sans)', display:'flex', alignItems:'center', gap:8,
-                    opacity: salvandoSite ? .7 : 1 }}>
-                  {salvandoSite ? 'Salvando...' : '🌐 Salvar Configurações do Site'}
-                </button>
-              </div>
-            </div>
-          )}
-
         </div>
       </div>
 
-      {/* ── Painel: Categoria ─────────────────────────────────────────────── */}
-      <SlidePanel open={painelCat} onClose={()=>setPainelCat(false)}
-        title={editandoCat?'Editar Categoria':'Nova Categoria'}
-        subtitle="Categorias de equipamentos"
-        width="sm"
-        footer={
-          <div className="panel-footer-2btn">
-            <Btn variant="secondary" style={{ flex:1 }} onClick={()=>setPainelCat(false)}>Cancelar</Btn>
-            <Btn style={{ flex:2 }} loading={salvando} onClick={salvarCat}>{editandoCat?'Salvar Alterações':'Criar Categoria'}</Btn>
-          </div>
-        }>
+      {/* ── Painéis ───────────────────────────────────────────────────── */}
+      <SlidePanel open={painelCat} onClose={()=>setPainelCat(false)} title={editandoCat?'Editar Categoria':'Nova Categoria'} subtitle="Categorias de equipamentos" width="sm"
+        footer={<div className="panel-footer-2btn"><Btn variant="secondary" style={{ flex:1 }} onClick={()=>setPainelCat(false)}>Cancelar</Btn><Btn style={{ flex:2 }} loading={salvando} onClick={salvarCat}>{editandoCat?'Salvar':'Criar'}</Btn></div>}>
         {erroPainel&&<div className="ds-alert-error" style={{ marginBottom:14 }}>{erroPainel}</div>}
         <FormField label="Nome da Categoria" required>
-          <input value={formCat.nome} onChange={e=>setFormCat({nome:e.target.value})}
-            className={inpSm} autoFocus placeholder="Ex: Andaimes, Ferramentas, Geradores..."
-            onKeyDown={e=>e.key==='Enter'&&salvarCat()}/>
+          <input value={formCat.nome} onChange={e=>setFormCat({nome:e.target.value})} className={inpSm} autoFocus placeholder="Ex: Andaimes, Ferramentas..." onKeyDown={e=>e.key==='Enter'&&salvarCat()}/>
         </FormField>
       </SlidePanel>
 
-      {/* ── Painel: Tipo de Endereço ──────────────────────────────────────── */}
-      <SlidePanel open={painelEnd} onClose={()=>setPainelEnd(false)}
-        title={editandoEnd?'Editar Tipo de Endereço':'Novo Tipo de Endereço'}
-        subtitle="Tipos disponíveis no cadastro de clientes"
-        width="sm"
-        footer={
-          <div className="panel-footer-2btn">
-            <Btn variant="secondary" style={{ flex:1 }} onClick={()=>setPainelEnd(false)}>Cancelar</Btn>
-            <Btn style={{ flex:2 }} loading={salvando} onClick={salvarEnd}>{editandoEnd?'Salvar Alterações':'Criar Tipo'}</Btn>
-          </div>
-        }>
+      <SlidePanel open={painelEnd} onClose={()=>setPainelEnd(false)} title={editandoEnd?'Editar Tipo de Endereço':'Novo Tipo de Endereço'} subtitle="Tipos no cadastro de clientes" width="sm"
+        footer={<div className="panel-footer-2btn"><Btn variant="secondary" style={{ flex:1 }} onClick={()=>setPainelEnd(false)}>Cancelar</Btn><Btn style={{ flex:2 }} loading={salvando} onClick={salvarEnd}>{editandoEnd?'Salvar':'Criar'}</Btn></div>}>
         {erroPainel&&<div className="ds-alert-error" style={{ marginBottom:14 }}>{erroPainel}</div>}
         <FormField label="Nome do Tipo" required>
-          <input value={formEnd.nome} onChange={e=>setFormEnd({nome:e.target.value})}
-            className={inpSm} autoFocus placeholder="Ex: Residencial, Comercial, Obra, Praia..."
-            onKeyDown={e=>e.key==='Enter'&&salvarEnd()}/>
+          <input value={formEnd.nome} onChange={e=>setFormEnd({nome:e.target.value})} className={inpSm} autoFocus placeholder="Ex: Residencial, Comercial, Obra..." onKeyDown={e=>e.key==='Enter'&&salvarEnd()}/>
         </FormField>
       </SlidePanel>
 
-      {/* ── Painel: Local de Armazenagem ──────────────────────────────────── */}
-      <SlidePanel open={painelLoc} onClose={()=>setPainelLoc(false)}
-        title={editandoLoc?'Editar Local de Armazenagem':'Novo Local de Armazenagem'}
-        subtitle="Locais de estoque e patrimônio"
-        width="sm"
-        footer={
-          <div className="panel-footer-2btn">
-            <Btn variant="secondary" style={{ flex:1 }} onClick={()=>setPainelLoc(false)}>Cancelar</Btn>
-            <Btn style={{ flex:2 }} loading={salvando} onClick={salvarLoc}>{editandoLoc?'Salvar Alterações':'Criar Local'}</Btn>
-          </div>
-        }>
+      <SlidePanel open={painelLoc} onClose={()=>setPainelLoc(false)} title={editandoLoc?'Editar Local de Armazenagem':'Novo Local de Armazenagem'} subtitle="Locais de estoque e patrimônio" width="sm"
+        footer={<div className="panel-footer-2btn"><Btn variant="secondary" style={{ flex:1 }} onClick={()=>setPainelLoc(false)}>Cancelar</Btn><Btn style={{ flex:2 }} loading={salvando} onClick={salvarLoc}>{editandoLoc?'Salvar':'Criar'}</Btn></div>}>
         {erroPainel&&<div className="ds-alert-error" style={{ marginBottom:14 }}>{erroPainel}</div>}
-        <div style={{display:"flex",flexDirection:"column",gap:14}}>
+        <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <FormField label="Nome do Local" required>
-            <input value={formLoc.nome} onChange={e=>setFormLoc(f=>({...f,nome:e.target.value}))}
-              className={inpSm} autoFocus placeholder="Ex: Galpão A, Prateleira 01, Depósito..."/>
+            <input value={formLoc.nome} onChange={e=>setFormLoc(f=>({...f,nome:e.target.value}))} className={inpSm} autoFocus placeholder="Ex: Galpão A, Prateleira 01..."/>
           </FormField>
           <FormField label="Descrição">
-            <input value={formLoc.descricao} onChange={e=>setFormLoc(f=>({...f,descricao:e.target.value}))}
-              className={inpSm} placeholder="Localização adicional ou observações (opcional)"/>
+            <input value={formLoc.descricao} onChange={e=>setFormLoc(f=>({...f,descricao:e.target.value}))} className={inpSm} placeholder="Localização ou observações (opcional)"/>
           </FormField>
-
         </div>
       </SlidePanel>
-
     </div>
   )
 }
