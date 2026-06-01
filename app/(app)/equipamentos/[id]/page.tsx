@@ -231,6 +231,19 @@ export default function EquipamentoDetalhe() {
         .replace(/\s+/g, '-')
         .replace(/-+/g, '-')
     }
+    // Verificar limite de 10 destaques
+    if (siteData.destaque_home) {
+      const { count } = await supabase.from('produtos')
+        .select('id', { count: 'exact', head: true })
+        .eq('destaque_home', true)
+        .neq('id', Number(id))
+      if ((count ?? 0) >= 10) {
+        setErroSite('Limite atingido: o site suporta no máximo 10 equipamentos em destaque. Remova um destaque antes de adicionar outro.')
+        setSalvandoSite(false)
+        return
+      }
+    }
+
     const { error } = await supabase.from('produtos').update({
       publicado_site:  siteData.publicado_site,
       destaque_home:   siteData.destaque_home,
@@ -879,6 +892,9 @@ export default function EquipamentoDetalhe() {
               <div style={{ fontWeight:700, color:'var(--t-primary)', fontSize:'var(--fs-base)' }}>Destaque na Home</div>
               <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginTop:4 }}>
                 {siteData.destaque_home ? '⭐ Aparece nos destaques da home' : '○ Não aparece nos destaques'}
+              </div>
+              <div style={{ fontSize:'var(--fs-sm)', color:'rgba(255,255,255,0.3)', marginTop:4 }}>
+                Limite: 10 equipamentos em destaque
               </div>
             </div>
           </div>
