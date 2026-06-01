@@ -161,6 +161,7 @@ export default function ParametrosPage() {
       'contato_subtitulo','rodape_texto','prazo_resposta',
       'stat_equipamentos','stat_categorias','stat_prazo',
       'politica_privacidade',
+      'horario_seg_sex','horario_sabado','horario_domingo',
     ]
     for (const chave of chaves) {
       const valor = params[chave] ?? ''
@@ -971,6 +972,31 @@ export default function ParametrosPage() {
                     <input className={inpSm} value={getParam('prazo_resposta')}
                       onChange={e => setParam('prazo_resposta', e.target.value)}
                       placeholder="2 horas úteis" />
+                  </FormField>
+                </div>
+              </div>
+
+              {/* Horário de Funcionamento */}
+              <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
+                <div className="ds-section-title">🕐 Horário de Funcionamento</div>
+                <p style={{ color:'var(--t-muted)', fontSize:'var(--fs-sm)', margin:'8px 0 16px' }}>
+                  Exibido no rodapé do site. Deixe em branco os dias que não atende.
+                </p>
+                <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+                  <FormField label="Segunda a Sexta">
+                    <input className={inpSm} value={getParam('horario_seg_sex')}
+                      onChange={e => setParam('horario_seg_sex', e.target.value)}
+                      placeholder="Seg–Sex: 08h às 18h" />
+                  </FormField>
+                  <FormField label="Sábado">
+                    <input className={inpSm} value={getParam('horario_sabado')}
+                      onChange={e => setParam('horario_sabado', e.target.value)}
+                      placeholder="Sáb: 08h às 12h" />
+                  </FormField>
+                  <FormField label="Domingo (deixe vazio se não atende)">
+                    <input className={inpSm} value={getParam('horario_domingo')}
+                      onChange={e => setParam('horario_domingo', e.target.value)}
+                      placeholder="Dom: Fechado" />
                   </FormField>
                 </div>
               </div>
