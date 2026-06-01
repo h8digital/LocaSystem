@@ -162,6 +162,7 @@ export default function ParametrosPage() {
       'stat_equipamentos','stat_categorias','stat_prazo',
       'politica_privacidade',
       'horario_seg_sex','horario_sabado','horario_domingo',
+      'meta_titulo_home','meta_descricao_home',
     ]
     for (const chave of chaves) {
       const valor = params[chave] ?? ''
@@ -1002,13 +1003,29 @@ export default function ParametrosPage() {
               </div>
 
               {/* Salvar */}
-              {okSite && (
-                <div style={{ background:'rgba(52,211,153,0.1)', border:'1px solid rgba(52,211,153,0.3)',
-                  borderRadius:'var(--r-md)', padding:'10px 16px', fontSize:'var(--fs-md)', color:'#34d399' }}>
-                  ✅ Configurações do site salvas com sucesso!
+              {/* SEO — Meta Title e Meta Description */}
+              <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
+                <div className="ds-section-title">🔍 SEO — Página Inicial</div>
+                <p style={{ color:'var(--t-muted)', fontSize:'var(--fs-sm)', margin:'8px 0 16px' }}>
+                  Aparecem nos resultados do Google ao buscar pelo site.
+                </p>
+                <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+                  <FormField label={`Meta Title (${getParam('meta_titulo_home').length}/70 caracteres)`}>
+                    <input className={inpSm}
+                      value={getParam('meta_titulo_home')}
+                      onChange={e => setParam('meta_titulo_home', e.target.value.slice(0,70))}
+                      placeholder="Kanoff Soluções — Locação de Equipamentos em Sapucaia do Sul" />
+                  </FormField>
+                  <FormField label={`Meta Description (${getParam('meta_descricao_home').length}/160 caracteres)`}>
+                    <textarea className={inpSm} rows={3}
+                      value={getParam('meta_descricao_home')}
+                      onChange={e => setParam('meta_descricao_home', e.target.value.slice(0,160))}
+                      placeholder="Alugue andaimes, betoneiras e equipamentos para construção civil. Cotação online rápida."
+                      style={{ resize:'vertical' }} />
+                  </FormField>
                 </div>
-              )}
-              <div style={{ display:'flex', justifyContent:'flex-end' }}>
+              </div>
+
               {/* Política de Privacidade */}
               <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
                 <div className="ds-section-title">🔒 Política de Privacidade</div>
@@ -1022,11 +1039,16 @@ export default function ParametrosPage() {
                     placeholder="<h2>1. Informações que Coletamos</h2>&#10;<p>...</p>"
                     style={{ resize:'vertical', fontFamily:'monospace', fontSize:12 }} />
                 </FormField>
-                <p style={{ color:'var(--t-muted)', fontSize:11, marginTop:8 }}>
-                  💡 Clique em "Salvar Configurações do Site" abaixo para publicar as alterações.
-                </p>
               </div>
 
+              {/* Botão salvar + feedback */}
+              {okSite && (
+                <div style={{ background:'rgba(52,211,153,0.1)', border:'1px solid rgba(52,211,153,0.3)',
+                  borderRadius:'var(--r-md)', padding:'10px 16px', fontSize:'var(--fs-md)', color:'#34d399' }}>
+                  ✅ Configurações do site salvas com sucesso!
+                </div>
+              )}
+              <div style={{ display:'flex', justifyContent:'flex-end' }}>
                 <button onClick={salvarSite} disabled={salvandoSite}
                   style={{ padding:'10px 28px', borderRadius:'var(--r-md)', border:'none',
                     background: salvandoSite ? 'rgba(99,102,241,0.5)' : 'linear-gradient(135deg,#6366f1,#818cf8)',
