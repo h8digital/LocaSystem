@@ -160,6 +160,7 @@ export default function ParametrosPage() {
       'quem_somos_historia','quem_somos_missao','quem_somos_visao',
       'contato_subtitulo','rodape_texto','prazo_resposta',
       'stat_equipamentos','stat_categorias','stat_prazo',
+      'politica_privacidade',
     ]
     for (const chave of chaves) {
       const valor = params[chave] ?? ''
@@ -982,6 +983,24 @@ export default function ParametrosPage() {
                 </div>
               )}
               <div style={{ display:'flex', justifyContent:'flex-end' }}>
+              {/* Política de Privacidade */}
+              <div style={{ background:'rgba(255,255,255,0.03)', border:'1px solid var(--border)', borderRadius:'var(--r-lg)', padding:'20px 24px' }}>
+                <div className="ds-section-title">🔒 Política de Privacidade</div>
+                <p style={{ color:'var(--t-muted)', fontSize:'var(--fs-sm)', margin:'8px 0 16px' }}>
+                  Conteúdo exibido em <strong style={{color:'var(--t-base)'}}>kanoffsolucoes.com.br/politica-de-privacidade</strong>. Aceita HTML básico (h2, p, ul, li, strong).
+                </p>
+                <FormField label="Conteúdo (HTML)">
+                  <textarea className={inpSm} rows={20}
+                    value={getParam('politica_privacidade')}
+                    onChange={e => setParam('politica_privacidade', e.target.value)}
+                    placeholder="<h2>1. Informações que Coletamos</h2>&#10;<p>...</p>"
+                    style={{ resize:'vertical', fontFamily:'monospace', fontSize:12 }} />
+                </FormField>
+                <p style={{ color:'var(--t-muted)', fontSize:11, marginTop:8 }}>
+                  💡 Clique em "Salvar Configurações do Site" abaixo para publicar as alterações.
+                </p>
+              </div>
+
                 <button onClick={salvarSite} disabled={salvandoSite}
                   style={{ padding:'10px 28px', borderRadius:'var(--r-md)', border:'none',
                     background: salvandoSite ? 'rgba(99,102,241,0.5)' : 'linear-gradient(135deg,#6366f1,#818cf8)',
