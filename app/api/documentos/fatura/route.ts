@@ -112,6 +112,7 @@ export async function POST(req: NextRequest) {
 
     // ── Tags ──────────────────────────────────────────────────────────────────
     const tags: Record<string,string> = {
+      '{{empresa_logo_url}}':      p['empresa_logo_url'] ?? '',
       '{{empresa_nome}}':          p['empresa_nome'] ?? '',
       '{{empresa_cnpj}}':          p['empresa_cnpj'] ?? '',
       '{{empresa_telefone}}':      p['empresa_telefone'] ?? '',
