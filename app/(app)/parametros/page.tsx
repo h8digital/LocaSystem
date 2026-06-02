@@ -112,7 +112,6 @@ export default function ParametrosPage() {
   const [categorias,  setCategorias]  = useState<any[]>([])
   const [tiposEnd,    setTiposEnd]    = useState<any[]>([])
   const [locais,      setLocais]      = useState<any[]>([])
-  const [tabelas,     setTabelas]     = useState<any[]>([])
   const [saving,      setSaving]      = useState(false)
   const [savingSite,  setSavingSite]  = useState(false)
   const [okSite,      setOkSite]      = useState(false)
@@ -120,8 +119,6 @@ export default function ParametrosPage() {
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [uploadingHero, setUploadingHero] = useState(false)
   const [erroLogo,    setErroLogo]    = useState('')
-  const [formTabela,  setFormTabela]  = useState({ nome:'', descricao:'', padrao:false })
-  const [salvandoTab, setSalvandoTab] = useState(false)
 
   // Navegação — seção principal e sub-aba do Site
   const [secao, setSecao]   = useState('empresa')
@@ -160,7 +157,6 @@ export default function ParametrosPage() {
     const { data: siteConf } = await supabase.from('site_config').select('chave,valor')
     ;(siteConf ?? []).forEach((r:any) => { map[r.chave] = r.valor ?? '' })
     setParams(map); setPeriodos(per??[]); setCategorias(cat??[]); setTiposEnd(te??[]); setLocais(lo??[])
-    fetch('/api/tabelas-preco').then(r=>r.json()).then(d=>{ if(d.ok) setTabelas(d.data) })
   }
 
   const getP = (k: string) => params[k] ?? ''
@@ -358,8 +354,7 @@ export default function ParametrosPage() {
             <NavItem id="categorias" active={secao==='categorias'} icon="🏷️"  label="Categorias"        onClick={()=>setSecao('categorias')} />
             <NavItem id="enderecos"  active={secao==='enderecos'}  icon="📍" label="Tipos de Endereço"  onClick={()=>setSecao('enderecos')} />
             <NavItem id="locais"     active={secao==='locais'}     icon="🏭" label="Locais de Estoque"  onClick={()=>setSecao('locais')} />
-            <NavItem id="tabelas"    active={secao==='tabelas'}    icon="📊" label="Tabelas de Preço"   onClick={()=>setSecao('tabelas')} />
-          </NavGroup>
+                  </NavGroup>
         </div>
 
         {/* ── Conteúdo ───────────────────────────────────────────────── */}
@@ -629,78 +624,6 @@ export default function ParametrosPage() {
                     </div>
                   </Section>
 
-                  <Section title="Tabelas de Preço">
-                    <div style={{ display:'flex', gap:10, alignItems:'flex-end', flexWrap:'wrap', marginBottom:16,
-                      background:'var(--bg-header)', border:'1px solid var(--border)', borderRadius:'var(--r-md)', padding:16 }}>
-                      <FormField label="Nome da tabela *" style={{ flex:'2 1 160px' }}>
-                        <input className={inpSm} value={formTabela.nome}
-                          onChange={e=>setFormTabela(f=>({...f,nome:e.target.value}))} placeholder="Ex: Grandes Construtoras" />
-                      </FormField>
-                      <FormField label="Descrição" style={{ flex:'3 1 200px' }}>
-                        <input className={inpSm} value={formTabela.descricao}
-                          onChange={e=>setFormTabela(f=>({...f,descricao:e.target.value}))} placeholder="Uso interno" />
-                      </FormField>
-                      <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontSize:'var(--fs-md)', paddingBottom:2 }}>
-                        <input type="checkbox" checked={formTabela.padrao}
-                          onChange={e=>setFormTabela(f=>({...f,padrao:e.target.checked}))}
-                          style={{ accentColor:'var(--c-primary)' }} />
-                        Padrão
-                      </label>
-                      <Btn size="sm" loading={salvandoTab} onClick={async()=>{
-                        if (!formTabela.nome.trim()) return; setSalvandoTab(true)
-                        const res=await fetch('/api/tabelas-preco',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(formTabela)})
-                        const data=await res.json()
-                        if(data.ok){setTabelas((p:any[])=>[...p,data.data]);setFormTabela({nome:'',descricao:'',padrao:false})}
-                        setSalvandoTab(false)
-                      }}>+ Criar</Btn>
-                    </div>
-                    {tabelas.length===0
-                      ? <div style={{ textAlign:'center', padding:24, color:'var(--t-muted)', fontSize:'var(--fs-md)' }}>Nenhuma tabela cadastrada.</div>
-                      : <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-                          {tabelas.map((t:any)=>(
-                            <div key={t.id} style={{ border:'1px solid var(--border)', borderRadius:'var(--r-md)', padding:'12px 16px',
-                              display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-                              <div>
-                                <div style={{ fontWeight:700, fontSize:'var(--fs-base)', display:'flex', alignItems:'center', gap:8 }}>
-                                  {t.nome}
-                                  {t.padrao && <span style={{ fontSize:'var(--fs-xs)', background:'var(--c-primary)', color:'#fff', padding:'2px 8px', borderRadius:'var(--r-sm)', fontWeight:700 }}>PADRÃO</span>}
-                                </div>
-                                {t.descricao && <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)', marginTop:2 }}>{t.descricao}</div>}
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                    }
-                  </Section>
-                </div>
-              )}
-
-              {/* SUB: HERO */}
-              {subSite === 'hero' && (
-                <div style={{ display:'flex', flexDirection:'column', gap:28 }}>
-                  <Section title="Textos do Hero">
-                    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-                      <FormField label="Título principal">
-                        <input className={inpSm} value={getP('hero_titulo')}
-                          onChange={e=>setP('hero_titulo',e.target.value)} placeholder="EQUIPAMENTOS PRONTOS PARA SUA OBRA" />
-                      </FormField>
-                      <FormField label="Subtítulo">
-                        <textarea className={inpSm} rows={3} value={getP('hero_subtitulo')}
-                          onChange={e=>setP('hero_subtitulo',e.target.value)}
-                          placeholder="Descrição abaixo do título..." style={{ resize:'vertical' }} />
-                      </FormField>
-                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
-                        <FormField label="Botão principal">
-                          <input className={inpSm} value={getP('hero_cta_texto')}
-                            onChange={e=>setP('hero_cta_texto',e.target.value)} placeholder="Ver Equipamentos" />
-                        </FormField>
-                        <FormField label="Botão WhatsApp">
-                          <input className={inpSm} value={getP('hero_cta2_texto')}
-                            onChange={e=>setP('hero_cta2_texto',e.target.value)} placeholder="Falar no WhatsApp" />
-                        </FormField>
-                      </div>
-                    </div>
-                  </Section>
 
                   <Section title="Imagem de Fundo (Background)" hint="Deixe vazio para usar as partículas animadas. Recomendado: 1920×1080px, JPG ou WebP.">
                     {getP('hero_bg_url') && (

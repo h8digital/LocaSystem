@@ -1,24 +1,79 @@
-// build: 2026-05-29 18:10:30
+// build: 2026-06-02
 'use client'
 import Notificacoes from '@/components/ui/Notificacoes'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 
-const nav = [
-  { href:'/dashboard',               icon:'⊞',  label:'Dashboard',              section:'PRINCIPAL' },
-  { href:'/cotacoes',                icon:'📋', label:'Cotações',               section:'COMERCIAL' },
-  { href:'/contratos',               icon:'📄', label:'Contratos',              section:null },
-  { href:'/financeiro',              icon:'💰', label:'Financeiro',             section:null },
-  { href:'/clientes',                icon:'👥', label:'Clientes',               section:null },
-  { href:'/equipamentos',            icon:'🔧', label:'Equipamentos',           section:'ESTOQUE' },
-  { href:'/manutencoes',             icon:'🔩', label:'Manutenções',            section:null },
-  { href:'/relatorios',              icon:'📊', label:'Relatórios',             section:'RELATÓRIOS' },
-  { href:'/relatorios/equipamentos', icon:'📦', label:'Catálogo de Equipamentos', section:null },
-  { href:'/templates',               icon:'📋', label:'Templates',              section:'DOCUMENTOS' },
-  { href:'/usuarios',                icon:'👤', label:'Usuários',               section:'SISTEMA' },
-  { href:'/parametros',              icon:'⚙️', label:'Parâmetros',             section:null },
-  { href:'/system/logs', icon:'🪵', label:'Logs do Sistema', section:null },
+// Seções com seus itens — separação clara entre módulos operacionais e sistema
+const NAV: { section: string; items: { href: string; icon: string; label: string }[] }[] = [
+  {
+    section: 'Principal',
+    items: [
+      { href: '/dashboard',   icon: '⊞',  label: 'Dashboard'   },
+    ],
+  },
+  {
+    section: 'Comercial',
+    items: [
+      { href: '/cotacoes',    icon: '📋', label: 'Cotações'    },
+      { href: '/contratos',   icon: '📄', label: 'Contratos'   },
+      { href: '/clientes',    icon: '👥', label: 'Clientes'    },
+      { href: '/financeiro',  icon: '💰', label: 'Financeiro'  },
+    ],
+  },
+  {
+    section: 'Estoque',
+    items: [
+      { href: '/equipamentos',  icon: '🔧', label: 'Equipamentos' },
+      { href: '/manutencoes',   icon: '🔩', label: 'Manutenções'  },
+    ],
+  },
+  {
+    section: 'Documentos',
+    items: [
+      { href: '/relatorios',              icon: '📊', label: 'Relatórios'         },
+      { href: '/relatorios/equipamentos', icon: '📦', label: 'Catálogo'           },
+      { href: '/templates',               icon: '🖨️', label: 'Templates de Doc'   },
+    ],
+  },
+  {
+    section: 'Sistema',
+    items: [
+      { href: '/usuarios',    icon: '👤', label: 'Usuários'    },
+      { href: '/parametros',  icon: '⚙️', label: 'Parâmetros'  },
+    ],
+  },
 ]
+
+function NavSection({ section, items, pathname }: {
+  section: string
+  items: { href: string; icon: string; label: string }[]
+  pathname: string
+}) {
+  return (
+    <div>
+      <div className="ds-nav-section">{section}</div>
+      {items.map(item => {
+        const isExact      = pathname === item.href
+        const hasExactChild = NAV.flatMap(s => s.items).some(
+          o => o.href === pathname && o.href !== item.href
+        )
+        const isActive = isExact || (
+          item.href !== '/dashboard' &&
+          pathname.startsWith(item.href + '/') &&
+          !hasExactChild
+        )
+        return (
+          <Link key={item.href} href={item.href}
+            className={`ds-nav-item${isActive ? ' active' : ''}`}>
+            <span className="ds-nav-icon">{item.icon}</span>
+            <span>{item.label}</span>
+          </Link>
+        )
+      })}
+    </div>
+  )
+}
 
 export default function Sidebar({ user }: { user: any }) {
   const pathname = usePathname()
@@ -35,19 +90,14 @@ export default function Sidebar({ user }: { user: any }) {
       <div style={{
         padding: '16px 18px',
         borderBottom: '1px solid rgba(255,255,255,0.07)',
-        display: 'flex',
-        alignItems: 'center',
-        gap: 10,
-        flexShrink: 0,
+        display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0,
       }}>
         <div style={{
-          width: 30, height: 30,
-          borderRadius: 8,
+          width: 30, height: 30, borderRadius: 8,
           background: 'linear-gradient(135deg,#6366f1,#818cf8)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           fontSize: 15, fontWeight: 700, color: '#fff',
-          boxShadow: '0 0 12px rgba(99,102,241,0.5)',
-          flexShrink: 0,
+          boxShadow: '0 0 12px rgba(99,102,241,0.5)', flexShrink: 0,
         }}>L</div>
         <div>
           <div style={{ color: '#fff', fontWeight: 600, fontSize: 14, letterSpacing: '-0.01em', lineHeight: 1.2 }}>
@@ -61,63 +111,30 @@ export default function Sidebar({ user }: { user: any }) {
 
       {/* Navegação */}
       <nav style={{ flex: 1, overflowY: 'auto', padding: '8px 0' }}>
-        {nav.map((item) => {
-          // Um item é ativo se:
-          // 1. O pathname é exatamente igual ao href, OU
-          // 2. O pathname começa com href+'/' E não existe outro item no nav
-          //    cujo href é exatamente igual ao pathname (para evitar pai+filho ativos juntos)
-          const isExactMatch  = pathname === item.href
-          const hasExactChild = nav.some(other => other.href === pathname && other.href !== item.href)
-          const isActive = isExactMatch ||
-            (item.href !== '/dashboard' &&
-             pathname.startsWith(item.href + '/') &&
-             !hasExactChild)
-
-          return (
-            <div key={item.href}>
-              {item.section && (
-                <div className="ds-nav-section">{item.section}</div>
-              )}
-              <Link
-                href={item.href}
-                className={`ds-nav-item${isActive ? ' active' : ''}`}
-              >
-                <span className="ds-nav-icon">{item.icon}</span>
-                <span>{item.label}</span>
-              </Link>
-            </div>
-          )
-        })}
+        {NAV.map(s => (
+          <NavSection key={s.section} section={s.section} items={s.items} pathname={pathname} />
+        ))}
       </nav>
 
-      {/* Footer do sidebar: usuário + notificações + logout */}
+      {/* Footer: notificações + usuário + logout */}
       <div style={{
         padding: '10px 14px',
         borderTop: '1px solid rgba(255,255,255,0.07)',
-        display: 'flex',
-        flexDirection: 'column',
-        gap: 8,
-        flexShrink: 0,
+        display: 'flex', flexDirection: 'column', gap: 8, flexShrink: 0,
       }}>
         <Notificacoes />
 
-        {/* Info do usuário */}
         <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: 8,
-          padding: '8px 10px',
-          borderRadius: 8,
+          display: 'flex', alignItems: 'center', gap: 8,
+          padding: '8px 10px', borderRadius: 8,
           background: 'rgba(255,255,255,0.04)',
           border: '1px solid rgba(255,255,255,0.07)',
         }}>
           <div style={{
-            width: 28, height: 28,
-            borderRadius: '50%',
+            width: 28, height: 28, borderRadius: '50%',
             background: 'linear-gradient(135deg,#6366f1,#a78bfa)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 11, fontWeight: 700, color: '#fff',
-            flexShrink: 0,
+            fontSize: 11, fontWeight: 700, color: '#fff', flexShrink: 0,
           }}>
             {user?.nome?.charAt(0)?.toUpperCase() ?? 'U'}
           </div>
@@ -131,20 +148,10 @@ export default function Sidebar({ user }: { user: any }) {
               </div>
             )}
           </div>
-          <button
-            onClick={logout}
-            title="Sair"
-            style={{
-              background: 'none', border: 'none',
-              color: 'rgba(255,255,255,0.25)',
-              cursor: 'pointer', fontSize: 15,
-              padding: '2px 4px',
-              borderRadius: 4,
-              transition: 'color 0.15s',
-            }}
+          <button onClick={logout} title="Sair"
+            style={{ background: 'none', border: 'none', color: 'rgba(255,255,255,0.25)', cursor: 'pointer', fontSize: 15, padding: '2px 4px', borderRadius: 4, transition: 'color 0.15s' }}
             onMouseEnter={e => (e.currentTarget.style.color = '#f87171')}
-            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.25)')}
-          >
+            onMouseLeave={e => (e.currentTarget.style.color = 'rgba(255,255,255,0.25)')}>
             ⏻
           </button>
         </div>
