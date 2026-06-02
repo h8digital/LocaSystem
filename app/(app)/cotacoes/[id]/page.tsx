@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase, fmt } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
 import { Btn, FormField, inputCls, selectCls, textareaCls } from '@/components/ui'
+import { linkCotacao } from '@/lib/site'
 
 // ── Status ────────────────────────────────────────────────────────────────────
 const STATUS_MAP: Record<string, { label: string; cls: string; cor: string }> = {
@@ -158,7 +159,7 @@ export default function CotacaoDetalhePage() {
     }).eq('id', cot.id)
 
     // Montar link e abrir WhatsApp
-    const link     = `${window.location.origin}/minha-cotacao/${token}`
+    const link     = linkCotacao(token)
     const celular  = cot.clientes?.celular || cot.clientes?.telefone || ''
     const numero   = celular.replace(/\D/g, '')
     const fone     = numero.startsWith('55') ? numero : `55${numero}`
@@ -172,7 +173,7 @@ export default function CotacaoDetalhePage() {
   // ── Copiar link ───────────────────────────────────────────────────────────
   async function copiarLink() {
     if (!cot.token_aprovacao) { alert('Envie para o cliente primeiro para gerar o link.'); return }
-    const link = `${window.location.origin}/minha-cotacao/${cot.token_aprovacao}`
+    const link = linkCotacao(cot.token_aprovacao)
     await navigator.clipboard.writeText(link)
     setCopiado(true)
     setTimeout(() => setCopiado(false), 2500)
