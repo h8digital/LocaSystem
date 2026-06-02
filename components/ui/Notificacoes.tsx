@@ -98,7 +98,7 @@ export default function Notificacoes() {
         onClick={() => { setOpen(o => !o); if (!open) load() }}
         title="Notificações"
         style={{
-          position: 'relative', background: 'none', border: 'none', cursor: 'pointer',
+          position: 'relative', border: 'none', cursor: 'pointer',
           width: 36, height: 36, borderRadius: 8,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           color: open ? '#a5b4fc' : 'var(--t-secondary)',
