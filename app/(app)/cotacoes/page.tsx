@@ -9,6 +9,7 @@ import type { AcaoSecundaria } from '@/components/ui/ActionButtons'
 // ── Status ────────────────────────────────────────────────────────────────────
 const STATUS_MAP: Record<string, { label:string; cls:string; accent:string }> = {
   rascunho:   { label:'Rascunho',   cls:'ds-badge ds-badge-gray',   accent:'#94a3b8' },
+  em_analise: { label:'Em Análise', cls:'ds-badge ds-badge-yellow', accent:'#fbbf24' },
   aguardando: { label:'Aguardando', cls:'ds-badge ds-badge-yellow', accent:'#fbbf24' },
   aprovada:   { label:'Aprovada',   cls:'ds-badge ds-badge-green',  accent:'#34d399' },
   recusada:   { label:'Recusada',   cls:'ds-badge ds-badge-red',    accent:'#f87171' },
@@ -80,7 +81,7 @@ export default function CotacoesPage() {
     const lt = todas ?? []
     setKpis({
       total:          lt.length,
-      rascunho:       lt.filter(c => c.status === 'rascunho').length,
+      rascunho:       lt.filter(c => ['rascunho','em_analise'].includes(c.status)).length,
       aguardando:     lt.filter(c => c.status === 'aguardando').length,
       aprovadas:      lt.filter(c => c.status === 'aprovada').length,
       recusadas:      lt.filter(c => c.status === 'recusada').length,
@@ -90,7 +91,7 @@ export default function CotacoesPage() {
       valor_aprovado: lt.filter(c => c.status === 'aprovada').reduce((s,c) => s + Number(c.total ?? 0), 0),
       valor_aguardando: lt.filter(c => c.status === 'aguardando').reduce((s,c) => s + Number(c.total ?? 0), 0),
     })
-    setNovasSite(lt.filter((cotItem: any) => cotItem.origem === 'site' && cotItem.status === 'aguardando').length)
+    setNovasSite(lt.filter((cotItem: any) => cotItem.origem === 'site' && ['em_analise','aguardando'].includes(cotItem.status)).length)
 
     // Tabela — com filtros
     let q = supabase.from('cotacoes')

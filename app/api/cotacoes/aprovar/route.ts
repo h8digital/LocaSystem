@@ -142,6 +142,28 @@ export async function POST(req: NextRequest) {
       motivo_recusa:        motivo || null,
     })
 
+
+    // ── Notificar admins e vendedores sobre a resposta ────────────────────────
+    try {
+      const { data: usuarios } = await supabase.from('usuarios')
+        .select('id').in('perfil', ['admin','gerente','vendedor']).eq('ativo', 1)
+      if (usuarios?.length) {
+        const emoji    = novoStatus === 'aprovada' ? '✅' : '❌'
+        const acao_str = novoStatus === 'aprovada' ? 'APROVOU' : 'RECUSOU'
+        await supabase.from('notificacoes').insert(
+          usuarios.map((u: any) => ({
+            usuario_id:      u.id,
+            tipo:            novoStatus === 'aprovada' ? 'cotacao_aprovada' : 'cotacao_reprovada',
+            titulo:          `${emoji} ${nomeLog ?? 'Cliente'} ${acao_str} a cotação`,
+            mensagem:        motivo ? `Motivo: ${motivo}` : `Cotação do cliente ${nomeLog ?? ''} foi ${novoStatus === 'aprovada' ? 'aprovada' : 'recusada'}.`,
+            referencia_tipo: 'cotacao',
+            referencia_id:   cot.id,
+            lida:            false,
+          }))
+        )
+      }
+    } catch {}
+
     return NextResponse.json({ ok: true, status: novoStatus })
   } catch (e: any) {
     return NextResponse.json({ error: e.message }, { status: 500 })
