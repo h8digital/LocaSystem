@@ -99,7 +99,7 @@ export default function Notificacoes() {
         title="Notificações"
         style={{
           width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-          padding: '8px 10px', borderRadius: 8, border: 'none', cursor: 'pointer',
+          padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
           background: open ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
           border: open ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(255,255,255,0.07)',
           color: open ? '#a5b4fc' : 'rgba(255,255,255,0.6)',
