@@ -16,6 +16,7 @@ const TIPO_ICON: Record<string, string> = {
   manutencao:        '🔧',
   pagamento:         '💰',
   sistema:           'ℹ️',
+  cotacao_site:      '🌐',
 }
 
 function tempoRelativo(dt: string) {
@@ -86,8 +87,8 @@ export default function Notificacoes() {
   function navegar(n: Notif) {
     marcarLida(n.id)
     setOpen(false)
-    if (n.referencia_tipo === 'cotacao'   && n.referencia_id) router.push(`/cotacoes/${n.referencia_id}`)
-    if (n.referencia_tipo === 'contrato'  && n.referencia_id) router.push(`/contratos/${n.referencia_id}`)
+    if (n.referencia_tipo === 'cotacao'  && n.referencia_id) router.push(`/cotacoes/${n.referencia_id}`)
+    else if (n.referencia_tipo === 'contrato' && n.referencia_id) router.push(`/contratos/${n.referencia_id}`)
   }
 
   return (
