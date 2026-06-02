@@ -155,7 +155,7 @@ export default function Topbar({ user }: Props) {
               top: 'calc(100% + 8px)',
               right: 0,
               width: 220,
-              background: 'var(--bg-card)',
+              background: '#1e293b',
               border: '1px solid var(--border)',
               borderRadius: 'var(--r-lg)',
               boxShadow: '0 8px 24px rgba(0,0,0,0.4)',
@@ -167,7 +167,7 @@ export default function Topbar({ user }: Props) {
               <div style={{
                 padding: '12px 14px',
                 borderBottom: '1px solid var(--border)',
-                background: 'rgba(99,102,241,0.06)',
+                background: 'rgba(99,102,241,0.1)',
               }}>
                 <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--t-primary)' }}>
                   {user?.nome ?? 'Usuário'}

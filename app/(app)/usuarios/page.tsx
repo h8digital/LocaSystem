@@ -178,8 +178,9 @@ export default function UsuariosPage() {
 
       <Filters
         fields={[
-          { type:'text',   key:'busca',  placeholder:'Buscar por nome ou e-mail...', width:'280px' },
+          { type:'text',   key:'busca',  placeholder:'Buscar por nome ou e-mail...', flex:'1' },
           { type:'select', key:'perfil', placeholder:'Todos os perfis',
+            width:'180px',
             options: PERFIS.map(p => ({ value: p.value, label: p.label })) },
         ]}
         values={filters}

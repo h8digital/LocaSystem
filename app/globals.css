@@ -811,3 +811,33 @@ input[type="datetime-local"] {
 /* v-20260515141101 — LocaSystem rebuild */
 
 /* build: 20260525183104 */
+
+/* ── Filtros (barra de busca + selects) ────────────────────────────── */
+.filter-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+.filter-row > * {
+  flex-shrink: 0;
+}
+.btn-clear-filter {
+  padding: 0 12px;
+  height: 32px;
+  border-radius: var(--r-md);
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--t-muted);
+  font-size: var(--fs-sm);
+  font-family: var(--font);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.15s;
+}
+.btn-clear-filter:hover {
+  background: rgba(248,113,113,0.1);
+  border-color: rgba(248,113,113,0.4);
+  color: #f87171;
+}

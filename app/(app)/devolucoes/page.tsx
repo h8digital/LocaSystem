@@ -93,7 +93,7 @@ export default function DevolucoesPage() {
 
       <Filters
         fields={[
-          { type:'text', key:'busca', placeholder:'Buscar por contrato...', width:'260px' },
+          { type:'text', key:'busca', placeholder:'Buscar por contrato...', flex:'1' },
           { type:'select', key:'status', placeholder:'Todos os status', options:[
             { value:'completa',    label:'Completa' },
             { value:'parcial',     label:'Parcial' },
