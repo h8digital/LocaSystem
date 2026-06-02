@@ -61,8 +61,8 @@ export default function CotacaoDetalhePage() {
   async function load() {
     const [{ data: cotData }, { data: logsData }, { data: perData }] = await Promise.all([
       supabase.from('cotacoes')
-        .select('*, clientes(id,nome,cpf_cnpj,email,celular,telefone,cidade,spc_consultado_em,spc_status), usuarios(nome), periodos_locacao(nome,dias), cotacao_itens(*, produtos(nome,unidade,codigo,produto_fotos(url,principal)))')
-        .eq('id', params.id).single(),
+        .select('*, clientes(id,nome,cpf_cnpj,email,celular,telefone,cidade), usuarios(nome), periodos_locacao(nome,dias), cotacao_itens(*, produtos(nome,unidade,codigo,produto_fotos(url,principal)))')
+        .eq('id', params.id).maybeSingle(),
       supabase.from('cotacao_logs')
         .select('*').eq('cotacao_id', params.id).order('created_at', { ascending: false }),
       supabase.from('periodos_locacao').select('*').eq('ativo', 1).order('dias'),
@@ -637,18 +637,7 @@ export default function CotacaoDetalhePage() {
           <div style={{ background:'var(--bg-card)', border:'1px solid var(--border)', borderRadius:'var(--r-md)', padding:16 }}>
             <div style={{ fontWeight:700, marginBottom:14, color:'var(--t-primary)' }}>🔍 Situação de Crédito</div>
             <div style={{ fontSize:'var(--fs-md)', color:'var(--t-muted)', lineHeight:1.7 }}>
-              {cot.clientes?.spc_consultado_em ? (
-                <>
-                  <div>Última consulta: <strong style={{ color:'var(--t-primary)' }}>{fmt.date(cot.clientes.spc_consultado_em)}</strong></div>
-                  <div style={{ marginTop:8 }}>
-                    Status: <span style={{ fontWeight:700, color: cot.clientes.spc_status === 'ok' ? '#34d399' : '#f87171' }}>
-                      {cot.clientes.spc_status === 'ok' ? '✅ Sem restrições' : '⚠️ Com restrições'}
-                    </span>
-                  </div>
-                </>
-              ) : (
-                <div style={{ color:'var(--t-muted)' }}>Nenhuma consulta de crédito registrada.</div>
-              )}
+              Nenhuma consulta de crédito integrada. Use o campo abaixo para registrar manualmente.
             </div>
             <div style={{ marginTop:16 }}>
               <div style={{ fontSize:'var(--fs-sm)', fontWeight:700, color:'var(--t-muted)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>Obs. Internas</div>
