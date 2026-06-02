@@ -1,7 +1,8 @@
-// build: 2026-05-29 18:10:30
+// build: 2026-06-02
 import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import Sidebar from '@/components/Sidebar'
+import Topbar from '@/components/Topbar'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const cookieStore = await cookies()
@@ -10,10 +11,11 @@ export default async function AppLayout({ children }: { children: React.ReactNod
   const user = JSON.parse(userCookie.value)
 
   return (
-    <div style={{ display:'flex', minHeight:'100vh', background:'var(--bg)' }}>
-      <Sidebar user={user} />
-      <div style={{ flex:1, display:'flex', flexDirection:'column', minWidth:0, overflow:'hidden' }}>
-        <main style={{ flex:1, overflowY:'auto', padding:'20px 24px' }}>
+    <div style={{ display: 'flex', minHeight: '100vh', background: 'var(--bg)' }}>
+      <Sidebar />
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minWidth: 0, overflow: 'hidden' }}>
+        <Topbar user={user} />
+        <main style={{ flex: 1, overflowY: 'auto', padding: '20px 24px' }}>
           {children}
         </main>
       </div>

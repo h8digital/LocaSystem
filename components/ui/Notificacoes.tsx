@@ -98,26 +98,26 @@ export default function Notificacoes() {
         onClick={() => { setOpen(o => !o); if (!open) load() }}
         title="Notificações"
         style={{
-          width: '100%', display: 'flex', alignItems: 'center', gap: 8,
-          padding: '8px 10px', borderRadius: 8, cursor: 'pointer',
-          background: open ? 'rgba(99,102,241,0.15)' : 'rgba(255,255,255,0.04)',
-          border: open ? '1px solid rgba(99,102,241,0.4)' : '1px solid rgba(255,255,255,0.07)',
-          color: open ? '#a5b4fc' : 'rgba(255,255,255,0.6)',
-          transition: 'all 0.15s', position: 'relative',
+          position: 'relative', background: 'none', border: 'none', cursor: 'pointer',
+          width: 36, height: 36, borderRadius: 8,
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          color: open ? '#a5b4fc' : 'var(--t-secondary)',
+          background: open ? 'rgba(99,102,241,0.12)' : 'transparent',
+          transition: 'all 0.15s',
         }}
-        onMouseEnter={e => { if (!open) { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.08)'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.9)' }}}
-        onMouseLeave={e => { if (!open) { (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.04)'; (e.currentTarget as HTMLElement).style.color = 'rgba(255,255,255,0.6)' }}}
+        onMouseEnter={e => { if (!open) (e.currentTarget as HTMLElement).style.background = 'rgba(255,255,255,0.06)' }}
+        onMouseLeave={e => { if (!open) (e.currentTarget as HTMLElement).style.background = 'transparent' }}
       >
-        <svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0 }}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/>
           <path d="M13.73 21a2 2 0 0 1-3.46 0"/>
         </svg>
-        <span style={{ fontSize: 12, fontWeight: 500, flex: 1, textAlign: 'left' }}>Notificações</span>
         {naoLidas > 0 && (
           <span style={{
+            position: 'absolute', top: 4, right: 4,
             background: '#ef4444', color: '#fff', borderRadius: 999,
-            minWidth: 18, height: 18, paddingInline: 4,
-            fontSize: 10, fontWeight: 800,
+            minWidth: 16, height: 16, paddingInline: 3,
+            fontSize: 9, fontWeight: 800,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
           }}>
             {naoLidas > 9 ? '9+' : naoLidas}
@@ -129,8 +129,8 @@ export default function Notificacoes() {
       {open && (
         <div style={{
           position: 'absolute',
-          bottom: 'calc(100% + 8px)',
-          left: 0, right: 0,
+          top: 'calc(100% + 8px)',
+          right: 0,
           width: 320,
           zIndex: 9999,
           background: 'var(--bg-card)',
