@@ -1,7 +1,6 @@
-// build: 2026-05-29 18:10:30
+// build: 2026-06-04 — dropdown sem portal (position:absolute estável em qualquer resolução)
 'use client'
-import { useState, useRef, useEffect, useCallback } from 'react'
-import { createPortal } from 'react-dom'
+import { useState, useRef, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
 import SlidePanel from './SlidePanel'
 
@@ -17,60 +16,28 @@ interface LookupFieldProps {
   disabled?:boolean; error?:string; hint?:string; className?:string
 }
 
-// ─── Posição calculada para o dropdown ───────────────────────────────────────
-interface DropPos { top:number; left:number; width:number; above:boolean }
-
 export default function LookupField({
   label, required, placeholder='Pesquisar...', value, displayValue,
   onChange, table, searchColumn, displayColumn, extraColumns, filter={}, orderBy,
   renderOption, createPanel, createPanelTitle, createPanelWidth,
   disabled, error, hint, className=''
 }: LookupFieldProps) {
-  const [query,    setQuery]    = useState('')
-  const [results,  setResults]  = useState<any[]>([])
-  const [open,     setOpen]     = useState(false)
-  const [loading,  setLoading]  = useState(false)
-  const [panelOpen,setPanelOpen]= useState(false)
-  const [focused,  setFocused]  = useState(false)
-  const [dropPos,  setDropPos]  = useState<DropPos|null>(null)
-  const [isMounted, setIsMounted] = useState(false)
+  const [query,     setQuery]     = useState('')
+  const [results,   setResults]   = useState<any[]>([])
+  const [open,      setOpen]      = useState(false)
+  const [loading,   setLoading]   = useState(false)
+  const [panelOpen, setPanelOpen] = useState(false)
+  const [focused,   setFocused]   = useState(false)
+  const [above,     setAbove]     = useState(false)
 
-  const inputRef   = useRef<HTMLInputElement>(null)
-  const wrapRef    = useRef<HTMLDivElement>(null)   // wraps the whole field
-  const dropRef    = useRef<HTMLDivElement>(null)   // the dropdown itself
-  const display    = displayColumn || searchColumn
+  const inputRef = useRef<HTMLInputElement>(null)
+  const wrapRef  = useRef<HTMLDivElement>(null)
+  const display  = displayColumn || searchColumn
 
-  // ── Calcular posição fixed do dropdown ──────────────────────────────────
-  const calcPos = useCallback(() => {
-    if (!wrapRef.current) return
-    const rect = wrapRef.current.getBoundingClientRect()
-    const viewH = window.innerHeight
-    const dropH = 280  // max expected dropdown height
-    const spaceBelow = viewH - rect.bottom
-    const spaceAbove = rect.top
-
-    // Preferir abaixo. Só abre acima se não couber abaixo E couber acima
-    const above = spaceBelow < dropH && spaceAbove > spaceBelow
-
-    setDropPos({
-      top:   above ? Math.max(4, rect.top - Math.min(dropH, spaceAbove) - 4) : rect.bottom + 2,
-      left:  rect.left,
-      width: rect.width,
-      above,
-    })
-  }, [])
-
-  // ── Marcar montagem no cliente (SSR-safe para portal) ──────────────────
-  useEffect(() => { setIsMounted(true) }, [])
-
-  // ── Fechar ao clicar fora ────────────────────────────────────────────────
+  // Fechar ao clicar fora
   useEffect(() => {
     function h(e: MouseEvent) {
-      const t = e.target as Node
-      if (
-        wrapRef.current  && !wrapRef.current.contains(t) &&
-        dropRef.current  && !dropRef.current.contains(t)
-      ) {
+      if (wrapRef.current && !wrapRef.current.contains(e.target as Node)) {
         setOpen(false); setFocused(false)
       }
     }
@@ -78,28 +45,21 @@ export default function LookupField({
     return () => document.removeEventListener('mousedown', h)
   }, [])
 
-  // ── Recalcular posição ao rolar / redimensionar ─────────────────────────
-  useEffect(() => {
-    if (!open) return
-    calcPos()
-    // Captura scroll em qualquer ancestral (útil para containers com overflow:auto)
-    const scrollParent = wrapRef.current?.closest('[style*="overflow"]') ?? window
-    window.addEventListener('scroll',  calcPos, true)
-    window.addEventListener('resize',  calcPos)
-    scrollParent.addEventListener('scroll', calcPos, true)
-    return () => {
-      window.removeEventListener('scroll', calcPos, true)
-      window.removeEventListener('resize', calcPos)
-      scrollParent.removeEventListener('scroll', calcPos, true)
-    }
-  }, [open, calcPos])
-
-  // ── Fechar com ESC ───────────────────────────────────────────────────────
+  // Fechar com ESC
   useEffect(() => {
     const h = (e: KeyboardEvent) => { if (e.key === 'Escape') { setOpen(false); setFocused(false) } }
     document.addEventListener('keydown', h)
     return () => document.removeEventListener('keydown', h)
   }, [])
+
+  // Calcular se dropdown abre para cima ou baixo
+  function calcAbove() {
+    if (!wrapRef.current) return
+    const rect    = wrapRef.current.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom
+    const spaceAbove = rect.top
+    setAbove(spaceBelow < 240 && spaceAbove > spaceBelow)
+  }
 
   async function search(q: string) {
     setLoading(true)
@@ -115,17 +75,19 @@ export default function LookupField({
   }
 
   function openDropdown() {
-    calcPos()
+    calcAbove()
     setFocused(true)
     setOpen(true)
     if (!query && results.length === 0) search('')
   }
 
-  function handleFocus()  { openDropdown() }
+  function handleFocus() { openDropdown() }
   function handleInput(e: React.ChangeEvent<HTMLInputElement>) {
-    setQuery(e.target.value); setOpen(true); calcPos(); search(e.target.value)
+    setQuery(e.target.value); setOpen(true); search(e.target.value)
   }
-  function handleSelect(row: any) { onChange(row.id, row); setQuery(''); setOpen(false); setFocused(false) }
+  function handleSelect(row: any) {
+    onChange(row.id, row); setQuery(''); setOpen(false); setFocused(false)
+  }
   function handleClear(e: React.MouseEvent) {
     e.stopPropagation(); onChange(null, null); setQuery('')
     setTimeout(() => inputRef.current?.focus(), 50)
@@ -142,7 +104,7 @@ export default function LookupField({
         </label>
       )}
 
-      {/* Campo de entrada */}
+      {/* Wrapper com position:relative para o dropdown absoluto */}
       <div ref={wrapRef} style={{ position:'relative' }}>
         <div
           className="ds-lookup"
@@ -198,62 +160,60 @@ export default function LookupField({
             </button>
           )}
         </div>
-      </div>
 
-      {/* Dropdown — renderizado via portal com position:fixed */}
-      {open && dropPos && isMounted && createPortal(
-        <div
-          ref={dropRef}
-          className="ds-dropdown"
-          style={{
-            position: 'fixed',
-            top:    dropPos.above ? 'auto' : dropPos.top,
-            bottom: dropPos.above ? `${window.innerHeight - dropPos.top}px` : 'auto',
-            left:   dropPos.left,
-            width:  dropPos.width,
-            zIndex: 99999,
-            maxHeight: dropPos.above
-              ? Math.min(280, dropPos.top - 8)
-              : Math.min(280, window.innerHeight - dropPos.top - 8),
-            overflowY: 'auto',
-          }}
-        >
-          {loading ? (
-            <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px',
-              color:'var(--t-muted)', fontSize:'var(--fs-sm)' }}>
-              <div className="ds-spinner" style={{ width:13, height:13 }}/>Buscando...
-            </div>
-          ) : results.length === 0 ? (
-            <div style={{ padding:'10px 14px', color:'var(--t-muted)', fontSize:'var(--fs-sm)' }}>
-              {query ? `Nenhum resultado para "${query}"` : 'Nenhum registro.'}
-              {createPanel && (
-                <button type="button"
-                  onClick={() => { setPanelOpen(true); setOpen(false) }}
-                  style={{ display:'block', marginTop:6, color:'var(--c-primary)', fontWeight:600,
-                    background:'none', border:'none', cursor:'pointer', fontSize:'var(--fs-sm)' }}>
-                  + Criar novo registro
-                </button>
-              )}
-            </div>
-          ) : (
-            <ul style={{ listStyle:'none', margin:0, padding:0 }}>
-              {results.map(row => (
-                <li key={row.id}>
+        {/* Dropdown — position:absolute, sem portal, sem fixed ─────────── */}
+        {open && (
+          <div
+            className="ds-dropdown"
+            style={{
+              position:  'absolute',
+              left:      0,
+              right:     0,
+              zIndex:    9999,
+              maxHeight: 260,
+              overflowY: 'auto',
+              // Abre para cima ou para baixo conforme espaço disponível
+              ...(above
+                ? { bottom: 'calc(100% + 4px)', top: 'auto' }
+                : { top:    'calc(100% + 4px)', bottom: 'auto' }),
+            }}
+          >
+            {loading ? (
+              <div style={{ display:'flex', alignItems:'center', gap:8, padding:'10px 14px',
+                color:'var(--t-muted)', fontSize:'var(--fs-sm)' }}>
+                <div className="ds-spinner" style={{ width:13, height:13 }}/>Buscando...
+              </div>
+            ) : results.length === 0 ? (
+              <div style={{ padding:'10px 14px', color:'var(--t-muted)', fontSize:'var(--fs-sm)' }}>
+                {query ? `Nenhum resultado para "${query}"` : 'Nenhum registro.'}
+                {createPanel && (
                   <button type="button"
-                    onClick={() => handleSelect(row)}
-                    className={`ds-dropdown-item ${row.id === value ? 'selected' : ''}`}>
-                    {row.id === value && (
-                      <span style={{ marginRight:6, color:'var(--c-primary)' }}>✓</span>
-                    )}
-                    {renderOption ? renderOption(row) : <span>{row[display]}</span>}
+                    onClick={() => { setPanelOpen(true); setOpen(false) }}
+                    style={{ display:'block', marginTop:6, color:'var(--c-primary)', fontWeight:600,
+                      background:'none', border:'none', cursor:'pointer', fontSize:'var(--fs-sm)' }}>
+                    + Criar novo registro
                   </button>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>,
-        document.body
-      )}
+                )}
+              </div>
+            ) : (
+              <ul style={{ listStyle:'none', margin:0, padding:0 }}>
+                {results.map(row => (
+                  <li key={row.id}>
+                    <button type="button"
+                      onClick={() => handleSelect(row)}
+                      className={`ds-dropdown-item ${row.id === value ? 'selected' : ''}`}>
+                      {row.id === value && (
+                        <span style={{ marginRight:6, color:'var(--c-primary)' }}>✓</span>
+                      )}
+                      {renderOption ? renderOption(row) : <span>{row[display]}</span>}
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
+      </div>
 
       {hint  && !error && <p className="ds-hint">{hint}</p>}
       {error && <p className="ds-error">{error}</p>}

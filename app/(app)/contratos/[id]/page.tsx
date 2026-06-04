@@ -82,7 +82,68 @@ export default function VerContratoPage() {
   const [salvandoEdicao, setSalvandoEdicao] = useState(false)
   const [erroEdicao, setErroEdicao] = useState('')
   const [formEdicao, setFormEdicao] = useState<any>({})
-  // ── Mini-modal: devolução rápida por item ─────────────────────────────────
+  // ── Renovação ──────────────────────────────────────────────
+  const [modalRenovar,    setModalRenovar]    = useState(false)
+  const [formRenovar,     setFormRenovar]     = useState<any>({})
+  const [renovando,       setRenovando]       = useState(false)
+  const [erroRenovar,     setErroRenovar]     = useState('')
+
+  async function abrirRenovar() {
+    const dataFimAtual = contrato.data_fim || new Date().toISOString().split('T')[0]
+    const novaDataFim  = new Date(dataFimAtual + 'T12:00:00')
+    const diasAtuais   = contrato.data_inicio && contrato.data_fim
+      ? Math.max(1, Math.ceil((new Date(contrato.data_fim+'T12:00:00').getTime()-new Date(contrato.data_inicio+'T12:00:00').getTime())/86400000))
+      : 30
+    novaDataFim.setDate(novaDataFim.getDate() + diasAtuais)
+    setFormRenovar({
+      nova_data_fim:      novaDataFim.toISOString().split('T')[0],
+      forma_pagamento:    contrato.forma_pagamento || 'pix',
+      quitar_pendentes:   true,
+    })
+    setErroRenovar('')
+    setModalRenovar(true)
+  }
+
+  async function confirmarRenovacao() {
+    if (!formRenovar.nova_data_fim) { setErroRenovar('Informe a nova data de fim.'); return }
+    if (formRenovar.nova_data_fim <= contrato.data_fim) { setErroRenovar('A nova data de fim deve ser após a data atual.'); return }
+    setRenovando(true); setErroRenovar('')
+    try {
+      // 1. Quitar faturas pendentes se marcado
+      if (formRenovar.quitar_pendentes) {
+        const pendentes = faturas.filter(f => !['pago','cancelada'].includes(f.status))
+        for (const f of pendentes) {
+          await supabase.from('faturas').update({
+            status:           'pago',
+            valor_pago:        Number(f.saldo_restante ?? f.valor),
+            valor_recebido:    Number(f.saldo_restante ?? f.valor),
+            saldo_restante:    0,
+            data_pagamento:    new Date().toISOString().split('T')[0],
+            forma_pagamento:   formRenovar.forma_pagamento,
+            observacoes:       'Quitado na renovação do contrato',
+          }).eq('id', f.id)
+        }
+      }
+      // 2. Atualizar data_fim do contrato
+      await supabase.from('contratos').update({
+        data_fim:        formRenovar.nova_data_fim,
+        data_devolucao_prevista: formRenovar.nova_data_fim,
+        updated_at:      new Date().toISOString(),
+      }).eq('id', id)
+      // 3. Registrar na timeline
+      await registrarTimeline('renovacao',
+        `Contrato renovado até ${fmt.date(formRenovar.nova_data_fim)}`,
+        { nova_data_fim: formRenovar.nova_data_fim, pendentes_quitados: formRenovar.quitar_pendentes }
+      )
+      setModalRenovar(false)
+      await load()
+    } catch (e: any) {
+      setErroRenovar('Erro: ' + e.message)
+    }
+    setRenovando(false)
+  }
+
+  // ── Devolução rápida por item ─────────────────────────────────────────────
   const [modalDevItem, setModalDevItem] = useState(false)
   const [itemDevoluver, setItemDevoluver] = useState<any>(null)
   const [formDevItem, setFormDevItem]   = useState<any>({ qtd:1, condicao:'bom', custo_avaria:0, obs:'' })
@@ -668,6 +729,7 @@ export default function VerContratoPage() {
               sec.push({ label:'↩ Registrar Devolução', onClick:iniciarCheckin, grupo:1 })
             }
             if(contrato.status==='ativo'||contrato.status==='em_devolucao'||contrato.status==='pendente_manutencao'){
+              sec.push({ label:'🔄 Renovar Contrato', onClick:abrirRenovar, grupo:1 })
               sec.push({ label:'🔒 Encerrar Contrato', onClick:encerrarContrato, grupo:1 })
             }
             sec.push({ label:'📄 Gerar Documento', onClick:()=>{setAba('documentos');setDocLink('')}, grupo:1 })
@@ -1298,6 +1360,97 @@ export default function VerContratoPage() {
             </div>
           )}
 
+
+      {/* ── Modal: Renovação de Contrato ─────────────────────────────────── */}
+      {modalRenovar && contrato && (
+        <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:20 }}
+          onClick={e=>{ if(e.target===e.currentTarget) setModalRenovar(false) }}>
+          <div style={{ background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',width:'100%',maxWidth:520,boxShadow:'0 24px 64px rgba(0,0,0,0.6)',overflow:'hidden' }}>
+            {/* Header */}
+            <div style={{ background:'rgba(99,102,241,0.1)',borderBottom:'1px solid var(--border)',padding:'16px 20px',display:'flex',justifyContent:'space-between',alignItems:'center' }}>
+              <div>
+                <div style={{ fontWeight:700,fontSize:15,color:'var(--t-primary)' }}>🔄 Renovar Contrato</div>
+                <div style={{ fontSize:12,color:'var(--t-muted)',marginTop:2 }}>{contrato.numero} · {contrato.clientes?.nome}</div>
+              </div>
+              <button onClick={()=>setModalRenovar(false)} style={{ background:'none',border:'none',color:'var(--t-muted)',cursor:'pointer',fontSize:20 }}>×</button>
+            </div>
+            {/* Body */}
+            <div style={{ padding:'20px 24px',display:'flex',flexDirection:'column',gap:16 }}>
+              {/* Situação atual */}
+              <div style={{ background:'var(--bg-header)',borderRadius:'var(--r-md)',padding:'12px 16px',fontSize:13 }}>
+                <div style={{ fontWeight:700,color:'var(--t-secondary)',marginBottom:8 }}>Situação atual</div>
+                <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:8 }}>
+                  {[
+                    { l:'Data fim atual',     v:fmt.date(contrato.data_fim) },
+                    { l:'Status',             v:contrato.status },
+                    { l:'Faturas pendentes',  v:String(faturas.filter(f=>!['pago','cancelada'].includes(f.status)).length) },
+                    { l:'Valor pendente',     v:fmt.money(faturas.filter(f=>!['pago','cancelada'].includes(f.status)).reduce((s,f)=>s+Number(f.saldo_restante??f.valor),0)) },
+                  ].map(item=>(
+                    <div key={item.l}>
+                      <div style={{ fontSize:11,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:2 }}>{item.l}</div>
+                      <div style={{ fontWeight:600,color:'var(--t-primary)' }}>{item.v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Nova data de fim */}
+              <FormField label="Nova data de devolução *">
+                <input type="date" className={inputCls}
+                  value={formRenovar.nova_data_fim ?? ''}
+                  min={contrato.data_fim}
+                  onChange={e=>setFormRenovar((p:any)=>({...p,nova_data_fim:e.target.value}))}
+                />
+              </FormField>
+
+              {/* Opção de quitar pendentes */}
+              {faturas.filter(f=>!['pago','cancelada'].includes(f.status)).length > 0 && (
+                <div style={{ background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'var(--r-md)',padding:'12px 16px' }}>
+                  <label style={{ display:'flex',alignItems:'flex-start',gap:10,cursor:'pointer' }}>
+                    <input type="checkbox" checked={formRenovar.quitar_pendentes ?? true}
+                      onChange={e=>setFormRenovar((p:any)=>({...p,quitar_pendentes:e.target.checked}))}
+                      style={{ marginTop:2,accentColor:'var(--c-primary)',flexShrink:0 }}
+                    />
+                    <div>
+                      <div style={{ fontWeight:600,color:'#fbbf24',fontSize:13 }}>
+                        Quitar faturas pendentes nesta renovação
+                      </div>
+                      <div style={{ fontSize:12,color:'var(--t-secondary)',marginTop:2 }}>
+                        As {faturas.filter(f=>!['pago','cancelada'].includes(f.status)).length} fatura(s) em aberto ({fmt.money(faturas.filter(f=>!['pago','cancelada'].includes(f.status)).reduce((s,f)=>s+Number(f.saldo_restante??f.valor),0))}) serão marcadas como pagas.
+                      </div>
+                    </div>
+                  </label>
+                  {formRenovar.quitar_pendentes && (
+                    <div style={{ marginTop:10 }}>
+                      <FormField label="Forma de pagamento das pendências">
+                        <select className={selectCls} value={formRenovar.forma_pagamento ?? 'pix'}
+                          onChange={e=>setFormRenovar((p:any)=>({...p,forma_pagamento:e.target.value}))}>
+                          {['pix','dinheiro','transferencia','boleto','cartao_credito','cartao_debito','cheque'].map(f=>(
+                            <option key={f} value={f}>{f.replace(/_/g,' ')}</option>
+                          ))}
+                        </select>
+                      </FormField>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {erroRenovar && (
+                <div style={{ background:'rgba(248,113,113,0.1)',border:'1px solid rgba(248,113,113,0.3)',borderRadius:'var(--r-md)',padding:'10px 14px',color:'#f87171',fontSize:13 }}>
+                  {erroRenovar}
+                </div>
+              )}
+            </div>
+            {/* Footer */}
+            <div style={{ padding:'14px 24px',borderTop:'1px solid var(--border)',display:'flex',gap:10 }}>
+              <Btn variant="secondary" style={{ flex:1 }} onClick={()=>setModalRenovar(false)}>Cancelar</Btn>
+              <Btn style={{ flex:2 }} loading={renovando} onClick={confirmarRenovacao}>
+                🔄 Confirmar Renovação
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal: Devolução Rápida de Item ─────────────────────────────── */}
       {modalDevItem && itemDevoluver && (
