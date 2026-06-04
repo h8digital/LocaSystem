@@ -34,9 +34,8 @@ export async function GET(req: NextRequest) {
     // Receita realizada por semana
     { data: receitaSemana },
   ] = await Promise.all([
-    // KPIs
-    sb.rpc('dashboard_kpis', { p_de: de, p_ate: ate }).maybeSingle()
-      .catch(() => ({ data: null })),
+    // KPIs — rpc não usado, calculamos manualmente abaixo
+    sb.from('contratos').select('status').limit(1),
 
     // Locações por semana no período
     sb.from('contratos')
