@@ -1365,7 +1365,7 @@ export default function VerContratoPage() {
       {modalRenovar && contrato && (
         <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:20 }}
           onClick={e=>{ if(e.target===e.currentTarget) setModalRenovar(false) }}>
-          <div style={{ background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',width:'100%',maxWidth:520,boxShadow:'0 24px 64px rgba(0,0,0,0.6)',overflow:'hidden' }}>
+          <div style={{ background:'#1e293b',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',width:'100%',maxWidth:520,boxShadow:'0 24px 64px rgba(0,0,0,0.6)',overflow:'hidden' }}>
             {/* Header */}
             <div style={{ background:'rgba(99,102,241,0.1)',borderBottom:'1px solid var(--border)',padding:'16px 20px',display:'flex',justifyContent:'space-between',alignItems:'center' }}>
               <div>
