@@ -93,7 +93,7 @@ export default function VerContratoPage() {
     const hoje         = new Date().toISOString().split('T')[0]
     const dataFimAtual = contrato.data_fim || hoje
 
-    // Calcular dias do período original
+    // Dias do período original
     const diasOriginais = contrato.data_inicio && contrato.data_fim
       ? Math.max(1, Math.ceil((new Date(contrato.data_fim+'T12:00:00').getTime()-new Date(contrato.data_inicio+'T12:00:00').getTime())/86400000))
       : 30
@@ -103,20 +103,24 @@ export default function VerContratoPage() {
       ? Math.ceil((Date.now() - new Date(dataFimAtual+'T12:00:00').getTime()) / 86400000)
       : 0
 
-    // Valor diário proporcional
-    const valorDiario = Number(contrato.total || 0) / diasOriginais
+    // ── Valor diário: soma dos preco_diario de cada item × quantidade ──────
+    // Regra (parametros.multa_atraso_base = 'diaria_item'):
+    // Sempre usar contrato_itens.preco_diario — frete e encargos não entram.
+    const valorDiarioItens = itens.reduce((s: number, item: any) => {
+      const diaria = Number(item.preco_diario ?? 0)
+      const qtd    = Number(item.quantidade ?? 1)
+      return s + (diaria * qtd)
+    }, 0)
 
     // Diárias extras pelo atraso
-    const valorDiariasExtras = valorDiario * diasAtraso
+    const valorDiariasExtras = valorDiarioItens * diasAtraso
 
     // Buscar parâmetros de multa
     const { data: params } = await supabase.from('parametros')
       .select('chave,valor')
-      .in('chave', ['multa_pagamento_percentual','juros_pagamento_mensal','multa_entrega_ativo'])
+      .in('chave', ['multa_entrega_ativo','multa_atraso_base'])
     const pMap: Record<string,string> = {}
     ;(params??[]).forEach((p:any) => { pMap[p.chave] = p.valor })
-
-    const multaAtraso = pMap['multa_entrega_ativo'] === 'sim' ? valorDiariasExtras : 0
 
     // Faturas pendentes
     const pendentes = faturas.filter(f => !['pago','cancelada'].includes(f.status))
@@ -129,18 +133,18 @@ export default function VerContratoPage() {
     setCalcRenovar({
       diasOriginais,
       diasAtraso,
-      valorDiario,
+      valorDiario:         valorDiarioItens,
       valorDiariasExtras,
-      multaAtraso,
+      multaAtivo:          pMap['multa_entrega_ativo'] === 'sim',
+      baseCalculo:         pMap['multa_atraso_base'] || 'diaria_item',
       valorPendente,
-      totalRenovacao: valorPendente + multaAtraso,
       pendentes,
     })
 
     setFormRenovar({
       nova_data_fim:    novaData.toISOString().split('T')[0],
       forma_pagamento:  contrato.forma_pagamento || 'pix',
-      cobrar_diarias:   diasAtraso > 0,
+      cobrar_diarias:   diasAtraso > 0 && pMap['multa_entrega_ativo'] === 'sim',
       quitar_pendentes: pendentes.length > 0,
     })
     setErroRenovar('')
@@ -1493,7 +1497,7 @@ export default function VerContratoPage() {
                         <strong style={{ color:'#fbbf24' }}>{fmt.money(calcRenovar.valorDiariasExtras)}</strong>
                       </div>
                       <div style={{ fontSize:11,color:'var(--t-muted)',marginTop:3 }}>
-                        Será criada uma fatura do tipo "atraso" com vencimento hoje.
+                        Base: diária do equipamento (frete e encargos não incluídos). Será criada uma fatura do tipo "atraso".
                       </div>
                     </div>
                   </label>
