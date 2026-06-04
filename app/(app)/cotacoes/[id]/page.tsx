@@ -240,6 +240,33 @@ export default function CotacaoDetalhePage() {
   const podeEnviar   = ['rascunho','em_analise'].includes(cot.status)
   const podeAprovar  = ['aguardando'].includes(cot.status)
   const podeConverter= ['aprovada'].includes(cot.status) && !cot.contrato_id
+  // Pode excluir se não tem contrato vinculado e não está convertida
+  const podeExcluir  = !cot.contrato_id && cot.status !== 'convertida'
+
+  async function excluir() {
+    // Verificar dependências antes de excluir
+    if (cot.contrato_id) {
+      alert(`❌ Esta cotação não pode ser excluída pois originou o contrato ${cot.contrato_id}.\n\nExclua ou desvincule o contrato primeiro.`)
+      return
+    }
+    if (cot.status === 'convertida') {
+      alert('❌ Cotações convertidas em contrato não podem ser excluídas.')
+      return
+    }
+    if (!confirm(`Excluir a cotação ${cot.numero}?\n\nEsta ação não pode ser desfeita.`)) return
+
+    // Excluir itens primeiro (FK)
+    await supabase.from('cotacao_itens').delete().eq('cotacao_id', cot.id)
+    await supabase.from('cotacao_logs').delete().eq('cotacao_id', cot.id)
+    await supabase.from('notificacoes').delete().eq('referencia_id', cot.id).eq('referencia_tipo', 'cotacao')
+    const { error } = await supabase.from('cotacoes').delete().eq('id', cot.id)
+
+    if (error) {
+      alert('Erro ao excluir: ' + error.message)
+      return
+    }
+    router.push('/cotacoes')
+  }
 
   const logAprov = logs.find(l => l.acao === 'aprovada')
   const logRecus = logs.find(l => l.acao === 'recusada')
@@ -326,6 +353,11 @@ export default function CotacaoDetalhePage() {
           {/* Converter */}
           {podeConverter && (
             <Btn size="sm" onClick={converter}>➡️ Converter em Contrato</Btn>
+          )}
+
+          {/* Excluir — sempre visível se não tem contrato */}
+          {podeExcluir && (
+            <Btn size="sm" variant="danger" onClick={excluir}>🗑 Excluir</Btn>
           )}
         </div>
       </div>
