@@ -154,12 +154,30 @@ export default function CriarContratoPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   },[form.periodo_id,dias])
 
+  // Mapear nome do período para tipo_contrato
+  function tipoContratoDoPeriodo(nomePeriodo: string): string {
+    const n = (nomePeriodo || '').toLowerCase()
+    if (n.includes('mensal') || n.includes('mês')) return 'mensal'
+    if (n.includes('final') || n.includes('fds') || n.includes('fim de semana')) return 'fds'
+    if (n.includes('quinzenal') || n.includes('quinzena')) return 'quinzenal'
+    if (n.includes('semanal') || n.includes('semana')) return 'semanal'
+    return 'diario'
+  }
+
+  function isMensal(pid: string): boolean {
+    const p = periodos.find((x:any) => String(x.id) === String(pid))
+    return tipoContratoDoPeriodo(p?.nome ?? '') === 'mensal'
+  }
+
   function aplicarPeriodo(pid:string) {
-    const p = periodos.find(x=>x.id==pid)
-    if(p && form.data_inicio) {
-      const fim=new Date(form.data_inicio); fim.setDate(fim.getDate()+p.dias)
-      setForm((f:any)=>({...f,periodo_id:pid,data_fim:fim.toISOString().split('T')[0]}))
-    } else setForm((f:any)=>({...f,periodo_id:pid}))
+    const p = periodos.find((x:any)=>x.id==pid)
+    const tipo = tipoContratoDoPeriodo(p?.nome ?? '')
+    if (p && form.data_inicio && tipo !== 'mensal') {
+      const fim = new Date(form.data_inicio); fim.setDate(fim.getDate() + p.dias)
+      setForm((f:any)=>({...f, periodo_id:pid, tipo_contrato:tipo, data_fim:fim.toISOString().split('T')[0]}))
+    } else {
+      setForm((f:any)=>({...f, periodo_id:pid, tipo_contrato:tipo, data_fim: tipo==='mensal' ? '' : f.data_fim}))
+    }
   }
 
   async function selecionarCliente(id:number|null, row:any|null) {
@@ -239,7 +257,8 @@ export default function CriarContratoPage() {
     if(passo===1){
       if(!clienteId)        return 'Selecione o cliente.'
       if(!form.data_inicio) return 'Informe a data de início.'
-      if(!form.data_fim)    return 'Informe a data de fim.'
+      if(!form.data_fim && !isMensal(form.periodo_id)) return 'Informe a data de fim.'
+      if(!form.periodo_id)  return 'Selecione um período.'
     }
     if(passo===3){
       if(itens.length===0) return 'Adicione pelo menos 1 equipamento.'
@@ -356,17 +375,33 @@ export default function CriarContratoPage() {
             <FormField label="Data de Início" required>
               <input type="date" {...F('data_inicio')} className={inputCls}/>
             </FormField>
-            <FormField label="Data de Fim" required>
-              <input type="date" {...F('data_fim')} min={form.data_inicio} className={inputCls}/>
+            {isMensal(form.periodo_id) ? (
+              <FormField label="Dia de Vencimento Mensal" hint="Ex: 5 = todo dia 5 do mês">
+                <input type="number" min="1" max="28" className={inputCls}
+                  placeholder="Ex: 5"
+                  value={form.dia_vencimento ?? ''}
+                  onChange={e=>setForm((f:any)=>({...f, dia_vencimento:e.target.value}))}/>
+              </FormField>
+            ) : (
+              <FormField label="Data de Fim" required>
+                <input type="date" {...F('data_fim')} min={form.data_inicio} className={inputCls}/>
+              </FormField>
+            )}
             </FormField>
           </div>
 
-          {form.data_inicio && form.data_fim && (
+          {form.data_inicio && (isMensal(form.periodo_id) ? (
+            <div style={{ background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.25)', borderRadius:'var(--r-sm)',
+              padding:'8px 14px', fontSize:'var(--fs-md)', color:'#a5b4fc', fontWeight:500 }}>
+              📅 Contrato mensal recorrente — inicia em {form.data_inicio ? new Date(form.data_inicio+'T12:00:00').toLocaleDateString('pt-BR') : '—'}
+              {form.dia_vencimento ? ` · vence todo dia ${form.dia_vencimento}` : ' · configure o dia de vencimento'}
+            </div>
+          ) : form.data_fim && (
             <div style={{ background:'var(--c-info-light)', border:'1px solid var(--c-info)', borderRadius:'var(--r-sm)',
               padding:'8px 14px', fontSize:'var(--fs-md)', color:'var(--c-info-text)', fontWeight:500 }}>
               Duração: <strong>{dias} dia(s)</strong>
             </div>
-          )}
+          ))}
 
           <FormField label="Observações">
             <textarea {...F('observacoes')} rows={2} className={textareaCls} placeholder="Observações gerais do contrato..."/>

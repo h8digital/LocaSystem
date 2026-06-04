@@ -156,9 +156,21 @@ export async function POST(req: NextRequest) {
       })
     } catch (_) { /* timeline é opcional — não bloqueia encerramento */ }
 
+    // ── 8. Buscar fatura principal para impressão obrigatória ─────────────────
+    // Regra: ao encerrar, a fatura DEVE ser impressa como documento de quitação
+    const { data: faturaFinal } = await sb.from('faturas')
+      .select('id')
+      .eq('contrato_id', contrato_id)
+      .eq('tipo', 'locacao')
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle()
+
     return NextResponse.json({
-      ok:  true,
-      msg: `Contrato ${contrato.numero} encerrado com sucesso.`,
+      ok:         true,
+      msg:        `Contrato ${contrato.numero} encerrado com sucesso.`,
+      fatura_id:  faturaFinal?.id ?? null,  // front deve abrir impressão automaticamente
+      imprimir:   true,
     })
 
   } catch (e: any) {

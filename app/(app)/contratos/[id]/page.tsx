@@ -427,7 +427,22 @@ export default function VerContratoPage() {
       alert('Erro: ' + data.error)
       return
     }
-    alert('✅ ' + data.msg)
+    // ── Encerramento bem-sucedido — imprimir fatura obrigatoriamente ──────────
+    alert('✅ ' + data.msg + '\n\n🖨️ A fatura será aberta para impressão agora.')
+    if (data.fatura_id) {
+      // Gerar e abrir o PDF da fatura — obrigatório ao encerrar
+      try {
+        const fatRes = await fetch('/api/documentos/fatura', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fatura_id: data.fatura_id, tipo: 'fatura' }),
+        })
+        const fatData = await fatRes.json()
+        if (fatData.ok && fatData.token) {
+          window.open(`/doc/${fatData.token}`, '_blank')
+        }
+      } catch (_) {}
+    }
     window.location.reload()
   }
   // manter alias para compatibilidade
