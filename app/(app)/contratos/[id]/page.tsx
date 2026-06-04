@@ -87,18 +87,61 @@ export default function VerContratoPage() {
   const [formRenovar,     setFormRenovar]     = useState<any>({})
   const [renovando,       setRenovando]       = useState(false)
   const [erroRenovar,     setErroRenovar]     = useState('')
+  const [calcRenovar,     setCalcRenovar]     = useState<any>(null) // cálculo exibido no modal
 
   async function abrirRenovar() {
-    const dataFimAtual = contrato.data_fim || new Date().toISOString().split('T')[0]
-    const novaDataFim  = new Date(dataFimAtual + 'T12:00:00')
-    const diasAtuais   = contrato.data_inicio && contrato.data_fim
+    const hoje         = new Date().toISOString().split('T')[0]
+    const dataFimAtual = contrato.data_fim || hoje
+
+    // Calcular dias do período original
+    const diasOriginais = contrato.data_inicio && contrato.data_fim
       ? Math.max(1, Math.ceil((new Date(contrato.data_fim+'T12:00:00').getTime()-new Date(contrato.data_inicio+'T12:00:00').getTime())/86400000))
       : 30
-    novaDataFim.setDate(novaDataFim.getDate() + diasAtuais)
+
+    // Dias de atraso (se vencido)
+    const diasAtraso = dataFimAtual < hoje
+      ? Math.ceil((Date.now() - new Date(dataFimAtual+'T12:00:00').getTime()) / 86400000)
+      : 0
+
+    // Valor diário proporcional
+    const valorDiario = Number(contrato.total || 0) / diasOriginais
+
+    // Diárias extras pelo atraso
+    const valorDiariasExtras = valorDiario * diasAtraso
+
+    // Buscar parâmetros de multa
+    const { data: params } = await supabase.from('parametros')
+      .select('chave,valor')
+      .in('chave', ['multa_pagamento_percentual','juros_pagamento_mensal','multa_entrega_ativo'])
+    const pMap: Record<string,string> = {}
+    ;(params??[]).forEach((p:any) => { pMap[p.chave] = p.valor })
+
+    const multaAtraso = pMap['multa_entrega_ativo'] === 'sim' ? valorDiariasExtras : 0
+
+    // Faturas pendentes
+    const pendentes = faturas.filter(f => !['pago','cancelada'].includes(f.status))
+    const valorPendente = pendentes.reduce((s,f) => s + Number(f.saldo_restante ?? f.valor), 0)
+
+    // Nova data sugerida = hoje + período original
+    const novaData = new Date()
+    novaData.setDate(novaData.getDate() + diasOriginais)
+
+    setCalcRenovar({
+      diasOriginais,
+      diasAtraso,
+      valorDiario,
+      valorDiariasExtras,
+      multaAtraso,
+      valorPendente,
+      totalRenovacao: valorPendente + multaAtraso,
+      pendentes,
+    })
+
     setFormRenovar({
-      nova_data_fim:      novaDataFim.toISOString().split('T')[0],
-      forma_pagamento:    contrato.forma_pagamento || 'pix',
-      quitar_pendentes:   true,
+      nova_data_fim:    novaData.toISOString().split('T')[0],
+      forma_pagamento:  contrato.forma_pagamento || 'pix',
+      cobrar_diarias:   diasAtraso > 0,
+      quitar_pendentes: pendentes.length > 0,
     })
     setErroRenovar('')
     setModalRenovar(true)
@@ -106,35 +149,73 @@ export default function VerContratoPage() {
 
   async function confirmarRenovacao() {
     if (!formRenovar.nova_data_fim) { setErroRenovar('Informe a nova data de fim.'); return }
-    if (formRenovar.nova_data_fim <= contrato.data_fim) { setErroRenovar('A nova data de fim deve ser após a data atual.'); return }
+    if (formRenovar.nova_data_fim <= contrato.data_fim) { setErroRenovar('A nova data de fim deve ser após a data atual do contrato.'); return }
     setRenovando(true); setErroRenovar('')
     try {
-      // 1. Quitar faturas pendentes se marcado
-      if (formRenovar.quitar_pendentes) {
-        const pendentes = faturas.filter(f => !['pago','cancelada'].includes(f.status))
-        for (const f of pendentes) {
+      const hoje = new Date().toISOString().split('T')[0]
+
+      // 1. Criar fatura de diárias extras por atraso (se aplicável)
+      if (formRenovar.cobrar_diarias && calcRenovar.valorDiariasExtras > 0) {
+        const { data: ultimaFat } = await supabase.from('faturas')
+          .select('numero').order('id', { ascending: false }).limit(1).maybeSingle()
+        const seq = ultimaFat?.numero
+          ? String(Number(ultimaFat.numero.replace(/\D/g,'')) + 1).padStart(9,'0')
+          : '000000001'
+        await supabase.from('faturas').insert({
+          contrato_id:      contrato.id,
+          numero:           'FAT' + new Date().getFullYear() + seq.slice(-6),
+          tipo:             'atraso',
+          status:           'pendente',
+          valor:            Number(calcRenovar.valorDiariasExtras.toFixed(2)),
+          valor_pago:       0,
+          saldo_restante:   Number(calcRenovar.valorDiariasExtras.toFixed(2)),
+          data_emissao:     hoje,
+          data_vencimento:  hoje,
+          descricao:        `Diárias extras por atraso — ${calcRenovar.diasAtraso} dia(s) × ${fmt.money(calcRenovar.valorDiario)}/dia`,
+          forma_pagamento:  formRenovar.forma_pagamento,
+        })
+      }
+
+      // 2. Quitar faturas pendentes existentes (se marcado)
+      if (formRenovar.quitar_pendentes && calcRenovar.pendentes?.length > 0) {
+        for (const f of calcRenovar.pendentes) {
           await supabase.from('faturas').update({
-            status:           'pago',
-            valor_pago:        Number(f.saldo_restante ?? f.valor),
-            valor_recebido:    Number(f.saldo_restante ?? f.valor),
-            saldo_restante:    0,
-            data_pagamento:    new Date().toISOString().split('T')[0],
-            forma_pagamento:   formRenovar.forma_pagamento,
-            observacoes:       'Quitado na renovação do contrato',
+            status:          'pago',
+            valor_pago:       Number(f.saldo_restante ?? f.valor),
+            valor_recebido:   Number(f.saldo_restante ?? f.valor),
+            saldo_restante:   0,
+            data_pagamento:   hoje,
+            forma_pagamento:  formRenovar.forma_pagamento,
+            observacoes:      'Quitado na renovação do contrato',
           }).eq('id', f.id)
         }
       }
-      // 2. Atualizar data_fim do contrato
+
+      // 3. Atualizar data_fim do contrato
       await supabase.from('contratos').update({
-        data_fim:        formRenovar.nova_data_fim,
+        data_fim:                formRenovar.nova_data_fim,
         data_devolucao_prevista: formRenovar.nova_data_fim,
-        updated_at:      new Date().toISOString(),
+        updated_at:              new Date().toISOString(),
       }).eq('id', id)
-      // 3. Registrar na timeline
-      await registrarTimeline('renovacao',
-        `Contrato renovado até ${fmt.date(formRenovar.nova_data_fim)}`,
-        { nova_data_fim: formRenovar.nova_data_fim, pendentes_quitados: formRenovar.quitar_pendentes }
-      )
+
+      // 4. Registrar na timeline
+      const resumo = [
+        formRenovar.cobrar_diarias && calcRenovar.diasAtraso > 0
+          ? `${calcRenovar.diasAtraso} diária(s) extra(s): ${fmt.money(calcRenovar.valorDiariasExtras)}`
+          : '',
+        formRenovar.quitar_pendentes && calcRenovar.pendentes?.length > 0
+          ? `${calcRenovar.pendentes.length} fatura(s) quitada(s): ${fmt.money(calcRenovar.valorPendente)}`
+          : '',
+        `Nova data de devolução: ${fmt.date(formRenovar.nova_data_fim)}`,
+      ].filter(Boolean).join(' · ')
+
+      await registrarTimeline('renovacao', `Contrato renovado — ${resumo}`, {
+        nova_data_fim:    formRenovar.nova_data_fim,
+        dias_atraso:      calcRenovar.diasAtraso,
+        diarias_extras:   calcRenovar.valorDiariasExtras,
+        pendentes_quitados: formRenovar.quitar_pendentes,
+      })
+
       setModalRenovar(false)
       await load()
     } catch (e: any) {
@@ -1362,78 +1443,137 @@ export default function VerContratoPage() {
 
 
       {/* ── Modal: Renovação de Contrato ─────────────────────────────────── */}
-      {modalRenovar && contrato && (
+      {modalRenovar && contrato && calcRenovar && (
         <div style={{ position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:20 }}
           onClick={e=>{ if(e.target===e.currentTarget) setModalRenovar(false) }}>
-          <div style={{ background:'#1e293b',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',width:'100%',maxWidth:520,boxShadow:'0 24px 64px rgba(0,0,0,0.6)',overflow:'hidden' }}>
+          <div style={{ background:'#1e293b',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',width:'100%',maxWidth:560,boxShadow:'0 24px 64px rgba(0,0,0,0.6)',overflow:'hidden',maxHeight:'90vh',display:'flex',flexDirection:'column' }}>
             {/* Header */}
-            <div style={{ background:'rgba(99,102,241,0.1)',borderBottom:'1px solid var(--border)',padding:'16px 20px',display:'flex',justifyContent:'space-between',alignItems:'center' }}>
+            <div style={{ background:'rgba(99,102,241,0.1)',borderBottom:'1px solid var(--border)',padding:'16px 20px',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0 }}>
               <div>
                 <div style={{ fontWeight:700,fontSize:15,color:'var(--t-primary)' }}>🔄 Renovar Contrato</div>
                 <div style={{ fontSize:12,color:'var(--t-muted)',marginTop:2 }}>{contrato.numero} · {contrato.clientes?.nome}</div>
               </div>
               <button onClick={()=>setModalRenovar(false)} style={{ background:'none',border:'none',color:'var(--t-muted)',cursor:'pointer',fontSize:20 }}>×</button>
             </div>
+
             {/* Body */}
-            <div style={{ padding:'20px 24px',display:'flex',flexDirection:'column',gap:16 }}>
+            <div style={{ padding:'20px 24px',display:'flex',flexDirection:'column',gap:14,overflowY:'auto' }}>
+
               {/* Situação atual */}
-              <div style={{ background:'var(--bg-header)',borderRadius:'var(--r-md)',padding:'12px 16px',fontSize:13 }}>
-                <div style={{ fontWeight:700,color:'var(--t-secondary)',marginBottom:8 }}>Situação atual</div>
-                <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:8 }}>
+              <div style={{ background:'rgba(255,255,255,0.04)',borderRadius:'var(--r-md)',padding:'12px 16px' }}>
+                <div style={{ fontWeight:700,color:'var(--t-secondary)',fontSize:12,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:10 }}>Situação do contrato</div>
+                <div style={{ display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,fontSize:13 }}>
                   {[
-                    { l:'Data fim atual',     v:fmt.date(contrato.data_fim) },
-                    { l:'Status',             v:contrato.status },
-                    { l:'Faturas pendentes',  v:String(faturas.filter(f=>!['pago','cancelada'].includes(f.status)).length) },
-                    { l:'Valor pendente',     v:fmt.money(faturas.filter(f=>!['pago','cancelada'].includes(f.status)).reduce((s,f)=>s+Number(f.saldo_restante??f.valor),0)) },
+                    { l:'Período original',    v:`${calcRenovar.diasOriginais} dias` },
+                    { l:'Valor diário',         v:fmt.money(calcRenovar.valorDiario) },
+                    { l:'Data fim original',    v:fmt.date(contrato.data_fim) },
+                    { l:'Dias em atraso',       v:calcRenovar.diasAtraso > 0 ? `${calcRenovar.diasAtraso} dias` : '—', cor: calcRenovar.diasAtraso>0?'#f87171':undefined },
                   ].map(item=>(
                     <div key={item.l}>
-                      <div style={{ fontSize:11,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:2 }}>{item.l}</div>
-                      <div style={{ fontWeight:600,color:'var(--t-primary)' }}>{item.v}</div>
+                      <div style={{ fontSize:10,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:2 }}>{item.l}</div>
+                      <div style={{ fontWeight:600,color:item.cor??'var(--t-primary)' }}>{item.v}</div>
                     </div>
                   ))}
                 </div>
               </div>
 
-              {/* Nova data de fim */}
-              <FormField label="Nova data de devolução *">
-                <input type="date" className={inputCls}
-                  value={formRenovar.nova_data_fim ?? ''}
-                  min={contrato.data_fim}
-                  onChange={e=>setFormRenovar((p:any)=>({...p,nova_data_fim:e.target.value}))}
-                />
-              </FormField>
-
-              {/* Opção de quitar pendentes */}
-              {faturas.filter(f=>!['pago','cancelada'].includes(f.status)).length > 0 && (
-                <div style={{ background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.25)',borderRadius:'var(--r-md)',padding:'12px 16px' }}>
+              {/* Diárias extras */}
+              {calcRenovar.diasAtraso > 0 && (
+                <div style={{ background:'rgba(248,113,113,0.06)',border:'1px solid rgba(248,113,113,0.2)',borderRadius:'var(--r-md)',padding:'12px 16px' }}>
                   <label style={{ display:'flex',alignItems:'flex-start',gap:10,cursor:'pointer' }}>
-                    <input type="checkbox" checked={formRenovar.quitar_pendentes ?? true}
-                      onChange={e=>setFormRenovar((p:any)=>({...p,quitar_pendentes:e.target.checked}))}
-                      style={{ marginTop:2,accentColor:'var(--c-primary)',flexShrink:0 }}
-                    />
-                    <div>
-                      <div style={{ fontWeight:600,color:'#fbbf24',fontSize:13 }}>
-                        Quitar faturas pendentes nesta renovação
+                    <input type="checkbox" checked={formRenovar.cobrar_diarias ?? true}
+                      onChange={e=>setFormRenovar((p:any)=>({...p,cobrar_diarias:e.target.checked}))}
+                      style={{ marginTop:2,accentColor:'var(--c-primary)',flexShrink:0 }}/>
+                    <div style={{ flex:1 }}>
+                      <div style={{ fontWeight:600,color:'#f87171',fontSize:13 }}>
+                        Cobrar diárias extras por atraso
                       </div>
                       <div style={{ fontSize:12,color:'var(--t-secondary)',marginTop:2 }}>
-                        As {faturas.filter(f=>!['pago','cancelada'].includes(f.status)).length} fatura(s) em aberto ({fmt.money(faturas.filter(f=>!['pago','cancelada'].includes(f.status)).reduce((s,f)=>s+Number(f.saldo_restante??f.valor),0))}) serão marcadas como pagas.
+                        {calcRenovar.diasAtraso} dia(s) × {fmt.money(calcRenovar.valorDiario)}/dia =&nbsp;
+                        <strong style={{ color:'#fbbf24' }}>{fmt.money(calcRenovar.valorDiariasExtras)}</strong>
+                      </div>
+                      <div style={{ fontSize:11,color:'var(--t-muted)',marginTop:3 }}>
+                        Será criada uma fatura do tipo "atraso" com vencimento hoje.
                       </div>
                     </div>
                   </label>
-                  {formRenovar.quitar_pendentes && (
-                    <div style={{ marginTop:10 }}>
-                      <FormField label="Forma de pagamento das pendências">
-                        <select className={selectCls} value={formRenovar.forma_pagamento ?? 'pix'}
-                          onChange={e=>setFormRenovar((p:any)=>({...p,forma_pagamento:e.target.value}))}>
-                          {['pix','dinheiro','transferencia','boleto','cartao_credito','cartao_debito','cheque'].map(f=>(
-                            <option key={f} value={f}>{f.replace(/_/g,' ')}</option>
-                          ))}
-                        </select>
-                      </FormField>
-                    </div>
-                  )}
                 </div>
               )}
+
+              {/* Faturas pendentes */}
+              {calcRenovar.pendentes?.length > 0 && (
+                <div style={{ background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'var(--r-md)',padding:'12px 16px' }}>
+                  <label style={{ display:'flex',alignItems:'flex-start',gap:10,cursor:'pointer' }}>
+                    <input type="checkbox" checked={formRenovar.quitar_pendentes ?? true}
+                      onChange={e=>setFormRenovar((p:any)=>({...p,quitar_pendentes:e.target.checked}))}
+                      style={{ marginTop:2,accentColor:'var(--c-primary)',flexShrink:0 }}/>
+                    <div>
+                      <div style={{ fontWeight:600,color:'#fbbf24',fontSize:13 }}>
+                        Quitar {calcRenovar.pendentes.length} fatura(s) pendente(s)
+                      </div>
+                      <div style={{ fontSize:12,color:'var(--t-secondary)',marginTop:2 }}>
+                        Total: <strong style={{ color:'#fbbf24' }}>{fmt.money(calcRenovar.valorPendente)}</strong> — serão marcadas como pagas na renovação.
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* Forma de pagamento */}
+              <FormField label="Forma de pagamento">
+                <select className={selectCls} value={formRenovar.forma_pagamento ?? 'pix'}
+                  onChange={e=>setFormRenovar((p:any)=>({...p,forma_pagamento:e.target.value}))}>
+                  {['pix','dinheiro','transferencia','boleto','cartao_credito','cartao_debito','cheque'].map(f=>(
+                    <option key={f} value={f}>{f.replace(/_/g,' ')}</option>
+                  ))}
+                </select>
+              </FormField>
+
+              {/* Nova data */}
+              <FormField label="Nova data de devolução *">
+                <input type="date" className={inputCls}
+                  value={formRenovar.nova_data_fim ?? ''}
+                  min={new Date().toISOString().split('T')[0]}
+                  onChange={e=>setFormRenovar((p:any)=>({...p,nova_data_fim:e.target.value}))}/>
+              </FormField>
+
+              {/* Resumo financeiro */}
+              <div style={{ background:'rgba(99,102,241,0.06)',border:'1px solid rgba(99,102,241,0.2)',borderRadius:'var(--r-md)',padding:'12px 16px' }}>
+                <div style={{ fontWeight:700,color:'var(--t-secondary)',fontSize:12,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:10 }}>Resumo da renovação</div>
+                <div style={{ display:'flex',flexDirection:'column',gap:6,fontSize:13 }}>
+                  {calcRenovar.diasAtraso > 0 && (
+                    <div style={{ display:'flex',justifyContent:'space-between' }}>
+                      <span style={{ color:'var(--t-muted)' }}>Diárias extras ({calcRenovar.diasAtraso}d)</span>
+                      <span style={{ color:formRenovar.cobrar_diarias?'var(--t-primary)':'var(--t-muted)', textDecoration:!formRenovar.cobrar_diarias?'line-through':undefined }}>
+                        {fmt.money(calcRenovar.valorDiariasExtras)}
+                      </span>
+                    </div>
+                  )}
+                  {calcRenovar.pendentes?.length > 0 && (
+                    <div style={{ display:'flex',justifyContent:'space-between' }}>
+                      <span style={{ color:'var(--t-muted)' }}>Pendências anteriores</span>
+                      <span style={{ color:formRenovar.quitar_pendentes?'var(--t-primary)':'var(--t-muted)', textDecoration:!formRenovar.quitar_pendentes?'line-through':undefined }}>
+                        {fmt.money(calcRenovar.valorPendente)}
+                      </span>
+                    </div>
+                  )}
+                  <div style={{ display:'flex',justifyContent:'space-between',borderTop:'1px solid rgba(255,255,255,0.08)',paddingTop:8,marginTop:2 }}>
+                    <span style={{ fontWeight:700,color:'var(--t-primary)' }}>Total a receber agora</span>
+                    <span style={{ fontWeight:800,color:'#34d399',fontSize:15 }}>
+                      {fmt.money(
+                        (formRenovar.cobrar_diarias ? calcRenovar.valorDiariasExtras : 0) +
+                        (formRenovar.quitar_pendentes ? calcRenovar.valorPendente : 0)
+                      )}
+                    </span>
+                  </div>
+                  <div style={{ display:'flex',justifyContent:'space-between' }}>
+                    <span style={{ color:'var(--t-muted)' }}>Novo período</span>
+                    <span style={{ color:'#818cf8',fontWeight:600 }}>
+                      {formRenovar.nova_data_fim ? `até ${fmt.date(formRenovar.nova_data_fim)}` : '—'}
+                    </span>
+                  </div>
+                </div>
+              </div>
 
               {erroRenovar && (
                 <div style={{ background:'rgba(248,113,113,0.1)',border:'1px solid rgba(248,113,113,0.3)',borderRadius:'var(--r-md)',padding:'10px 14px',color:'#f87171',fontSize:13 }}>
@@ -1441,8 +1581,9 @@ export default function VerContratoPage() {
                 </div>
               )}
             </div>
+
             {/* Footer */}
-            <div style={{ padding:'14px 24px',borderTop:'1px solid var(--border)',display:'flex',gap:10 }}>
+            <div style={{ padding:'14px 24px',borderTop:'1px solid var(--border)',display:'flex',gap:10,flexShrink:0 }}>
               <Btn variant="secondary" style={{ flex:1 }} onClick={()=>setModalRenovar(false)}>Cancelar</Btn>
               <Btn style={{ flex:2 }} loading={renovando} onClick={confirmarRenovacao}>
                 🔄 Confirmar Renovação
