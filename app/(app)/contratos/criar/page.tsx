@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { calcularPrecoItem, calcularDias, type PrecosProduto } from '@/lib/calcularCobranca'
 import { supabase, fmt } from '@/lib/supabase'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import { FormField, inputCls, selectCls, textareaCls, Btn, LookupField } from '@/components/ui'
 import { QuickCreateCliente, QuickCreateProduto } from '@/components/quick-create'
 
@@ -91,12 +91,16 @@ const Th = ({ children, right }: { children?:React.ReactNode; right?:boolean }) 
 )
 
 export default function CriarContratoPage() {
-  const router = useRouter()
+  const router       = useRouter()
+  const searchParams = useSearchParams()
+  const novoPeriodoDe = searchParams.get('novo_periodo_de') // ID do contrato anterior
+
   const [passo,     setPasso]     = useState(1)
   const [periodos,  setPeriodos]  = useState<any[]>([])
   const [itens,     setItens]     = useState<any[]>([])
   const [saving,    setSaving]    = useState(false)
   const [erro,      setErro]      = useState('')
+  const [carregandoAnterior, setCarregandoAnterior] = useState(false)
 
   // Passo 1 — cliente e período
   const [clienteId,   setClienteId]   = useState<number|null>(null)
@@ -140,6 +144,66 @@ export default function CriarContratoPage() {
   const multaDiaria    = itens.reduce((s,i)=>s+Number(i.preco_diario||0),0)
 
   useEffect(()=>{ supabase.from('periodos_locacao').select('*').eq('ativo',1).order('dias').then(({data})=>setPeriodos(data??[])) },[])
+
+  // Carregar dados do contrato anterior (Novo Período)
+  useEffect(() => {
+    if (!novoPeriodoDe || periodos.length === 0) return
+    async function carregarAnterior() {
+      setCarregandoAnterior(true)
+      const { data: ct } = await supabase
+        .from('contratos')
+        .select('*, clientes(id,nome,cpf_cnpj,celular,tipo), contrato_itens(*, produtos(*))')
+        .eq('id', novoPeriodoDe)
+        .maybeSingle()
+
+      if (!ct) { setCarregandoAnterior(false); return }
+
+      // Pré-preencher cliente
+      setClienteId(ct.clientes?.id ?? null)
+      setClienteNome(ct.clientes?.nome ?? '')
+      setClienteData(ct.clientes)
+
+      // Pré-preencher forma de pagamento
+      setForm((f:any) => ({
+        ...f,
+        forma_pagamento: ct.forma_pagamento || 'pix',
+        frete: ct.frete || 0,
+        data_inicio: new Date().toISOString().split('T')[0],
+      }))
+
+      // Pré-preencher itens com preços do novo período (será recalculado ao selecionar período)
+      const novosItens = (ct.contrato_itens ?? []).map((ci:any) => {
+        const prod = ci.produtos
+        return {
+          produto_id:     ci.produto_id,
+          produto_nome:   prod?.nome ?? ci.descricao_livre ?? '—',
+          patrimonio_id:  ci.patrimonio_id,
+          patrimonio_num: ci.patrimonio_num ?? null,
+          quantidade:     ci.quantidade,
+          preco_unitario: Number(prod?.preco_locacao_diario ?? ci.preco_unitario),
+          tipo_item:      'locacao',
+          descricao_livre:null,
+          preco_diario:   Number(prod?.preco_locacao_diario ?? 0),
+          custo_reposicao:Number(prod?.custo_reposicao ?? 0),
+          prazo_entrega_dias: Number(prod?.prazo_entrega_dias ?? 0),
+          limpeza_contratada: false,
+          taxa_limpeza_contratada: Number(prod?.taxa_limpeza_contratada ?? 0),
+          taxa_limpeza_avulsa: Number(prod?.taxa_limpeza_avulsa ?? 0),
+          valor_limpeza:  0,
+          total: Number(prod?.preco_locacao_diario ?? ci.preco_unitario),
+          _produto: prod,
+          _descricaoCobranca: 'Selecione o período para calcular',
+        }
+      })
+      setItens(novosItens)
+
+      // Banner informativo
+      setErro(`✅ Contrato ${ct.numero} encerrado. Selecione o novo período e os preços serão calculados automaticamente.`)
+      setCarregandoAnterior(false)
+    }
+    carregarAnterior()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [novoPeriodoDe, periodos.length])
 
   // Recalcular preços dos itens quando período ou datas mudam
   useEffect(() => {
@@ -331,7 +395,21 @@ export default function CriarContratoPage() {
 
       <Stepper passo={passo} />
 
-      {erro && <div className="ds-alert-error" style={{ marginBottom:16 }}>{erro}</div>}
+      {/* Banner Novo Período */}
+      {novoPeriodoDe && (
+        <div style={{background:'rgba(99,102,241,0.08)',border:'1px solid rgba(99,102,241,0.3)',borderRadius:'var(--r-md)',padding:'12px 16px',marginBottom:16,fontSize:13,color:'#a5b4fc',display:'flex',alignItems:'center',gap:10}}>
+          <span style={{fontSize:18}}>🔁</span>
+          <div>
+            <strong>Novo Período</strong> — cliente e equipamentos pré-carregados do contrato anterior.
+            Selecione o novo período para recalcular os preços automaticamente.
+          </div>
+          {carregandoAnterior && <span style={{marginLeft:'auto',color:'var(--t-muted)',fontSize:12}}>Carregando...</span>}
+        </div>
+      )}
+
+      {erro && !novoPeriodoDe && <div className="ds-alert-error" style={{ marginBottom:16 }}>{erro}</div>}
+      {erro && novoPeriodoDe && erro.startsWith('✅') && <div className="ds-alert-success" style={{ marginBottom:16 }}>{erro.replace('✅ ','')}</div>}
+      {erro && novoPeriodoDe && !erro.startsWith('✅') && <div className="ds-alert-error" style={{ marginBottom:16 }}>{erro}</div>}
 
       {/* ══════════════════════════════════════════════════════════
           PASSO 1 — CLIENTE E PERÍODO

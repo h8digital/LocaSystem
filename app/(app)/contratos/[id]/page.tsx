@@ -89,7 +89,113 @@ export default function VerContratoPage() {
   const [erroRenovar,     setErroRenovar]     = useState('')
   const [calcRenovar,     setCalcRenovar]     = useState<any>(null) // cálculo exibido no modal
 
-  async function abrirRenovar() {
+  // ── Novo Período ────────────────────────────────────────────
+  const [modalNovoPeriodo,  setModalNovoPeriodo]  = useState(false)
+  const [calcNovoPeriodo,   setCalcNovoPeriodo]   = useState<any>(null)
+  const [formNovoPeriodo,   setFormNovoPeriodo]   = useState<any>({})
+  const [encerrando,        setEncerrando]        = useState(false)
+  const [erroNovoPeriodo,   setErroNovoPeriodo]   = useState('')
+
+  async function abrirNovoPeriodo() {
+    const hoje         = new Date().toISOString().split('T')[0]
+    const dataFimAtual = contrato.data_fim || hoje
+
+    const diasOriginais = contrato.data_inicio && contrato.data_fim
+      ? Math.max(1, Math.ceil((new Date(contrato.data_fim+'T12:00:00').getTime()-new Date(contrato.data_inicio+'T12:00:00').getTime())/86400000))
+      : 1
+
+    const diasAtraso = dataFimAtual < hoje
+      ? Math.ceil((Date.now() - new Date(dataFimAtual+'T12:00:00').getTime()) / 86400000)
+      : 0
+
+    // Valor diário: soma de preco_diario × qtd de cada item (sem frete)
+    const valorDiarioItens = itens.reduce((s:number, item:any) =>
+      s + Number(item.preco_diario ?? 0) * Number(item.quantidade ?? 1), 0)
+
+    const valorDiariasExtras = valorDiarioItens * diasAtraso
+
+    // Faturas pendentes
+    const pendentes = faturas.filter((f:any) => !['pago','cancelada'].includes(f.status))
+    const valorPendente = pendentes.reduce((s:number,f:any) => s + Number(f.saldo_restante ?? f.valor), 0)
+
+    setCalcNovoPeriodo({
+      diasOriginais, diasAtraso,
+      valorDiario: valorDiarioItens,
+      valorDiariasExtras,
+      valorPendente, pendentes,
+      totalEncerramento: valorPendente + valorDiariasExtras,
+    })
+    setFormNovoPeriodo({
+      forma_pagamento:  contrato.forma_pagamento || 'pix',
+      cobrar_diarias:   diasAtraso > 0,
+      quitar_pendentes: pendentes.length > 0,
+    })
+    setErroNovoPeriodo('')
+    setModalNovoPeriodo(true)
+  }
+
+  async function confirmarNovoPeriodo() {
+    setEncerrando(true); setErroNovoPeriodo('')
+    try {
+      const hoje = new Date().toISOString().split('T')[0]
+
+      // 1. Fatura de diárias extras (se houver atraso)
+      if (formNovoPeriodo.cobrar_diarias && calcNovoPeriodo.valorDiariasExtras > 0) {
+        const { data: ult } = await supabase.from('faturas').select('numero').order('id',{ascending:false}).limit(1).maybeSingle()
+        const seq = ult?.numero ? String(Number(ult.numero.replace(/\D/g,''))+1).padStart(9,'0') : '000000001'
+        await supabase.from('faturas').insert({
+          contrato_id:     contrato.id,
+          numero:          'FAT'+new Date().getFullYear()+seq.slice(-6),
+          tipo:            'atraso',
+          status:          'pendente',
+          valor:            Number(calcNovoPeriodo.valorDiariasExtras.toFixed(2)),
+          valor_pago:       0,
+          saldo_restante:   Number(calcNovoPeriodo.valorDiariasExtras.toFixed(2)),
+          data_emissao:     hoje,
+          data_vencimento:  hoje,
+          descricao:        `Diárias extras — ${calcNovoPeriodo.diasAtraso} dia(s) × ${fmt.money(calcNovoPeriodo.valorDiario)}/dia`,
+          forma_pagamento:  formNovoPeriodo.forma_pagamento,
+        })
+      }
+
+      // 2. Quitar pendentes (se marcado)
+      if (formNovoPeriodo.quitar_pendentes) {
+        for (const f of calcNovoPeriodo.pendentes) {
+          await supabase.from('faturas').update({
+            status:'pago', valor_pago:Number(f.saldo_restante??f.valor),
+            valor_recebido:Number(f.saldo_restante??f.valor), saldo_restante:0,
+            data_pagamento:hoje, forma_pagamento:formNovoPeriodo.forma_pagamento,
+            observacoes:'Quitado no encerramento para novo período',
+          }).eq('id',f.id)
+        }
+      }
+
+      // 3. Encerrar contrato atual via API (gera fatura e abre PDF)
+      const res = await fetch('/api/contratos/encerrar', {
+        method:'POST', headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ contrato_id: contrato.id }),
+      })
+      const enc = await res.json()
+
+      // Abrir fatura para impressão
+      if (enc.fatura_id) {
+        try {
+          const fr = await fetch('/api/documentos/fatura',{
+            method:'POST', headers:{'Content-Type':'application/json'},
+            body: JSON.stringify({ fatura_id: enc.fatura_id, tipo:'fatura' }),
+          })
+          const fd = await fr.json()
+          if (fd.ok && fd.token) window.open(`/doc/${fd.token}`, '_blank')
+        } catch(_) {}
+      }
+
+      // 4. Redirecionar para novo contrato pré-preenchido
+      setModalNovoPeriodo(false)
+      router.push(`/contratos/criar?novo_periodo_de=${contrato.id}`)
+
+    } catch(e:any) { setErroNovoPeriodo('Erro: '+e.message) }
+    setEncerrando(false)
+  }
     const hoje         = new Date().toISOString().split('T')[0]
     const dataFimAtual = contrato.data_fim || hoje
 
@@ -829,7 +935,14 @@ export default function VerContratoPage() {
               sec.push({ label:'↩ Registrar Devolução', onClick:iniciarCheckin, grupo:1 })
             }
             if(contrato.status==='ativo'||contrato.status==='em_devolucao'||contrato.status==='pendente_manutencao'){
-              sec.push({ label:'🔄 Renovar Contrato', onClick:abrirRenovar, grupo:1 })
+              // Novo Período: apenas para contratos não-mensais
+              if(contrato.tipo_contrato !== 'mensal') {
+                sec.push({ label:'🔁 Novo Período', onClick:abrirNovoPeriodo, grupo:1 })
+              }
+              // Renovar: apenas para mensais
+              if(contrato.tipo_contrato === 'mensal') {
+                sec.push({ label:'🔄 Renovar Contrato', onClick:abrirRenovar, grupo:1 })
+              }
               sec.push({ label:'🔒 Encerrar Contrato', onClick:encerrarContrato, grupo:1 })
             }
             sec.push({ label:'📄 Gerar Documento', onClick:()=>{setAba('documentos');setDocLink('')}, grupo:1 })
@@ -1460,6 +1573,142 @@ export default function VerContratoPage() {
             </div>
           )}
 
+
+      {/* ── Modal: Novo Período ───────────────────────────────────────────── */}
+      {modalNovoPeriodo && contrato && calcNovoPeriodo && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.6)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}
+          onClick={e=>{if(e.target===e.currentTarget)setModalNovoPeriodo(false)}}>
+          <div style={{background:'#1e293b',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',width:'100%',maxWidth:560,boxShadow:'0 24px 64px rgba(0,0,0,0.6)',overflow:'hidden',maxHeight:'90vh',display:'flex',flexDirection:'column'}}>
+
+            {/* Header */}
+            <div style={{background:'rgba(251,191,36,0.08)',borderBottom:'1px solid var(--border)',padding:'16px 20px',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:15,color:'var(--t-primary)'}}>🔁 Novo Período</div>
+                <div style={{fontSize:12,color:'var(--t-muted)',marginTop:2}}>{contrato.numero} · {contrato.clientes?.nome}</div>
+              </div>
+              <button onClick={()=>setModalNovoPeriodo(false)} style={{background:'none',border:'none',color:'var(--t-muted)',cursor:'pointer',fontSize:20}}>×</button>
+            </div>
+
+            {/* Body */}
+            <div style={{padding:'20px 24px',display:'flex',flexDirection:'column',gap:14,overflowY:'auto'}}>
+
+              {/* Explicação */}
+              <div style={{background:'rgba(99,102,241,0.06)',border:'1px solid rgba(99,102,241,0.2)',borderRadius:'var(--r-md)',padding:'12px 16px',fontSize:13,color:'var(--t-secondary)',lineHeight:1.6}}>
+                <strong style={{color:'#a5b4fc'}}>Como funciona:</strong> este contrato será <strong>encerrado</strong> e a fatura impressa automaticamente. Em seguida, você será redirecionado para um <strong>novo contrato</strong> com o mesmo cliente e equipamentos — podendo escolher o novo período e ajustar os preços.
+              </div>
+
+              {/* Situação */}
+              <div style={{background:'rgba(255,255,255,0.04)',borderRadius:'var(--r-md)',padding:'12px 16px'}}>
+                <div style={{fontWeight:700,color:'var(--t-secondary)',fontSize:12,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:10}}>Situação do contrato</div>
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10,fontSize:13}}>
+                  {[
+                    {l:'Período', v:`${calcNovoPeriodo.diasOriginais} dias`},
+                    {l:'Valor diário (itens)', v:fmt.money(calcNovoPeriodo.valorDiario)},
+                    {l:'Data fim', v:fmt.date(contrato.data_fim)},
+                    {l:'Dias em atraso', v:calcNovoPeriodo.diasAtraso>0?`${calcNovoPeriodo.diasAtraso} dias`:'—', cor:calcNovoPeriodo.diasAtraso>0?'#f87171':undefined},
+                  ].map(item=>(
+                    <div key={item.l}>
+                      <div style={{fontSize:10,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.04em',marginBottom:2}}>{item.l}</div>
+                      <div style={{fontWeight:600,color:item.cor??'var(--t-primary)'}}>{item.v}</div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Diárias extras */}
+              {calcNovoPeriodo.diasAtraso > 0 && (
+                <div style={{background:'rgba(248,113,113,0.06)',border:'1px solid rgba(248,113,113,0.2)',borderRadius:'var(--r-md)',padding:'12px 16px'}}>
+                  <label style={{display:'flex',alignItems:'flex-start',gap:10,cursor:'pointer'}}>
+                    <input type="checkbox" checked={formNovoPeriodo.cobrar_diarias??true}
+                      onChange={e=>setFormNovoPeriodo((p:any)=>({...p,cobrar_diarias:e.target.checked}))}
+                      style={{marginTop:2,accentColor:'var(--c-primary)',flexShrink:0}}/>
+                    <div>
+                      <div style={{fontWeight:600,color:'#f87171',fontSize:13}}>Cobrar diárias extras por atraso</div>
+                      <div style={{fontSize:12,color:'var(--t-secondary)',marginTop:2}}>
+                        {calcNovoPeriodo.diasAtraso} dia(s) × {fmt.money(calcNovoPeriodo.valorDiario)} = <strong style={{color:'#fbbf24'}}>{fmt.money(calcNovoPeriodo.valorDiariasExtras)}</strong>
+                      </div>
+                      <div style={{fontSize:11,color:'var(--t-muted)',marginTop:2}}>Base: diária do equipamento. Frete excluído.</div>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* Pendentes */}
+              {calcNovoPeriodo.pendentes?.length > 0 && (
+                <div style={{background:'rgba(251,191,36,0.06)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'var(--r-md)',padding:'12px 16px'}}>
+                  <label style={{display:'flex',alignItems:'flex-start',gap:10,cursor:'pointer'}}>
+                    <input type="checkbox" checked={formNovoPeriodo.quitar_pendentes??true}
+                      onChange={e=>setFormNovoPeriodo((p:any)=>({...p,quitar_pendentes:e.target.checked}))}
+                      style={{marginTop:2,accentColor:'var(--c-primary)',flexShrink:0}}/>
+                    <div>
+                      <div style={{fontWeight:600,color:'#fbbf24',fontSize:13}}>Quitar {calcNovoPeriodo.pendentes.length} fatura(s) pendente(s)</div>
+                      <div style={{fontSize:12,color:'var(--t-secondary)',marginTop:2}}>
+                        Total: <strong style={{color:'#fbbf24'}}>{fmt.money(calcNovoPeriodo.valorPendente)}</strong>
+                      </div>
+                    </div>
+                  </label>
+                </div>
+              )}
+
+              {/* Forma de pagamento */}
+              <FormField label="Forma de pagamento do encerramento">
+                <select className={selectCls} value={formNovoPeriodo.forma_pagamento??'pix'}
+                  onChange={e=>setFormNovoPeriodo((p:any)=>({...p,forma_pagamento:e.target.value}))}>
+                  {['pix','dinheiro','transferencia','boleto','cartao_credito','cartao_debito','cheque'].map(f=>(
+                    <option key={f} value={f}>{f.replace(/_/g,' ')}</option>
+                  ))}
+                </select>
+              </FormField>
+
+              {/* Resumo */}
+              <div style={{background:'rgba(99,102,241,0.06)',border:'1px solid rgba(99,102,241,0.2)',borderRadius:'var(--r-md)',padding:'12px 16px'}}>
+                <div style={{fontWeight:700,color:'var(--t-secondary)',fontSize:12,textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:10}}>Resumo do encerramento</div>
+                <div style={{display:'flex',flexDirection:'column',gap:6,fontSize:13}}>
+                  {calcNovoPeriodo.diasAtraso > 0 && (
+                    <div style={{display:'flex',justifyContent:'space-between'}}>
+                      <span style={{color:'var(--t-muted)'}}>Diárias extras ({calcNovoPeriodo.diasAtraso}d)</span>
+                      <span style={{color:formNovoPeriodo.cobrar_diarias?'var(--t-primary)':'var(--t-muted)',textDecoration:!formNovoPeriodo.cobrar_diarias?'line-through':undefined}}>
+                        {fmt.money(calcNovoPeriodo.valorDiariasExtras)}
+                      </span>
+                    </div>
+                  )}
+                  {calcNovoPeriodo.pendentes?.length > 0 && (
+                    <div style={{display:'flex',justifyContent:'space-between'}}>
+                      <span style={{color:'var(--t-muted)'}}>Faturas pendentes</span>
+                      <span style={{color:formNovoPeriodo.quitar_pendentes?'var(--t-primary)':'var(--t-muted)',textDecoration:!formNovoPeriodo.quitar_pendentes?'line-through':undefined}}>
+                        {fmt.money(calcNovoPeriodo.valorPendente)}
+                      </span>
+                    </div>
+                  )}
+                  <div style={{display:'flex',justifyContent:'space-between',borderTop:'1px solid rgba(255,255,255,0.08)',paddingTop:8,marginTop:2}}>
+                    <span style={{fontWeight:700,color:'var(--t-primary)'}}>Total a receber agora</span>
+                    <span style={{fontWeight:800,color:'#34d399',fontSize:15}}>
+                      {fmt.money(
+                        (formNovoPeriodo.cobrar_diarias?calcNovoPeriodo.valorDiariasExtras:0)+
+                        (formNovoPeriodo.quitar_pendentes?calcNovoPeriodo.valorPendente:0)
+                      )}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {erroNovoPeriodo && (
+                <div style={{background:'rgba(248,113,113,0.1)',border:'1px solid rgba(248,113,113,0.3)',borderRadius:'var(--r-md)',padding:'10px 14px',color:'#f87171',fontSize:13}}>
+                  {erroNovoPeriodo}
+                </div>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{padding:'14px 24px',borderTop:'1px solid var(--border)',display:'flex',gap:10,flexShrink:0}}>
+              <Btn variant="secondary" style={{flex:1}} onClick={()=>setModalNovoPeriodo(false)}>Cancelar</Btn>
+              <Btn style={{flex:2}} loading={encerrando} onClick={confirmarNovoPeriodo}>
+                🔁 Encerrar e Abrir Novo Período
+              </Btn>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal: Renovação de Contrato ─────────────────────────────────── */}
       {modalRenovar && contrato && calcRenovar && (
