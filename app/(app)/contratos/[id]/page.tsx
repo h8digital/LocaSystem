@@ -336,6 +336,33 @@ export default function VerContratoPage() {
     setRenovando(false)
   }
 
+  // ── Cobrança Asaas ─────────────────────────────────────────
+  const [modalAsaas,    setModalAsaas]    = useState(false)
+  const [fatAsaas,      setFatAsaas]      = useState<any>(null)
+  const [tipoAsaas,     setTipoAsaas]     = useState<'PIX'|'BOLETO'|'PIX_BOLETO'>('PIX')
+  const [asaasResult,   setAsaasResult]   = useState<any>(null)
+  const [gerandoAsaas,  setGerandoAsaas]  = useState(false)
+  const [erroAsaas,     setErroAsaas]     = useState('')
+
+  function abrirCobrancaAsaas(f: any) {
+    setFatAsaas(f); setAsaasResult(null); setErroAsaas(''); setTipoAsaas('PIX'); setModalAsaas(true)
+  }
+
+  async function gerarCobrancaAsaas() {
+    setGerandoAsaas(true); setErroAsaas('')
+    try {
+      const res = await fetch('/api/asaas/cobranca', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fatura_id: fatAsaas.id, tipo: tipoAsaas }),
+      })
+      const d = await res.json()
+      if (!d.ok) { setErroAsaas(d.error); setGerandoAsaas(false); return }
+      setAsaasResult(d)
+      await load()
+    } catch(e: any) { setErroAsaas(e.message) }
+    setGerandoAsaas(false)
+  }
+
   // ── Devolução rápida por item ─────────────────────────────────────────────
   const [modalDevItem, setModalDevItem] = useState(false)
   const [itemDevoluver, setItemDevoluver] = useState<any>(null)
@@ -1285,6 +1312,14 @@ export default function VerContratoPage() {
                                   ✓
                                 </button>
                               )}
+                              {['pendente','vencida'].includes(f.status)&&(
+                                <button onClick={()=>abrirCobrancaAsaas(f)}
+                                  className="tbl-btn"
+                                  title="Cobrar via PIX ou Boleto (Asaas)"
+                                  style={{color:'#818cf8',fontSize:12,lineHeight:1,padding:'3px 7px',fontWeight:700}}>
+                                  💳
+                                </button>
+                              )}
                               {f.status==='pago'&&(
                                 <button onClick={()=>estornarPagamento(f)}
                                   className="tbl-btn"
@@ -1575,6 +1610,90 @@ export default function VerContratoPage() {
             </div>
           )}
 
+
+      {/* ── Modal: Cobrança Asaas ────────────────────────────────────────── */}
+      {modalAsaas && fatAsaas && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',zIndex:1000,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}
+          onClick={e=>{if(e.target===e.currentTarget)setModalAsaas(false)}}>
+          <div style={{background:'#1e293b',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',width:'100%',maxWidth:520,boxShadow:'0 24px 64px rgba(0,0,0,0.6)',overflow:'hidden',maxHeight:'90vh',display:'flex',flexDirection:'column'}}>
+
+            <div style={{background:'rgba(99,102,241,0.1)',borderBottom:'1px solid var(--border)',padding:'16px 20px',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:15,color:'var(--t-primary)'}}>💳 Cobrar via Asaas</div>
+                <div style={{fontSize:12,color:'var(--t-muted)',marginTop:2}}>{fatAsaas.numero} · {fmt.money(fatAsaas.saldo_restante??fatAsaas.valor)}</div>
+              </div>
+              <button onClick={()=>setModalAsaas(false)} style={{background:'none',border:'none',color:'var(--t-muted)',cursor:'pointer',fontSize:20}}>×</button>
+            </div>
+
+            <div style={{padding:'20px 24px',display:'flex',flexDirection:'column',gap:16,overflowY:'auto'}}>
+
+              {!asaasResult ? (<>
+                {/* Seletor de tipo */}
+                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+                  {([['PIX','⚡ PIX','Pagamento instantâneo'],['BOLETO','🏦 Boleto','Vencimento configurável'],['PIX_BOLETO','⚡🏦 Ambos','PIX + Boleto juntos']] as const).map(([val,label,desc])=>(
+                    <button key={val} onClick={()=>setTipoAsaas(val as any)}
+                      style={{padding:'12px 8px',borderRadius:'var(--r-md)',border:`2px solid ${tipoAsaas===val?'var(--c-primary)':'var(--border)'}`,background:tipoAsaas===val?'rgba(99,102,241,0.1)':'transparent',cursor:'pointer',textAlign:'center'}}>
+                      <div style={{fontSize:16,marginBottom:4}}>{label}</div>
+                      <div style={{fontSize:11,color:'var(--t-muted)'}}>{desc}</div>
+                    </button>
+                  ))}
+                </div>
+
+                {erroAsaas && (
+                  <div style={{background:'rgba(248,113,113,0.1)',border:'1px solid rgba(248,113,113,0.3)',borderRadius:'var(--r-md)',padding:'10px 14px',color:'#f87171',fontSize:13}}>
+                    {erroAsaas}
+                  </div>
+                )}
+              </>) : (<>
+                {/* Resultado — QR Code e linha digitável */}
+                {asaasResult.pix_qrcode && (
+                  <div style={{textAlign:'center'}}>
+                    <div style={{fontWeight:700,color:'#34d399',marginBottom:12,fontSize:14}}>✅ PIX gerado com sucesso</div>
+                    <img src={`data:image/png;base64,${asaasResult.pix_qrcode}`}
+                      alt="QR Code PIX" style={{width:200,height:200,borderRadius:8,background:'#fff',padding:8}}/>
+                    <div style={{marginTop:10}}>
+                      <div style={{fontSize:11,color:'var(--t-muted)',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.06em'}}>Pix Copia e Cola</div>
+                      <div style={{background:'rgba(255,255,255,0.04)',borderRadius:8,padding:'8px 12px',fontSize:11,fontFamily:'monospace',wordBreak:'break-all',color:'var(--t-secondary)',cursor:'pointer'}}
+                        onClick={()=>{navigator.clipboard.writeText(asaasResult.pix_copia_cola??'');alert('Copiado!')}}>
+                        {asaasResult.pix_copia_cola?.slice(0,60)}...
+                        <div style={{color:'var(--c-primary)',marginTop:4,fontSize:11}}>📋 Clique para copiar</div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+                {asaasResult.boleto_linha_digitavel && (
+                  <div>
+                    <div style={{fontWeight:700,color:'#34d399',marginBottom:8,fontSize:14}}>✅ Boleto gerado</div>
+                    <div style={{fontSize:11,color:'var(--t-muted)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>Linha Digitável</div>
+                    <div style={{background:'rgba(255,255,255,0.04)',borderRadius:8,padding:'8px 12px',fontSize:12,fontFamily:'monospace',wordBreak:'break-all',cursor:'pointer'}}
+                      onClick={()=>{navigator.clipboard.writeText(asaasResult.boleto_linha_digitavel??'');alert('Copiado!')}}>
+                      {asaasResult.boleto_linha_digitavel}
+                      <div style={{color:'var(--c-primary)',marginTop:4,fontSize:11}}>📋 Clique para copiar</div>
+                    </div>
+                    {asaasResult.boleto_url && (
+                      <a href={asaasResult.boleto_url} target="_blank" rel="noreferrer"
+                        style={{display:'block',marginTop:10,textAlign:'center',padding:'8px',borderRadius:'var(--r-sm)',background:'rgba(99,102,241,0.1)',border:'1px solid rgba(99,102,241,0.3)',color:'#818cf8',fontSize:13,fontWeight:600,textDecoration:'none'}}>
+                        🔗 Abrir boleto em PDF
+                      </a>
+                    )}
+                  </div>
+                )}
+              </>)}
+            </div>
+
+            <div style={{padding:'14px 24px',borderTop:'1px solid var(--border)',display:'flex',gap:10,flexShrink:0}}>
+              {!asaasResult ? (<>
+                <Btn variant="secondary" style={{flex:1}} onClick={()=>setModalAsaas(false)}>Cancelar</Btn>
+                <Btn style={{flex:2}} loading={gerandoAsaas} onClick={gerarCobrancaAsaas}>
+                  💳 Gerar Cobrança {tipoAsaas==='PIX'?'PIX':tipoAsaas==='BOLETO'?'Boleto':'PIX + Boleto'}
+                </Btn>
+              </>) : (
+                <Btn style={{flex:1}} onClick={()=>setModalAsaas(false)}>Fechar</Btn>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Modal: Novo Período ───────────────────────────────────────────── */}
       {modalNovoPeriodo && contrato && calcNovoPeriodo && (
