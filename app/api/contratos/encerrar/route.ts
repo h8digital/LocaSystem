@@ -114,6 +114,50 @@ export async function POST(req: NextRequest) {
       })
     }
 
+    // ── 4a. Para contratos mensais: gerar fatura proporcional dos dias usados ──
+    if (contrato.tipo_contrato === 'mensal') {
+      const hoje2     = new Date()
+      const anoAtual  = hoje2.getFullYear()
+      const mesAtual  = hoje2.getMonth() + 1
+      const diaAtual  = hoje2.getDate()
+      const competencia = `${anoAtual}-${String(mesAtual).padStart(2,'0')}-01`
+
+      // Verificar se já existe fatura deste mês
+      const fatMes = fats.find((f: any) => f.competencia === competencia)
+
+      if (!fatMes) {
+        // Calcular fração do mês: dias usados / 30
+        // Pegar último dia de vencimento ou início do mês
+        const ultimaFatData = fats.length > 0
+          ? new Date(Math.max(...fats.map((f: any) => new Date(f.data_vencimento).getTime())))
+          : new Date(contrato.data_inicio + 'T00:00:00')
+        const diasUsados = Math.max(1, Math.ceil((hoje2.getTime() - ultimaFatData.getTime()) / 86400000))
+        const valorProporcional = Number((Number(contrato.total) * Math.min(diasUsados, 30) / 30).toFixed(2))
+
+        if (valorProporcional > 0.01) {
+          const numFatProp = await gerarNumeroFatura()
+          await sb.from('faturas').insert({
+            contrato_id:     contrato_id,
+            numero:          numFatProp,
+            tipo:            'proporcional',
+            status:          'pendente',
+            valor:           valorProporcional,
+            valor_recebido:  0,
+            saldo_restante:  valorProporcional,
+            data_emissao:    hoje,
+            data_vencimento: hoje,
+            competencia,
+            descricao:       `Locação proporcional — ${diasUsados} dia(s) de ${String(mesAtual).padStart(2,'0')}/${anoAtual}`,
+          })
+          // Recarregar faturas para incluir a proporcional
+          const { data: fatsAtualizadas } = await sb.from('faturas')
+            .select('id, tipo, status, valor, valor_recebido, saldo_restante')
+            .eq('contrato_id', contrato_id).neq('status', 'cancelado')
+          fats.splice(0, fats.length, ...(fatsAtualizadas ?? []))
+        }
+      }
+    }
+
     // ── 4. Verificar saldo devedor em todas as faturas ───────────────────────
     const saldoTotal = fats.reduce((s: number, f: any) =>
       s + Number(f.saldo_restante ?? (Number(f.valor) - Number(f.valor_recebido ?? 0))), 0

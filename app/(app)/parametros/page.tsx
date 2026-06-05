@@ -313,7 +313,7 @@ export default function ParametrosPage() {
   const endsFiltrados  = tiposEnd.filter(t => !buscaEnd || t.nome.toLowerCase().includes(buscaEnd.toLowerCase()))
   const locaisFiltrados = locais.filter(l => !buscaLoc || l.nome.toLowerCase().includes(buscaLoc.toLowerCase()))
 
-  const isERP  = ['empresa','financeiro','contratos'].includes(secao)
+  const isERP  = ['empresa','financeiro','contratos','cobrancas'].includes(secao)
   const isSite = secao === 'site'
 
   return (
@@ -347,6 +347,7 @@ export default function ParametrosPage() {
             <NavItem id="financeiro" active={secao==='financeiro'} icon="💰" label="Financeiro"  onClick={()=>setSecao('financeiro')} />
             <NavItem id="contratos"  active={secao==='contratos'}  icon="📄" label="Contratos"  onClick={()=>setSecao('contratos')} />
             <NavItem id="site"       active={secao==='site'}       icon="🌐" label="Site Kanoff" onClick={()=>setSecao('site')} />
+            <NavItem id="cobrancas"  active={secao==='cobrancas'}  icon="💳" label="Cobranças Asaas" onClick={()=>setSecao('cobrancas')} />
           </NavGroup>
 
           <NavGroup label="Cadastros">
@@ -583,6 +584,77 @@ export default function ParametrosPage() {
           )}
 
           {/* ══ SITE KANOFF ══════════════════════════════════════════════ */}
+          {secao === 'cobrancas' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+              <div className="ds-card">
+                <div className="ds-card-header">
+                  <span className="ds-card-title">💳 Integração Asaas</span>
+                </div>
+                <div className="ds-card-body">
+                  <div style={{ background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.2)', borderRadius:'var(--r-md)', padding:'12px 16px', marginBottom:16, fontSize:'var(--fs-md)', color:'var(--t-secondary)', lineHeight:1.6 }}>
+                    O Asaas permite gerar cobranças via <strong>PIX</strong> e <strong>Boleto</strong> diretamente das faturas do sistema, sem convênio bancário. Crie sua conta em{' '}
+                    <a href="https://asaas.com" target="_blank" rel="noreferrer" style={{ color:'var(--c-primary)' }}>asaas.com</a> e configure sua chave de API abaixo.
+                  </div>
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+                    <FormField label="Chave de API (API Key)" hint="Obtida em Asaas → Configurações → Integrações">
+                      <input type="password" className={inputCls}
+                        defaultValue={params['asaas_api_key'] ?? ''}
+                        onBlur={async e => { await salvarParam('asaas_api_key', e.target.value); setMsg('Chave salva.') }}
+                        placeholder="$aact_..." />
+                    </FormField>
+                    <FormField label="Ambiente">
+                      <select className={selectCls}
+                        value={params['asaas_ambiente'] ?? 'sandbox'}
+                        onChange={async e => { await salvarParam('asaas_ambiente', e.target.value); setMsg('Ambiente salvo.') }}>
+                        <option value="sandbox">Sandbox (testes)</option>
+                        <option value="production">Produção</option>
+                      </select>
+                    </FormField>
+                    <FormField label="Multa por atraso (%)" hint="Ex: 2 = 2%">
+                      <input type="number" min="0" max="10" step="0.1" className={inputCls}
+                        defaultValue={params['asaas_multa_pct'] ?? '2'}
+                        onBlur={async e => { await salvarParam('asaas_multa_pct', e.target.value); setMsg('Salvo.') }} />
+                    </FormField>
+                    <FormField label="Juros ao mês (%)" hint="Ex: 1 = 1% ao mês">
+                      <input type="number" min="0" max="5" step="0.1" className={inputCls}
+                        defaultValue={params['asaas_juros_pct'] ?? '1'}
+                        onBlur={async e => { await salvarParam('asaas_juros_pct', e.target.value); setMsg('Salvo.') }} />
+                    </FormField>
+                    <FormField label="Dias de aviso antes do vencimento">
+                      <input type="number" min="0" max="30" className={inputCls}
+                        defaultValue={params['asaas_dias_aviso'] ?? '3'}
+                        onBlur={async e => { await salvarParam('asaas_dias_aviso', e.target.value); setMsg('Salvo.') }} />
+                    </FormField>
+                    <FormField label="Descrição padrão da cobrança">
+                      <input className={inputCls}
+                        defaultValue={params['asaas_descricao_padrao'] ?? 'Locação de equipamentos'}
+                        onBlur={async e => { await salvarParam('asaas_descricao_padrao', e.target.value); setMsg('Salvo.') }} />
+                    </FormField>
+                  </div>
+                </div>
+              </div>
+
+              <div className="ds-card">
+                <div className="ds-card-header">
+                  <span className="ds-card-title">🔄 Faturamento Mensal Automático</span>
+                </div>
+                <div className="ds-card-body">
+                  <div style={{ fontSize:'var(--fs-md)', color:'var(--t-secondary)', lineHeight:1.6, marginBottom:14 }}>
+                    Contratos com período <strong>Mensal</strong> geram faturas automaticamente todo dia configurado no contrato (campo "Dia de Vencimento").
+                    O processo roda diariamente às <strong>6h da manhã</strong> via Supabase Edge Function.
+                  </div>
+                  <div style={{ background:'rgba(52,211,153,0.06)', border:'1px solid rgba(52,211,153,0.2)', borderRadius:'var(--r-md)', padding:'12px 16px' }}>
+                    <div style={{ fontWeight:700, color:'#34d399', marginBottom:4, fontSize:'var(--fs-md)' }}>✅ Cron job ativo</div>
+                    <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)' }}>
+                      Edge Function <code>gerar-faturas-recorrentes</code> agendada para rodar diariamente às 9h UTC (6h BRT).
+                      Gera uma fatura por contrato mensal ativo cujo dia de vencimento seja o dia atual.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+
           {secao === 'site' && (
             <div style={{ maxWidth:820 }}>
               <SubTabs
