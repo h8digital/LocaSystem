@@ -465,7 +465,6 @@ export default function CriarContratoPage() {
                 <input type="date" {...F('data_fim')} min={form.data_inicio} className={inputCls}/>
               </FormField>
             )}
-            </FormField>
           </div>
 
           {form.data_inicio && (isMensal(form.periodo_id) ? (
