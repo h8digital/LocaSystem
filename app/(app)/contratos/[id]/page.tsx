@@ -196,6 +196,8 @@ export default function VerContratoPage() {
     } catch(e:any) { setErroNovoPeriodo('Erro: '+e.message) }
     setEncerrando(false)
   }
+
+  async function abrirRenovar() {
     const hoje         = new Date().toISOString().split('T')[0]
     const dataFimAtual = contrato.data_fim || hoje
 
