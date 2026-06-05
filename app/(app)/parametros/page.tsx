@@ -605,13 +605,13 @@ export default function ParametrosPage() {
                     <FormField label="Chave de API (API Key)" hint="Obtida em Asaas → Configurações → Integrações">
                       <input type="password" className={inputCls}
                         defaultValue={params['asaas_api_key'] ?? ''}
-                        onBlur={async e => { await salvarParam('asaas_api_key', e.target.value); setMsg('Chave salva.') }}
+                        onBlur={async e => { await salvarParam('asaas_api_key', e.target.value); setOkERP(true) }}
                         placeholder="$aact_..." />
                     </FormField>
                     <FormField label="Ambiente">
                       <select className={selectCls}
                         value={params['asaas_ambiente'] ?? 'sandbox'}
-                        onChange={async e => { await salvarParam('asaas_ambiente', e.target.value); setMsg('Ambiente salvo.') }}>
+                        onChange={async e => { await salvarParam('asaas_ambiente', e.target.value); setOkERP(true) }}>
                         <option value="sandbox">Sandbox (testes)</option>
                         <option value="production">Produção</option>
                       </select>
@@ -619,22 +619,22 @@ export default function ParametrosPage() {
                     <FormField label="Multa por atraso (%)" hint="Ex: 2 = 2%">
                       <input type="number" min="0" max="10" step="0.1" className={inputCls}
                         defaultValue={params['asaas_multa_pct'] ?? '2'}
-                        onBlur={async e => { await salvarParam('asaas_multa_pct', e.target.value); setMsg('Salvo.') }} />
+                        onBlur={async e => { await salvarParam('asaas_multa_pct', e.target.value); setOkERP(true) }} />
                     </FormField>
                     <FormField label="Juros ao mês (%)" hint="Ex: 1 = 1% ao mês">
                       <input type="number" min="0" max="5" step="0.1" className={inputCls}
                         defaultValue={params['asaas_juros_pct'] ?? '1'}
-                        onBlur={async e => { await salvarParam('asaas_juros_pct', e.target.value); setMsg('Salvo.') }} />
+                        onBlur={async e => { await salvarParam('asaas_juros_pct', e.target.value); setOkERP(true) }} />
                     </FormField>
                     <FormField label="Dias de aviso antes do vencimento">
                       <input type="number" min="0" max="30" className={inputCls}
                         defaultValue={params['asaas_dias_aviso'] ?? '3'}
-                        onBlur={async e => { await salvarParam('asaas_dias_aviso', e.target.value); setMsg('Salvo.') }} />
+                        onBlur={async e => { await salvarParam('asaas_dias_aviso', e.target.value); setOkERP(true) }} />
                     </FormField>
                     <FormField label="Descrição padrão da cobrança">
                       <input className={inputCls}
                         defaultValue={params['asaas_descricao_padrao'] ?? 'Locação de equipamentos'}
-                        onBlur={async e => { await salvarParam('asaas_descricao_padrao', e.target.value); setMsg('Salvo.') }} />
+                        onBlur={async e => { await salvarParam('asaas_descricao_padrao', e.target.value); setOkERP(true) }} />
                     </FormField>
                   </div>
                 </div>
