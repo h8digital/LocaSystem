@@ -177,6 +177,12 @@ export default function ParametrosPage() {
     setTimeout(() => setOkERP(false), 3000)
   }
 
+  // ── Salvar parâmetro individual (Asaas) ──────────────────────────────────
+  async function salvarParam(chave: string, valor: string) {
+    await supabase.from('parametros').upsert({ chave, valor }, { onConflict: 'chave' })
+    setParams((p: any) => ({ ...p, [chave]: valor }))
+  }
+
   // ── Salvar Site ───────────────────────────────────────────────────────────
   async function salvarSite() {
     setSavingSite(true); setOkSite(false)
@@ -643,11 +649,33 @@ export default function ParametrosPage() {
                     Contratos com período <strong>Mensal</strong> geram faturas automaticamente todo dia configurado no contrato (campo "Dia de Vencimento").
                     O processo roda diariamente às <strong>6h da manhã</strong> via Supabase Edge Function.
                   </div>
-                  <div style={{ background:'rgba(52,211,153,0.06)', border:'1px solid rgba(52,211,153,0.2)', borderRadius:'var(--r-md)', padding:'12px 16px' }}>
+                  <div style={{ background:'rgba(52,211,153,0.06)', border:'1px solid rgba(52,211,153,0.2)', borderRadius:'var(--r-md)', padding:'12px 16px', marginBottom:12 }}>
                     <div style={{ fontWeight:700, color:'#34d399', marginBottom:4, fontSize:'var(--fs-md)' }}>✅ Cron job ativo</div>
                     <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)' }}>
                       Edge Function <code>gerar-faturas-recorrentes</code> agendada para rodar diariamente às 9h UTC (6h BRT).
-                      Gera uma fatura por contrato mensal ativo cujo dia de vencimento seja o dia atual.
+                    </div>
+                  </div>
+                  <div style={{ background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.2)', borderRadius:'var(--r-md)', padding:'14px 16px' }}>
+                    <div style={{ fontWeight:700, color:'#a5b4fc', marginBottom:10, fontSize:'var(--fs-md)' }}>📡 Configurar Webhook no Asaas</div>
+                    <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-secondary)', lineHeight:1.7, marginBottom:10 }}>
+                      Para que pagamentos sejam confirmados automaticamente no ERP, configure o webhook no painel do Asaas:
+                    </div>
+                    <div style={{ display:'flex', flexDirection:'column', gap:8, fontSize:'var(--fs-sm)' }}>
+                      {[
+                        { n:'1', t:'Acesse o Asaas', d:'Configurações → Integrações → Webhook' },
+                        { n:'2', t:'URL do Webhook', d:'https://locasystem.vercel.app/api/asaas/webhook' },
+                        { n:'3', t:'Eventos a ativar', d:'PAYMENT_RECEIVED · PAYMENT_CONFIRMED · PAYMENT_OVERDUE · PAYMENT_CANCELLED' },
+                        { n:'4', t:'Versão da API', d:'v3' },
+                        { n:'5', t:'Autenticação', d:'Nenhuma (a API valida pelo payment ID)' },
+                      ].map(s => (
+                        <div key={s.n} style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
+                          <div style={{ width:22, height:22, borderRadius:'50%', background:'rgba(99,102,241,0.2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#818cf8', flexShrink:0 }}>{s.n}</div>
+                          <div>
+                            <div style={{ fontWeight:600, color:'var(--t-primary)' }}>{s.t}</div>
+                            <div style={{ color:'var(--t-muted)', fontFamily: s.n==='2' ? 'monospace' : undefined, fontSize: s.n==='2' ? 11 : undefined }}>{s.d}</div>
+                          </div>
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
