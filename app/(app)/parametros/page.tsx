@@ -609,7 +609,7 @@ export default function ParametrosPage() {
                         placeholder="$aact_..." />
                     </FormField>
                     <FormField label="Ambiente">
-                      <select className={selectCls}
+                      <select className={inputCls}
                         value={params['asaas_ambiente'] ?? 'sandbox'}
                         onChange={async e => { await salvarParam('asaas_ambiente', e.target.value); setOkERP(true) }}>
                         <option value="sandbox">Sandbox (testes)</option>
