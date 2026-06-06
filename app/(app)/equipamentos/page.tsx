@@ -1466,13 +1466,15 @@ export default function EquipamentosPage() {
       {modalLocado && (
         <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}
           onClick={e=>{if(e.target===e.currentTarget){setModalLocado(null)}}}>
-          <div style={{background:'#1e293b',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',width:'100%',maxWidth:620,maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 64px rgba(0,0,0,0.6)',overflow:'hidden'}}>
+          <div style={{background:'#1e293b',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',width:'100%',maxWidth:680,maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 64px rgba(0,0,0,0.6)',overflow:'hidden'}}>
 
             {/* Header */}
             <div style={{padding:'16px 20px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0,background:'rgba(14,165,233,0.06)'}}>
               <div>
                 <div style={{fontWeight:700,fontSize:15,color:'var(--t-primary)'}}>📦 Equipamento em Locação</div>
-                <div style={{fontSize:12,color:'var(--t-muted)',marginTop:2}}>{modalLocado.nome} · {modalLocado.locPat} patrimônio(s) locado(s)</div>
+                <div style={{fontSize:12,color:'var(--t-muted)',marginTop:2}}>
+                  {modalLocado.nome} · {loadingLocado ? '...' : `${contratosLocado.length} contrato(s) ativo(s)`}
+                </div>
               </div>
               <button onClick={()=>setModalLocado(null)} style={{background:'none',border:'none',color:'var(--t-muted)',cursor:'pointer',fontSize:20,lineHeight:1}}>×</button>
             </div>
@@ -1486,54 +1488,51 @@ export default function EquipamentosPage() {
                   Nenhum contrato ativo encontrado para este equipamento.
                 </div>
               ) : (
-                <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
-                  <thead>
-                    <tr style={{borderBottom:'2px solid var(--border)'}}>
-                      {[
-                        ...(modalLocado?.controla_patrimonio ? ['Patrimônio'] : []),
-                        'Contrato','Cliente','Qtd','Período','Status'
-                      ].map(h=>(
-                        <th key={h} style={{textAlign:'left',padding:'6px 10px',fontSize:11,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:700}}>{h}</th>
-                      ))}
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {contratosLocado.map((c,i)=>(
-                      <tr key={i} style={{borderBottom:'1px solid rgba(255,255,255,0.05)',background:i%2===0?'transparent':'rgba(255,255,255,0.02)'}}>
-                        {modalLocado?.controla_patrimonio && (
-                          <td style={{padding:'10px 10px',fontFamily:'monospace',color:'var(--t-secondary)',fontWeight:600}}>
-                            {c.patrimonio_num}
-                          </td>
-                        )}
-                        <td style={{padding:'10px 10px'}}>
-                          <a href={`/contratos/${c.contrato_id}`} onClick={()=>setModalLocado(null)}
-                            style={{color:'#818cf8',fontWeight:700,fontFamily:'monospace',textDecoration:'none',display:'inline-flex',alignItems:'center',gap:4}}>
-                            {c.contrato_num}<span style={{fontSize:10,opacity:0.7}}>↗</span>
-                          </a>
-                        </td>
-                        <td style={{padding:'10px 10px',color:'var(--t-primary)',maxWidth:150,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                <div style={{display:'flex',flexDirection:'column',gap:8}}>
+                  {/* Cabeçalho */}
+                  <div style={{display:'grid',gridTemplateColumns:modalLocado?.controla_patrimonio?'90px 1fr 1fr 50px 80px':'1fr 1fr 50px 80px',gap:8,padding:'6px 12px',borderBottom:'1px solid var(--border)'}}>
+                    {modalLocado?.controla_patrimonio && <div style={{fontSize:11,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:700}}>Patrimônio</div>}
+                    <div style={{fontSize:11,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:700}}>Contrato · Cliente</div>
+                    <div style={{fontSize:11,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:700}}>Período</div>
+                    <div style={{fontSize:11,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:700,textAlign:'center'}}>Qtd</div>
+                    <div style={{fontSize:11,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:700}}>Status</div>
+                  </div>
+                  {/* Linhas */}
+                  {contratosLocado.map((c,i)=>(
+                    <div key={i} style={{display:'grid',gridTemplateColumns:modalLocado?.controla_patrimonio?'90px 1fr 1fr 50px 80px':'1fr 1fr 50px 80px',gap:8,padding:'10px 12px',borderRadius:8,background:i%2===0?'transparent':'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.04)',alignItems:'center'}}>
+                      {modalLocado?.controla_patrimonio && (
+                        <div style={{fontFamily:'monospace',color:'var(--t-secondary)',fontWeight:700,fontSize:12}}>
+                          {c.patrimonio_num}
+                        </div>
+                      )}
+                      <div>
+                        <a href={`/contratos/${c.contrato_id}`} onClick={()=>setModalLocado(null)}
+                          style={{color:'#818cf8',fontWeight:700,fontFamily:'monospace',textDecoration:'none',fontSize:13,display:'flex',alignItems:'center',gap:3}}>
+                          {c.contrato_num} <span style={{fontSize:10,opacity:0.6}}>↗</span>
+                        </a>
+                        <div style={{fontSize:12,color:'var(--t-muted)',marginTop:2,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                           {c.cliente || '—'}
-                        </td>
-                        <td style={{padding:'10px 10px',textAlign:'center',fontWeight:700,color:'var(--t-secondary)'}}>
-                          {c.quantidade}
-                        </td>
-                        <td style={{padding:'10px 10px',color:'var(--t-muted)',fontSize:12,whiteSpace:'nowrap'}}>
-                          {c.data_inicio ? new Date(c.data_inicio+'T12:00:00').toLocaleDateString('pt-BR') : '—'}
-                          {c.data_fim ? <> → {new Date(c.data_fim+'T12:00:00').toLocaleDateString('pt-BR')}</> : ' → em aberto'}
-                        </td>
-                        <td style={{padding:'10px 10px'}}>
-                          <span style={{
-                            display:'inline-block',padding:'2px 8px',borderRadius:99,fontSize:11,fontWeight:700,
-                            background: c.status==='ativo'?'rgba(52,211,153,0.15)':c.status==='rascunho'?'rgba(251,191,36,0.15)':'rgba(148,163,184,0.15)',
-                            color:      c.status==='ativo'?'#34d399':c.status==='rascunho'?'#fbbf24':'#94a3b8',
-                          }}>
-                            {c.status}
-                          </span>
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
+                        </div>
+                      </div>
+                      <div style={{fontSize:12,color:'var(--t-muted)'}}>
+                        <div>{c.data_inicio ? new Date(c.data_inicio+'T12:00:00').toLocaleDateString('pt-BR') : '—'}</div>
+                        <div>{c.data_fim ? `→ ${new Date(c.data_fim+'T12:00:00').toLocaleDateString('pt-BR')}` : '→ em aberto'}</div>
+                      </div>
+                      <div style={{textAlign:'center',fontWeight:700,color:'var(--t-secondary)',fontSize:14}}>
+                        {c.quantidade}
+                      </div>
+                      <div>
+                        <span style={{
+                          display:'inline-block',padding:'3px 8px',borderRadius:99,fontSize:11,fontWeight:700,
+                          background: c.status==='ativo'?'rgba(52,211,153,0.15)':c.status==='rascunho'?'rgba(251,191,36,0.15)':'rgba(148,163,184,0.15)',
+                          color:      c.status==='ativo'?'#34d399':c.status==='rascunho'?'#fbbf24':'#94a3b8',
+                        }}>
+                          {c.status}
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
