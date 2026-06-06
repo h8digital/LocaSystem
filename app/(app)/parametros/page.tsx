@@ -692,7 +692,8 @@ export default function ParametrosPage() {
                         { n:'2', t:'URL do Webhook', d:'https://locasystem.vercel.app/api/asaas/webhook' },
                         { n:'3', t:'Eventos a ativar', d:'PAYMENT_RECEIVED · PAYMENT_CONFIRMED · PAYMENT_OVERDUE · PAYMENT_CANCELLED' },
                         { n:'4', t:'Versão da API', d:'v3' },
-                        { n:'5', t:'Token de assinatura', d: params['asaas_webhook_token'] ? '✅ Configurado — validação ativa' : '⚠️ Não configurado — configure em Asaas → Webhook → Token' },
+                        { n:'5', t:'Access Token', d: params['asaas_webhook_token'] ? '✅ Configurado — validação ativa' : '⚠️ Não configurado' },
+                        { n:'6', t:'Como configurar', d: 'No Asaas: Configurações → Integrações → Webhook → campo Access Token. Cole o token gerado pelo Asaas nos parâmetros acima.' },
                       ].map(s => (
                         <div key={s.n} style={{ display:'flex', gap:10, alignItems:'flex-start' }}>
                           <div style={{ width:22, height:22, borderRadius:'50%', background:'rgba(99,102,241,0.2)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:11, fontWeight:700, color:'#818cf8', flexShrink:0 }}>{s.n}</div>

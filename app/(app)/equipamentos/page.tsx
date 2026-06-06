@@ -605,29 +605,39 @@ export default function EquipamentosPage() {
                     {/* Disponível */}
                     <td style={{ textAlign:'center' }}>
                       {p.controla_patrimonio ? (
-                        <span style={{ fontWeight:700, color: p.dispPat > 0 ? '#16a34a' : 'var(--t-muted)' }}>
+                        // Com patrimônio: mostra disponíveis / total
+                        <span style={{ fontWeight:700, color: p.dispPat > 0 ? '#16a34a' : 'var(--t-muted)' }}
+                          title={`${p.dispPat} disponível(is) de ${p.totalPat} patrimônio(s) cadastrado(s)`}>
                           {p.dispPat} / {p.totalPat}
                         </span>
                       ) : (
-                        <span style={{ fontWeight:700, color: p.disponivel > 0 ? '#16a34a' : 'var(--t-muted)' }}>
-                          {p.disponivel} {p.unidade}
+                        // Sem patrimônio: mostra quantidade disponível
+                        <span style={{ fontWeight:700, color: p.disponivel > 0 ? '#16a34a' : 'var(--t-muted)' }}
+                          title="Quantidade disponível em estoque">
+                          {p.disponivel} / {p.estoque_total ?? p.disponivel + p.qtdLocada}
                         </span>
                       )}
                     </td>
 
                     {/* Locado */}
                     <td style={{ textAlign:'center' }}>
-                      {p.controla_patrimonio && (p.locPat > 0) ? (
-                        <button onClick={()=>abrirLocado(p)} style={{
-                          background:'none', border:'none', cursor:'pointer', padding:'2px 6px',
-                          borderRadius:6, fontWeight:700, color:'var(--c-primary)',
-                          fontSize:'var(--fs-md)', textDecoration:'underline dotted',
-                        }} title="Ver contratos vinculados">
-                          {p.locPat}
-                        </button>
+                      {p.controla_patrimonio ? (
+                        p.locPat > 0 ? (
+                          <button onClick={()=>abrirLocado(p)} style={{
+                            background:'rgba(14,165,233,0.1)', border:'1px solid rgba(14,165,233,0.3)',
+                            borderRadius:6, cursor:'pointer', padding:'2px 10px',
+                            fontWeight:700, color:'var(--c-primary)', fontSize:'var(--fs-md)',
+                          }} title="Clique para ver os contratos vinculados">
+                            {p.locPat} ↗
+                          </button>
+                        ) : (
+                          <span style={{ color:'var(--t-muted)', fontWeight:600 }}>0</span>
+                        )
                       ) : (
-                        <span style={{ fontWeight:700, color: p.locPat > 0 || p.qtdLocada > 0 ? 'var(--c-primary)' : 'var(--t-muted)' }}>
-                          {p.controla_patrimonio ? p.locPat : p.qtdLocada}{p.controla_patrimonio ? '' : ` ${p.unidade}`}
+                        // Sem patrimônio: só exibe quantidade, sem link (não há patrimônio para rastrear)
+                        <span style={{ fontWeight:700, color: p.qtdLocada > 0 ? 'var(--c-primary)' : 'var(--t-muted)' }}
+                          title="Quantidade em locação (sem controle de patrimônio individual)">
+                          {p.qtdLocada}
                         </span>
                       )}
                     </td>

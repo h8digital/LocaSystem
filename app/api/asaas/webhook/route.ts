@@ -1,4 +1,4 @@
-// build: 2026-06-05 — Webhook Asaas com validação de assinatura
+// build: 2026-06-06 — Webhook Asaas com validação por token simples (padrão Asaas)
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 export const runtime = 'nodejs'
@@ -8,29 +8,23 @@ const sb = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
 )
 
-// Valida a assinatura HMAC-SHA256 do Asaas
-async function validarAssinatura(req: NextRequest, rawBody: string): Promise<boolean> {
+// O Asaas envia o token configurado no header 'asaas-access-token'
+// Comparação direta — não HMAC
+async function validarToken(req: NextRequest): Promise<boolean> {
   try {
     const { data } = await sb.from('parametros')
       .select('valor').eq('chave', 'asaas_webhook_token').maybeSingle()
-    const secret = (data as any)?.valor
-    if (!secret) return true // sem token configurado, aceita tudo
+    const tokenSalvo = (data as any)?.valor
+    if (!tokenSalvo) return true // sem token configurado, aceita tudo
 
-    const assinatura = req.headers.get('asaas-signature') || req.headers.get('x-asaas-signature')
-    if (!assinatura) return false
+    // Asaas envia em asaas-access-token
+    const tokenRecebido = req.headers.get('asaas-access-token')
+      || req.headers.get('access-token')
+      || req.headers.get('authorization')?.replace('Bearer ', '')
 
-    // HMAC-SHA256
-    const encoder = new TextEncoder()
-    const key = await crypto.subtle.importKey(
-      'raw', encoder.encode(secret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false, ['sign']
-    )
-    const signed = await crypto.subtle.sign('HMAC', key, encoder.encode(rawBody))
-    const expected = Buffer.from(signed).toString('hex')
-    return expected === assinatura || `sha256=${expected}` === assinatura
+    return tokenRecebido === tokenSalvo
   } catch {
-    return true // em caso de erro na validação, aceita (não bloqueia)
+    return true
   }
 }
 
@@ -40,10 +34,10 @@ export async function POST(req: NextRequest) {
     const body = JSON.parse(rawBody)
     const { event, payment } = body
 
-    // Validar assinatura
-    const valido = await validarAssinatura(req, rawBody)
+    // Validar token
+    const valido = await validarToken(req)
     if (!valido) {
-      return NextResponse.json({ ok: false, error: 'Assinatura inválida' }, { status: 401 })
+      return NextResponse.json({ ok: false, error: 'Token inválido' }, { status: 401 })
     }
 
     if (!payment?.id) return NextResponse.json({ ok: true, msg: 'Sem payment ID' })
@@ -65,12 +59,12 @@ export async function POST(req: NextRequest) {
         valor_pago:      Number(payment.value ?? fat.valor),
         valor_recebido:  Number(payment.value ?? fat.valor),
         saldo_restante:  0,
-        data_pagamento:  payment.paymentDate ?? hoje,
+        data_pagamento:  payment.paymentDate ?? payment.clientPaymentDate ?? hoje,
         forma_pagamento: payment.billingType?.toLowerCase() ?? 'pix',
         observacoes:     `Pago via Asaas (${payment.billingType}) — ID: ${payment.id}`,
       }).eq('id', fat.id)
 
-      // Notificar usuários do ERP
+      // Notificar usuários
       const { data: usuarios } = await sb.from('usuarios')
         .select('id').in('perfil', ['admin','gerente','vendedor']).eq('ativo', 1)
       if (usuarios?.length) {
@@ -88,15 +82,13 @@ export async function POST(req: NextRequest) {
 
     if (event === 'PAYMENT_OVERDUE') {
       await sb.from('faturas').update({
-        status:       'vencida',
-        asaas_status: payment.status,
+        status: 'vencida', asaas_status: payment.status,
       }).eq('id', fat.id)
     }
 
     if (event === 'PAYMENT_CANCELLED') {
       await sb.from('faturas').update({
-        asaas_status:     payment.status,
-        asaas_payment_id: null,
+        asaas_status: payment.status, asaas_payment_id: null,
       }).eq('id', fat.id)
     }
 
