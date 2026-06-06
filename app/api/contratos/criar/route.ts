@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       usuario_id:           user.id,
       periodo_id:           contrato.periodo_id || null,
       data_inicio:          contrato.data_inicio,
-      data_fim:             contrato.data_fim,
+      data_fim:             contrato.data_fim || null,  // mensal: null (sem data fim)
       forma_pagamento:      contrato.forma_pagamento || 'pix',
       caucao:               Number(contrato.caucao) || 0,
       subtotal:             Number(subtotal) || 0,
@@ -117,8 +117,17 @@ export async function POST(req: NextRequest) {
     if (numFatError) return NextResponse.json({ ok:false, error:'Erro ao gerar número da fatura: ' + numFatError.message })
     const numFatura = numFatData as string
 
-    const dataVenc = contrato.data_venc_fatura || contrato.data_fim
     const hoje = new Date().toISOString().split('T')[0]
+    // Para mensal: vencimento no dia configurado do mês atual, ou hoje
+    let dataVenc = contrato.data_venc_fatura || contrato.data_fim || null
+    if (!dataVenc && contrato.tipo_contrato === 'mensal' && contrato.dia_vencimento) {
+      const dv = Number(contrato.dia_vencimento)
+      const now = new Date()
+      const venc = new Date(now.getFullYear(), now.getMonth(), Math.min(dv, 28))
+      if (venc < now) venc.setMonth(venc.getMonth() + 1)
+      dataVenc = venc.toISOString().split('T')[0]
+    }
+    if (!dataVenc) dataVenc = hoje
     await sb.from('faturas').insert({
       contrato_id:     c.id,
       numero:          numFatura,

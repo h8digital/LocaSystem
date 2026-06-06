@@ -108,7 +108,9 @@ export async function POST(req: NextRequest) {
     }).eq('id', contrato_id)
 
     return NextResponse.json({
-      ok: true,
+      ok:          true,
+      contrato_id: contrato_id,
+      numero:      contrato.numero,
       msg: `Contrato ${contrato.numero} ativado. Remessa registrada. ${itens.length} item(ns) com status atualizado para LOCADO.`,
     })
   } catch (e: any) {

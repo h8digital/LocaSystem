@@ -99,6 +99,8 @@ export default function CriarContratoPage() {
   const [periodos,  setPeriodos]  = useState<any[]>([])
   const [itens,     setItens]     = useState<any[]>([])
   const [saving,    setSaving]    = useState(false)
+  const [modalAtivar, setModalAtivar] = useState<{id:number; numero:string}|null>(null)
+  const [ativando,    setAtivando]    = useState(false)
   const [erro,      setErro]      = useState('')
   const [carregandoAnterior, setCarregandoAnterior] = useState(false)
 
@@ -471,8 +473,43 @@ export default function CriarContratoPage() {
     const res=await fetch('/api/contratos/criar',{method:'POST',headers:{'Content-Type':'application/json'},
       body:JSON.stringify({...form,...localUso,cliente_id:clienteId,itens,subtotal,total,totalLimpeza,comissao_valor:comissaoVal})})
     const result=await res.json()
-    if(result.ok) router.push(`/contratos/${result.id}`)
-    else { setErro('Erro: '+result.error); setSaving(false) }
+    if(result.ok) {
+      // Mostrar modal perguntando se quer ativar o contrato
+      setModalAtivar({ id: result.id, numero: result.numero })
+    } else {
+      setErro('Erro: '+result.error)
+    }
+    setSaving(false)
+  }
+
+  async function ativarEImprimir(contratoId: number, numero: string) {
+    setAtivando(true)
+    try {
+      // 1. Ativar o contrato
+      const res = await fetch('/api/contratos/ativar', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ contrato_id: contratoId }),
+      })
+      const d = await res.json()
+      if (!d.ok) { alert('Erro ao ativar: ' + d.error); setAtivando(false); return }
+
+      // 2. Gerar e imprimir a Ordem de Locação (template_id=1)
+      try {
+        const docRes = await fetch('/api/documentos/gerar', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ contrato_id: contratoId, template_id: 1 }),
+        })
+        const docData = await docRes.json()
+        if (docData.ok && docData.token) {
+          window.open(`/doc/${docData.token}`, '_blank')
+        }
+      } catch(_) {}
+
+      router.push(`/contratos/${contratoId}`)
+    } catch(e: any) {
+      alert('Erro: ' + e.message)
+    }
+    setAtivando(false)
   }
 
   return (
@@ -1172,6 +1209,59 @@ export default function CriarContratoPage() {
           }
         </div>
       </div>
+
+      {/* ── Modal: Ativar Contrato ──────────────────────────────────────────── */}
+      {modalAtivar && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.7)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}>
+          <div style={{background:'#1e293b',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',width:'100%',maxWidth:480,boxShadow:'0 24px 64px rgba(0,0,0,0.6)',overflow:'hidden'}}>
+
+            {/* Header */}
+            <div style={{background:'rgba(52,211,153,0.08)',borderBottom:'1px solid var(--border)',padding:'18px 22px',textAlign:'center'}}>
+              <div style={{fontSize:36,marginBottom:8}}>✅</div>
+              <div style={{fontWeight:800,fontSize:16,color:'#34d399'}}>Contrato salvo com sucesso!</div>
+              <div style={{fontSize:12,color:'var(--t-muted)',marginTop:4,fontFamily:'monospace'}}>{modalAtivar.numero}</div>
+            </div>
+
+            {/* Body */}
+            <div style={{padding:'20px 24px',display:'flex',flexDirection:'column',gap:14}}>
+              <div style={{fontSize:14,color:'var(--t-secondary)',textAlign:'center',lineHeight:1.6}}>
+                Deseja <strong style={{color:'var(--t-primary)'}}>ativar o contrato agora</strong> e imprimir a{' '}
+                <strong style={{color:'#818cf8'}}>Ordem de Locação</strong>?
+              </div>
+
+              <div style={{background:'rgba(99,102,241,0.06)',border:'1px solid rgba(99,102,241,0.2)',borderRadius:'var(--r-md)',padding:'12px 16px',fontSize:13,color:'var(--t-muted)',lineHeight:1.6}}>
+                🖨️ Ao ativar, a <strong style={{color:'var(--t-secondary)'}}>Ordem de Locação de Bens Móveis</strong> será gerada e aberta automaticamente para impressão.
+              </div>
+
+              <div style={{display:'flex',gap:10,marginTop:4}}>
+                {/* Só salvar — ir para o contrato sem ativar */}
+                <button
+                  onClick={()=>router.push(`/contratos/${modalAtivar.id}`)}
+                  style={{flex:1,padding:'12px',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'transparent',color:'var(--t-secondary)',cursor:'pointer',fontSize:13,fontWeight:600}}>
+                  Salvar como rascunho
+                </button>
+
+                {/* Ativar + imprimir */}
+                <button
+                  onClick={()=>ativarEImprimir(modalAtivar.id, modalAtivar.numero)}
+                  disabled={ativando}
+                  style={{flex:2,padding:'12px',borderRadius:'var(--r-md)',border:'none',
+                    background: ativando ? '#334155' : 'linear-gradient(135deg,#6366f1,#8b5cf6)',
+                    color:'#fff',cursor:ativando?'not-allowed':'pointer',fontSize:14,fontWeight:700,
+                    display:'flex',alignItems:'center',justifyContent:'center',gap:8}}>
+                  {ativando ? (
+                    <><div style={{width:16,height:16,border:'2px solid rgba(255,255,255,0.3)',borderTop:'2px solid #fff',borderRadius:'50%',animation:'spin 0.8s linear infinite'}}/> Ativando...</>
+                  ) : (
+                    <>🚀 Ativar e Imprimir Ordem</>
+                  )}
+                </button>
+              </div>
+            </div>
+          </div>
+          <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
+        </div>
+      )}
+
     </div>
   )
 }
