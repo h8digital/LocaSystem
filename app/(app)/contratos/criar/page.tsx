@@ -348,36 +348,38 @@ export default function CriarContratoPage() {
   
   async function loadPatrimonios(produtoId:number) {
     setLoadingPats(true)
-    // Buscar todos disponíveis + os locados que estão apenas em rascunho/encerrado
+
+    // Buscar patrimônios disponíveis para locação
     const { data: disponiveis } = await supabase.from('patrimonios')
       .select('id,numero_patrimonio,numero_serie,status,finalidade')
       .eq('produto_id', produtoId)
-      .eq('status', 'disponivel')
       .eq('finalidade', 'locacao')
       .is('deleted_at', null)
+      .in('status', ['disponivel','locado']) // incluir locado para verificar abaixo
       .order('numero_patrimonio')
 
-    // Patrimônios "locados" mas sem contrato ativo real (presos em rascunho)
-    const { data: locados } = await supabase.from('patrimonios')
-      .select('id,numero_patrimonio,numero_serie,status,finalidade')
-      .eq('produto_id', produtoId)
-      .eq('status', 'locado')
-      .eq('finalidade', 'locacao')
-      .is('deleted_at', null)
-      .order('numero_patrimonio')
-
-    // Filtrar locados: só incluir os que NÃO têm contrato ativo
-    const liberaveis: any[] = []
-    for (const pat of (locados ?? [])) {
-      const { data: ativo } = await supabase.from('contrato_itens')
-        .select('contrato_id, contratos!inner(status)')
-        .eq('patrimonio_id', pat.id)
-        .in('contratos.status' as any, ['ativo','em_devolucao','pendente_manutencao'])
-        .limit(1).maybeSingle()
-      if (!ativo) liberaveis.push({ ...pat, status: 'disponivel' }) // trata como disponível
+    // Para os locados, verificar via RPC se há contrato ativo real
+    // Filtrar: só mostrar disponivel, ou locado sem contrato ativo
+    const resultado: any[] = []
+    for (const pat of (disponiveis ?? [])) {
+      if (pat.status === 'disponivel') {
+        resultado.push(pat)
+      } else {
+        // Verificar se tem contrato ativo (não rascunho/encerrado)
+        const { data: contratoAtivo } = await supabase
+          .from('contratos')
+          .select('id')
+          .eq('status', 'ativo')
+          .in('id',
+            (await supabase.from('contrato_itens').select('contrato_id').eq('patrimonio_id', pat.id)).data?.map((r:any)=>r.contrato_id) ?? [0]
+          )
+          .limit(1)
+          .maybeSingle()
+        if (!contratoAtivo) resultado.push({ ...pat, status: 'disponivel' })
+      }
     }
 
-    setPatrimonios([...(disponiveis ?? []), ...liberaveis])
+    setPatrimonios(resultado)
     setLoadingPats(false)
   }
 
