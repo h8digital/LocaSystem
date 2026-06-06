@@ -121,7 +121,7 @@ export default function EquipamentosPage() {
     const lista: any[] = []
     for (const pat of (data ?? [])) {
       for (const ci of (pat.contrato_itens ?? [])) {
-        const ct = ci.contratos
+        const ct = (Array.isArray(ci.contratos) ? ci.contratos[0] : ci.contratos) as any
         if (!ct || ['encerrado','cancelado'].includes(ct.status)) continue
         lista.push({
           patrimonio_num: pat.numero_patrimonio,
