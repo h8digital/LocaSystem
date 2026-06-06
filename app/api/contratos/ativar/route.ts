@@ -47,24 +47,39 @@ export async function POST(req: NextRequest) {
           error: `O item "${prod.nome}" é rastreável e exige vinculação de um número de série/patrimônio.`
         })
       }
-      // Patrimônio não pode estar em outro contrato ativo
+      // Patrimônio não pode estar em outro contrato ATIVO (encerrados/cancelados não contam)
       if (item.patrimonio_id) {
-        const { data: pat } = await sb.from('patrimonios').select('status, numero_patrimonio').eq('id', item.patrimonio_id).single()
+        const { data: pat } = await sb.from('patrimonios')
+          .select('status, numero_patrimonio').eq('id', item.patrimonio_id).single()
+
         if (pat?.status === 'locado') {
-          // Verificar se pertence a este mesmo contrato (marcado na criação) ou a outro
-          const { data: outroContrato } = await sb.from('contrato_itens')
+          // Verificar se há outro contrato ATIVO (não encerrado/cancelado/rascunho) com este patrimônio
+          const { data: itensOutros } = await sb.from('contrato_itens')
             .select('contrato_id')
             .eq('patrimonio_id', item.patrimonio_id)
             .neq('contrato_id', contrato_id)
-            .limit(1).maybeSingle()
-          if (outroContrato) {
+
+          const outrosIds = (itensOutros ?? []).map((r: any) => r.contrato_id).filter(Boolean)
+
+          let conflito = false
+          if (outrosIds.length > 0) {
+            const { data: ativosReais } = await sb.from('contratos')
+              .select('id')
+              .in('id', outrosIds)
+              .in('status', ['ativo', 'em_devolucao', 'pendente_manutencao'])
+              .limit(1)
+            conflito = (ativosReais?.length ?? 0) > 0
+          }
+
+          if (conflito) {
             return NextResponse.json({
               ok: false,
               error: `O patrimônio "${pat.numero_patrimonio}" já está locado em outro contrato ativo.`
             })
           }
-          // Pertence a este contrato — OK, já estava marcado na criação
+          // Pertence a este contrato ou apenas a contratos encerrados — OK
         }
+
         if (pat?.status === 'manutencao') {
           return NextResponse.json({
             ok: false,

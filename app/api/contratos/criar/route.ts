@@ -77,32 +77,32 @@ export async function POST(req: NextRequest) {
         valor_limpeza:       Number(item.valor_limpeza) || 0,
       })
       if (item.patrimonio_id) {
-        // Verificar se patrimônio está disponível antes de reservar
         const { data: pat } = await sb.from('patrimonios')
           .select('status, numero_patrimonio').eq('id', item.patrimonio_id).single()
 
         if (pat?.status === 'locado') {
-          // Verificar se está em contrato ativo real (não apenas rascunho)
-          const { data: contratoAtivo } = await sb.from('contrato_itens')
-            .select('contrato_id, contratos!inner(status)')
-            .eq('patrimonio_id', item.patrimonio_id)
-            .in('contratos.status', ['ativo','em_devolucao','pendente_manutencao'])
-            .limit(1).maybeSingle()
-
-          if (contratoAtivo) {
+          // Só bloqueia se houver contrato ATIVO real com este patrimônio
+          const { data: itensOutros } = await sb.from('contrato_itens')
+            .select('contrato_id').eq('patrimonio_id', item.patrimonio_id)
+          const outrosIds = (itensOutros ?? []).map((r:any) => r.contrato_id).filter(Boolean)
+          let conflito = false
+          if (outrosIds.length > 0) {
+            const { data: ativos } = await sb.from('contratos').select('id')
+              .in('id', outrosIds)
+              .in('status', ['ativo','em_devolucao','pendente_manutencao'])
+              .limit(1)
+            conflito = (ativos?.length ?? 0) > 0
+          }
+          if (conflito) {
             return NextResponse.json({ ok: false, error: `Patrimônio "${pat.numero_patrimonio}" já está locado em um contrato ativo.` })
           }
-          // Estava preso em rascunho/encerrado — liberar e continuar
-          // (o trigger deveria ter feito isso, mas garantimos aqui)
         }
-
         if (pat?.status === 'manutencao') {
           return NextResponse.json({ ok: false, error: `Patrimônio "${pat.numero_patrimonio}" está em manutenção.` })
         }
         if (pat?.status === 'descartado') {
           return NextResponse.json({ ok: false, error: `Patrimônio "${pat.numero_patrimonio}" está descartado.` })
         }
-
         // Marcar como locado
         await sb.from('patrimonios').update({ status: 'locado' }).eq('id', item.patrimonio_id)
       }
