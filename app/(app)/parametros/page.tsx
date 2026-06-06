@@ -1,6 +1,6 @@
 // build: 2026-06-01
 'use client'
-import { useEffect, useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Btn, PageHeader, FormField, inputCls, textareaCls, Badge, SlidePanel } from '@/components/ui'
 
@@ -319,7 +319,32 @@ export default function ParametrosPage() {
   const endsFiltrados  = tiposEnd.filter(t => !buscaEnd || t.nome.toLowerCase().includes(buscaEnd.toLowerCase()))
   const locaisFiltrados = locais.filter(l => !buscaLoc || l.nome.toLowerCase().includes(buscaLoc.toLowerCase()))
 
-  const isERP  = ['empresa','financeiro','contratos','cobrancas'].includes(secao)
+  const isERP  = ['empresa','financeiro','contratos','cobrancas','dev'].includes(secao)
+  const [limpando,      setLimpando]      = React.useState(false)
+  const [resultLimpeza, setResultLimpeza] = React.useState<any>(null)
+  const [modosLimpeza,  setModosLimpeza]  = React.useState<string[]>([])
+
+  async function executarLimpeza() {
+    const modos = modosLimpeza
+    if (!modos.length) { alert('Selecione pelo menos um tipo de dado para limpar.'); return }
+    const texto = modos.includes('tudo') ? 'TODOS OS DADOS' : modos.join(', ').toUpperCase()
+    const conf1 = window.prompt(`⚠️ ATENÇÃO: Esta ação é IRREVERSÍVEL.\n\nDigite LIMPAR para confirmar a exclusão de: ${texto}`)
+    if (conf1 !== 'LIMPAR') { alert('Operação cancelada.'); return }
+    const conf2 = window.confirm(`🚨 ÚLTIMA CONFIRMAÇÃO\n\nTodos os ${texto} serão deletados permanentemente do banco de dados.\n\nTem ABSOLUTA certeza?`)
+    if (!conf2) return
+    setLimpando(true); setResultLimpeza(null)
+    try {
+      const modo = modos.includes('tudo') ? 'tudo' : modos[0]
+      const res = await fetch('/api/admin/limpar-testes', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ confirmar: 'CONFIRMAR_LIMPEZA', modo }),
+      })
+      const d = await res.json()
+      setResultLimpeza(d)
+    } catch(e: any) { setResultLimpeza({ ok: false, error: e.message }) }
+    setLimpando(false)
+  }
   const isSite = secao === 'site'
 
   return (
@@ -354,6 +379,7 @@ export default function ParametrosPage() {
             <NavItem id="contratos"  active={secao==='contratos'}  icon="📄" label="Contratos"  onClick={()=>setSecao('contratos')} />
             <NavItem id="site"       active={secao==='site'}       icon="🌐" label="Site Kanoff" onClick={()=>setSecao('site')} />
             <NavItem id="cobrancas"  active={secao==='cobrancas'}  icon="💳" label="Cobranças Asaas" onClick={()=>setSecao('cobrancas')} />
+            <NavItem id="dev"        active={secao==='dev'}        icon="🛠️" label="Desenvolvedor" onClick={()=>setSecao('dev')} />
           </NavGroup>
 
           <NavGroup label="Cadastros">
@@ -678,6 +704,82 @@ export default function ParametrosPage() {
                       ))}
                     </div>
                   </div>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {secao === 'dev' && (
+            <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+              <div className="ds-card" style={{ border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.04)' }}>
+                <div className="ds-card-header" style={{ borderBottom:'1px solid rgba(239,68,68,0.2)' }}>
+                  <span className="ds-card-title" style={{ color:'#f87171' }}>🧹 Limpeza de Dados de Teste</span>
+                </div>
+                <div className="ds-card-body" style={{ display:'flex', flexDirection:'column', gap:16 }}>
+                  <div style={{ background:'rgba(239,68,68,0.08)', border:'1px solid rgba(239,68,68,0.2)', borderRadius:'var(--r-md)', padding:'12px 16px', fontSize:13, color:'#fca5a5', lineHeight:1.6 }}>
+                    <strong>⚠️ ATENÇÃO:</strong> Esta operação é <strong>irreversível</strong>. Use apenas em ambiente de testes. Todos os dados selecionados serão permanentemente removidos do banco de dados.
+                  </div>
+
+                  <div style={{ fontWeight:700, color:'var(--t-secondary)', fontSize:13 }}>Selecione o que deseja limpar:</div>
+
+                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:10 }}>
+                    {[
+                      { id:'contratos', label:'📋 Contratos', desc:'Contratos, faturas, itens, timeline, devoluções' },
+                      { id:'clientes',  label:'👤 Clientes',  desc:'Clientes e endereços cadastrados' },
+                      { id:'cotacoes',  label:'📝 Cotações',  desc:'Cotações e itens de cotação' },
+                      { id:'docs',      label:'📄 Documentos', desc:'Documentos e faturas geradas' },
+                      { id:'tudo',      label:'💣 TUDO',      desc:'Limpa absolutamente tudo', danger: true },
+                    ].map(op => {
+                      const sel = modosLimpeza.includes(op.id)
+                      return (
+                        <button key={op.id}
+                          onClick={() => {
+                            if (op.id === 'tudo') { setModosLimpeza(['tudo']); return }
+                            setModosLimpeza(prev => prev.includes('tudo') ? [op.id] : prev.includes(op.id) ? prev.filter(x => x !== op.id) : [...prev, op.id])
+                          }}
+                          style={{
+                            padding:'12px 14px', borderRadius:'var(--r-md)', textAlign:'left', cursor:'pointer',
+                            border:`2px solid ${sel ? (op.id==='tudo'?'#ef4444':'var(--c-primary)') : 'var(--border)'}`,
+                            background: sel ? (op.id==='tudo'?'rgba(239,68,68,0.1)':'rgba(99,102,241,0.1)') : 'var(--bg-header)',
+                          }}>
+                          <div style={{ fontWeight:700, color: op.id==='tudo'?'#f87171':'var(--t-primary)', fontSize:13 }}>{op.label}</div>
+                          <div style={{ fontSize:11, color:'var(--t-muted)', marginTop:3 }}>{op.desc}</div>
+                        </button>
+                      )
+                    })}
+                  </div>
+
+                  {resultLimpeza && (
+                    <div style={{
+                      background: resultLimpeza.ok ? 'rgba(52,211,153,0.08)' : 'rgba(239,68,68,0.08)',
+                      border: `1px solid ${resultLimpeza.ok ? 'rgba(52,211,153,0.3)' : 'rgba(239,68,68,0.3)'}`,
+                      borderRadius:'var(--r-md)', padding:'12px 16px', fontSize:13,
+                    }}>
+                      {resultLimpeza.ok ? (
+                        <div>
+                          <div style={{ fontWeight:700, color:'#34d399', marginBottom:8 }}>✅ Limpeza concluída com sucesso</div>
+                          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:6 }}>
+                            {Object.entries(resultLimpeza.stats ?? {}).map(([k,v]:any) => (
+                              <div key={k} style={{ background:'rgba(255,255,255,0.04)', borderRadius:6, padding:'6px 10px' }}>
+                                <div style={{ fontSize:10, color:'var(--t-muted)', textTransform:'uppercase' }}>{k.replace(/_/g,' ')}</div>
+                                <div style={{ fontWeight:700, color:'#34d399', fontSize:14 }}>{v}</div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      ) : (
+                        <div style={{ color:'#f87171' }}>❌ Erro: {resultLimpeza.error}</div>
+                      )}
+                    </div>
+                  )}
+
+                  <Btn
+                    onClick={executarLimpeza}
+                    loading={limpando}
+                    disabled={modosLimpeza.length === 0}
+                    style={{ background:'#dc2626', border:'none', alignSelf:'flex-start', padding:'10px 24px', fontSize:14 }}>
+                    🗑️ Executar Limpeza
+                  </Btn>
                 </div>
               </div>
             </div>
