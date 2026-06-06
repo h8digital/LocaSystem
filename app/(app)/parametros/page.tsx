@@ -711,6 +711,90 @@ export default function ParametrosPage() {
 
           {secao === 'dev' && (
             <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
+
+              {/* ── Toggle Modo de Teste ── */}
+              <div className="ds-card" style={{
+                border:`1px solid ${params['modo_teste']==='true' ? 'rgba(251,191,36,0.5)' : 'rgba(255,255,255,0.08)'}`,
+                background: params['modo_teste']==='true' ? 'rgba(251,191,36,0.04)' : undefined,
+              }}>
+                <div className="ds-card-header" style={{ borderBottom:`1px solid ${params['modo_teste']==='true'?'rgba(251,191,36,0.2)':'var(--border)'}` }}>
+                  <span className="ds-card-title" style={{ color: params['modo_teste']==='true' ? '#fbbf24' : 'var(--t-primary)' }}>
+                    {params['modo_teste']==='true' ? '⚠️ Modo de Teste ATIVO' : '🧪 Modo de Teste'}
+                  </span>
+                </div>
+                <div className="ds-card-body" style={{ display:'flex', flexDirection:'column', gap:14 }}>
+
+                  {params['modo_teste']==='true' && (
+                    <div style={{ background:'rgba(251,191,36,0.1)', border:'1px solid rgba(251,191,36,0.3)', borderRadius:'var(--r-md)', padding:'12px 16px', fontSize:13 }}>
+                      <div style={{ fontWeight:700, color:'#fbbf24', marginBottom:6 }}>⚠️ Sistema em Modo de Teste</div>
+                      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8, fontSize:12, color:'var(--t-secondary)' }}>
+                        <div>
+                          <div style={{ color:'var(--t-muted)', fontSize:11, textTransform:'uppercase' }}>Iniciado em</div>
+                          <div style={{ fontWeight:600, color:'#fbbf24' }}>
+                            {params['modo_teste_inicio']
+                              ? new Date(params['modo_teste_inicio']).toLocaleString('pt-BR')
+                              : '—'}
+                          </div>
+                        </div>
+                        <div>
+                          <div style={{ color:'var(--t-muted)', fontSize:11, textTransform:'uppercase' }}>Usuário</div>
+                          <div style={{ fontWeight:600 }}>{params['modo_teste_usuario'] || '—'}</div>
+                        </div>
+                      </div>
+                      <div style={{ marginTop:8, fontSize:11, color:'var(--t-muted)' }}>
+                        Cobranças Asaas: <strong style={{ color:'#fbbf24' }}>Sandbox (testes)</strong>
+                      </div>
+                    </div>
+                  )}
+
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <div>
+                      <div style={{ fontWeight:600, color:'var(--t-primary)', fontSize:14 }}>
+                        {params['modo_teste']==='true' ? 'Desativar modo de teste' : 'Ativar modo de teste'}
+                      </div>
+                      <div style={{ fontSize:12, color:'var(--t-muted)', marginTop:3 }}>
+                        Registra data/hora de início e força Asaas para sandbox
+                      </div>
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const ativo = params['modo_teste'] === 'true'
+                        if (!ativo) {
+                          const agora = new Date().toISOString()
+                          const { data: usr } = await supabase.auth.getUser()
+                          const nomeUsr = usr?.user?.email || usr?.user?.id || 'desconhecido'
+                          await salvarParam('modo_teste', 'true')
+                          await salvarParam('modo_teste_inicio', agora)
+                          await salvarParam('modo_teste_usuario', nomeUsr)
+                          await salvarParam('asaas_ambiente', 'sandbox')
+                        } else {
+                          await salvarParam('modo_teste', 'false')
+                          await salvarParam('modo_teste_inicio', '')
+                          await salvarParam('modo_teste_usuario', '')
+                        }
+                        setParams((p:any) => ({
+                          ...p,
+                          modo_teste: ativo ? 'false' : 'true',
+                          asaas_ambiente: ativo ? p.asaas_ambiente : 'sandbox',
+                        }))
+                      }}
+                      style={{
+                        width:52, height:28, borderRadius:14, border:'none', cursor:'pointer',
+                        background: params['modo_teste']==='true' ? '#fbbf24' : '#334155',
+                        position:'relative', flexShrink:0, transition:'background 0.2s',
+                      }}>
+                      <div style={{
+                        width:22, height:22, borderRadius:'50%', background:'#fff',
+                        position:'absolute', top:3,
+                        left: params['modo_teste']==='true' ? 27 : 3,
+                        transition:'left 0.2s',
+                        boxShadow:'0 1px 4px rgba(0,0,0,0.3)',
+                      }}/>
+                    </button>
+                  </div>
+                </div>
+              </div>
+
               <div className="ds-card" style={{ border:'1px solid rgba(239,68,68,0.3)', background:'rgba(239,68,68,0.04)' }}>
                 <div className="ds-card-header" style={{ borderBottom:'1px solid rgba(239,68,68,0.2)' }}>
                   <span className="ds-card-title" style={{ color:'#f87171' }}>🧹 Limpeza de Dados de Teste</span>
