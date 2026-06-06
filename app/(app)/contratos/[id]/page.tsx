@@ -759,7 +759,21 @@ export default function VerContratoPage() {
   }
 
   async function excluirFatura(fatura: any) {
-    if (!confirm(`Excluir a fatura ${fatura.numero}?`)) return
+    if (!confirm(`Excluir a fatura ${fatura.numero}?\n\n${fatura.asaas_payment_id ? '⚠️ Esta fatura possui cobrança no Asaas que também será cancelada.' : ''}`)) return
+
+    // Se tem cobrança no Asaas, cancelar primeiro
+    if (fatura.asaas_payment_id) {
+      try {
+        await fetch('/api/asaas/cancelar', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ payment_id: fatura.asaas_payment_id }),
+        })
+      } catch(_) {
+        // Não bloquear exclusão local se Asaas falhar
+      }
+    }
+
     await supabase.from('faturas').delete().eq('id', fatura.id)
     setFaturas(prev => prev.filter(f => f.id !== fatura.id))
   }
