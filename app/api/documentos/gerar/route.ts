@@ -151,12 +151,21 @@ export async function POST(req: NextRequest) {
   const df   = contrato.data_fim    ? new Date(contrato.data_fim    + 'T12:00:00') : null
   const dias = di && df ? Math.max(1, Math.ceil((df.getTime() - di.getTime()) / 86400000)) : 0
 
-  // Descobrir período pelo numero de dias
-  const periodoDetected = (periodos ?? []).reduce((best: any, p2: any) => {
-    if (p2.dias <= dias && (!best || p2.dias > best.dias)) return p2
-    return best
-  }, null)
-  const periodoNome = periodoDetected?.nome ?? `${dias} dia(s)`
+  // Detectar período: priorizar periodo_id do contrato, senão detectar pelos dias
+  const periodoByIdRaw = contrato.periodo_id
+    ? (periodos ?? []).find((p2: any) => p2.id === contrato.periodo_id)
+    : null
+  const periodoById = periodoByIdRaw ?? null
+
+  const periodoDetected = periodoById ?? (dias > 0
+    ? (periodos ?? []).reduce((best: any, p2: any) => {
+        if (p2.dias <= dias && (!best || p2.dias > best.dias)) return p2
+        return best
+      }, null)
+    : null)
+
+  const periodoNome = periodoDetected?.nome
+    ?? (contrato.tipo_contrato === 'mensal' ? 'Mensal' : dias > 0 ? `${dias} dia(s)` : '—')
 
   // ── Local de uso ──────────────────────────────────────────────────────────
   const localUso = [
