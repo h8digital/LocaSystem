@@ -97,6 +97,47 @@ export default function EquipamentosPage() {
 
   // ── Painel de preços rápido (hover) ───────────────────────────────────────
   const [precoPainel, setPrecoPainel] = useState<any>(null)
+  const [modalLocado,    setModalLocado]    = useState<any>(null) // produto clicado em Locado
+  const [contratosLocado, setContratosLocado] = useState<any[]>([])
+  const [loadingLocado,   setLoadingLocado]   = useState(false)
+
+  async function abrirLocado(produto: any) {
+    setModalLocado(produto)
+    setContratosLocado([])
+    setLoadingLocado(true)
+    // Buscar patrimônios locados deste produto e seus contratos ativos
+    const { data } = await supabase
+      .from('patrimonios')
+      .select(`
+        id, numero_patrimonio, status,
+        contrato_itens(
+          id, quantidade,
+          contratos(id, numero, status, data_inicio, data_fim, clientes(nome))
+        )
+      `)
+      .eq('produto_id', produto.id)
+      .eq('status', 'locado')
+    // Montar lista de contratos com patrimônio
+    const lista: any[] = []
+    for (const pat of (data ?? [])) {
+      for (const ci of (pat.contrato_itens ?? [])) {
+        const ct = ci.contratos
+        if (!ct || ['encerrado','cancelado'].includes(ct.status)) continue
+        lista.push({
+          patrimonio_num: pat.numero_patrimonio,
+          contrato_id:    ct.id,
+          contrato_num:   ct.numero,
+          status:         ct.status,
+          cliente:        ct.clientes?.nome,
+          data_inicio:    ct.data_inicio,
+          data_fim:       ct.data_fim,
+          quantidade:     ci.quantidade,
+        })
+      }
+    }
+    setContratosLocado(lista)
+    setLoadingLocado(false)
+  }
   const [portalMounted, setPortalMounted] = useState(false)
   useEffect(() => { setPortalMounted(true) }, [])
 
@@ -576,9 +617,19 @@ export default function EquipamentosPage() {
 
                     {/* Locado */}
                     <td style={{ textAlign:'center' }}>
-                      <span style={{ fontWeight:700, color: p.locPat > 0 || p.qtdLocada > 0 ? 'var(--c-primary)' : 'var(--t-muted)' }}>
-                        {p.controla_patrimonio ? p.locPat : p.qtdLocada}{p.controla_patrimonio ? '' : ` ${p.unidade}`}
-                      </span>
+                      {p.controla_patrimonio && (p.locPat > 0) ? (
+                        <button onClick={()=>abrirLocado(p)} style={{
+                          background:'none', border:'none', cursor:'pointer', padding:'2px 6px',
+                          borderRadius:6, fontWeight:700, color:'var(--c-primary)',
+                          fontSize:'var(--fs-md)', textDecoration:'underline dotted',
+                        }} title="Ver contratos vinculados">
+                          {p.locPat}
+                        </button>
+                      ) : (
+                        <span style={{ fontWeight:700, color: p.locPat > 0 || p.qtdLocada > 0 ? 'var(--c-primary)' : 'var(--t-muted)' }}>
+                          {p.controla_patrimonio ? p.locPat : p.qtdLocada}{p.controla_patrimonio ? '' : ` ${p.unidade}`}
+                        </span>
+                      )}
                     </td>
 
                     {/* Preço/Dia — clicável para ver todos os preços */}
@@ -1379,6 +1430,89 @@ export default function EquipamentosPage() {
         )}
 
       </SlidePanel>
+
+      {/* ── Modal: Contratos com este equipamento locado ──────────────────── */}
+      {modalLocado && (
+        <div style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',zIndex:2000,display:'flex',alignItems:'center',justifyContent:'center',padding:20}}
+          onClick={e=>{if(e.target===e.currentTarget){setModalLocado(null)}}}>
+          <div style={{background:'#1e293b',border:'1px solid var(--border)',borderRadius:'var(--r-xl)',width:'100%',maxWidth:620,maxHeight:'80vh',display:'flex',flexDirection:'column',boxShadow:'0 24px 64px rgba(0,0,0,0.6)',overflow:'hidden'}}>
+
+            {/* Header */}
+            <div style={{padding:'16px 20px',borderBottom:'1px solid var(--border)',display:'flex',justifyContent:'space-between',alignItems:'center',flexShrink:0,background:'rgba(14,165,233,0.06)'}}>
+              <div>
+                <div style={{fontWeight:700,fontSize:15,color:'var(--t-primary)'}}>📦 Equipamento em Locação</div>
+                <div style={{fontSize:12,color:'var(--t-muted)',marginTop:2}}>{modalLocado.nome} · {modalLocado.locPat} patrimônio(s) locado(s)</div>
+              </div>
+              <button onClick={()=>setModalLocado(null)} style={{background:'none',border:'none',color:'var(--t-muted)',cursor:'pointer',fontSize:20,lineHeight:1}}>×</button>
+            </div>
+
+            {/* Body */}
+            <div style={{overflowY:'auto',flex:1,padding:'16px 20px'}}>
+              {loadingLocado ? (
+                <div style={{textAlign:'center',padding:32,color:'var(--t-muted)',fontSize:13}}>Carregando...</div>
+              ) : contratosLocado.length === 0 ? (
+                <div style={{textAlign:'center',padding:32,color:'var(--t-muted)',fontSize:13}}>
+                  Nenhum contrato ativo encontrado para este equipamento.
+                </div>
+              ) : (
+                <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
+                  <thead>
+                    <tr style={{borderBottom:'2px solid var(--border)'}}>
+                      {['Patrimônio','Contrato','Cliente','Período','Status'].map(h=>(
+                        <th key={h} style={{textAlign:'left',padding:'6px 10px',fontSize:11,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:700}}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {contratosLocado.map((c,i)=>(
+                      <tr key={i} style={{borderBottom:'1px solid rgba(255,255,255,0.05)',background:i%2===0?'transparent':'rgba(255,255,255,0.02)'}}>
+                        <td style={{padding:'10px 10px',fontFamily:'monospace',color:'var(--t-secondary)',fontWeight:600}}>
+                          {c.patrimonio_num}
+                        </td>
+                        <td style={{padding:'10px 10px'}}>
+                          <a
+                            href={`/contratos/${c.contrato_id}`}
+                            onClick={()=>setModalLocado(null)}
+                            style={{color:'#818cf8',fontWeight:700,fontFamily:'monospace',textDecoration:'none',display:'inline-flex',alignItems:'center',gap:4}}
+                          >
+                            {c.contrato_num}
+                            <span style={{fontSize:10,opacity:0.7}}>↗</span>
+                          </a>
+                        </td>
+                        <td style={{padding:'10px 10px',color:'var(--t-primary)',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                          {c.cliente || '—'}
+                        </td>
+                        <td style={{padding:'10px 10px',color:'var(--t-muted)',fontSize:12,whiteSpace:'nowrap'}}>
+                          {c.data_inicio ? new Date(c.data_inicio+'T12:00:00').toLocaleDateString('pt-BR') : '—'}
+                          {c.data_fim ? <> → {new Date(c.data_fim+'T12:00:00').toLocaleDateString('pt-BR')}</> : ' → em aberto'}
+                        </td>
+                        <td style={{padding:'10px 10px'}}>
+                          <span style={{
+                            display:'inline-block',padding:'2px 8px',borderRadius:99,fontSize:11,fontWeight:700,
+                            background: c.status==='ativo'?'rgba(52,211,153,0.15)':c.status==='rascunho'?'rgba(251,191,36,0.15)':'rgba(148,163,184,0.15)',
+                            color:      c.status==='ativo'?'#34d399':c.status==='rascunho'?'#fbbf24':'#94a3b8',
+                          }}>
+                            {c.status}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              )}
+            </div>
+
+            {/* Footer */}
+            <div style={{padding:'12px 20px',borderTop:'1px solid var(--border)',flexShrink:0,display:'flex',justifyContent:'flex-end'}}>
+              <button onClick={()=>setModalLocado(null)}
+                style={{padding:'8px 20px',borderRadius:'var(--r-md)',border:'1px solid var(--border)',background:'transparent',color:'var(--t-secondary)',cursor:'pointer',fontSize:13,fontWeight:600}}>
+                Fechar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </div>
   )
 }
