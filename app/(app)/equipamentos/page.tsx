@@ -105,26 +105,54 @@ export default function EquipamentosPage() {
     setModalLocado(produto)
     setContratosLocado([])
     setLoadingLocado(true)
-    // Buscar patrimônios locados deste produto e seus contratos ativos
-    const { data } = await supabase
-      .from('patrimonios')
-      .select(`
-        id, numero_patrimonio, status,
-        contrato_itens(
+
+    const lista: any[] = []
+
+    if (produto.controla_patrimonio) {
+      // Com patrimônio: buscar via patrimonios locados
+      const { data } = await supabase
+        .from('patrimonios')
+        .select(`
+          id, numero_patrimonio, status,
+          contrato_itens(
+            id, quantidade,
+            contratos(id, numero, status, data_inicio, data_fim, clientes(nome))
+          )
+        `)
+        .eq('produto_id', produto.id)
+        .eq('status', 'locado')
+
+      for (const pat of (data ?? [])) {
+        for (const ci of (pat.contrato_itens ?? [])) {
+          const ct = (Array.isArray(ci.contratos) ? ci.contratos[0] : ci.contratos) as any
+          if (!ct || ['encerrado','cancelado'].includes(ct.status)) continue
+          lista.push({
+            patrimonio_num: pat.numero_patrimonio,
+            contrato_id:    ct.id,
+            contrato_num:   ct.numero,
+            status:         ct.status,
+            cliente:        ct.clientes?.nome,
+            data_inicio:    ct.data_inicio,
+            data_fim:       ct.data_fim,
+            quantidade:     ci.quantidade,
+          })
+        }
+      }
+    } else {
+      // Sem patrimônio: buscar via contrato_itens pelo produto_id
+      const { data } = await supabase
+        .from('contrato_itens')
+        .select(`
           id, quantidade,
           contratos(id, numero, status, data_inicio, data_fim, clientes(nome))
-        )
-      `)
-      .eq('produto_id', produto.id)
-      .eq('status', 'locado')
-    // Montar lista de contratos com patrimônio
-    const lista: any[] = []
-    for (const pat of (data ?? [])) {
-      for (const ci of (pat.contrato_itens ?? [])) {
+        `)
+        .eq('produto_id', produto.id)
+
+      for (const ci of (data ?? [])) {
         const ct = (Array.isArray(ci.contratos) ? ci.contratos[0] : ci.contratos) as any
         if (!ct || ['encerrado','cancelado'].includes(ct.status)) continue
         lista.push({
-          patrimonio_num: pat.numero_patrimonio,
+          patrimonio_num: '—',
           contrato_id:    ct.id,
           contrato_num:   ct.numero,
           status:         ct.status,
@@ -135,6 +163,7 @@ export default function EquipamentosPage() {
         })
       }
     }
+
     setContratosLocado(lista)
     setLoadingLocado(false)
   }
@@ -621,24 +650,16 @@ export default function EquipamentosPage() {
 
                     {/* Locado */}
                     <td style={{ textAlign:'center' }}>
-                      {p.controla_patrimonio ? (
-                        p.locPat > 0 ? (
-                          <button onClick={()=>abrirLocado(p)} style={{
-                            background:'rgba(14,165,233,0.1)', border:'1px solid rgba(14,165,233,0.3)',
-                            borderRadius:6, cursor:'pointer', padding:'2px 10px',
-                            fontWeight:700, color:'var(--c-primary)', fontSize:'var(--fs-md)',
-                          }} title="Clique para ver os contratos vinculados">
-                            {p.locPat} ↗
-                          </button>
-                        ) : (
-                          <span style={{ color:'var(--t-muted)', fontWeight:600 }}>0</span>
-                        )
+                      {(p.controla_patrimonio ? p.locPat : p.qtdLocada) > 0 ? (
+                        <button onClick={()=>abrirLocado(p)} style={{
+                          background:'rgba(14,165,233,0.1)', border:'1px solid rgba(14,165,233,0.3)',
+                          borderRadius:6, cursor:'pointer', padding:'2px 10px',
+                          fontWeight:700, color:'var(--c-primary)', fontSize:'var(--fs-md)',
+                        }} title="Clique para ver os contratos vinculados">
+                          {p.controla_patrimonio ? p.locPat : p.qtdLocada} ↗
+                        </button>
                       ) : (
-                        // Sem patrimônio: só exibe quantidade, sem link (não há patrimônio para rastrear)
-                        <span style={{ fontWeight:700, color: p.qtdLocada > 0 ? 'var(--c-primary)' : 'var(--t-muted)' }}
-                          title="Quantidade em locação (sem controle de patrimônio individual)">
-                          {p.qtdLocada}
-                        </span>
+                        <span style={{ color:'var(--t-muted)', fontWeight:600 }}>0</span>
                       )}
                     </td>
 
@@ -1468,7 +1489,10 @@ export default function EquipamentosPage() {
                 <table style={{width:'100%',borderCollapse:'collapse',fontSize:13}}>
                   <thead>
                     <tr style={{borderBottom:'2px solid var(--border)'}}>
-                      {['Patrimônio','Contrato','Cliente','Período','Status'].map(h=>(
+                      {[
+                        ...(modalLocado?.controla_patrimonio ? ['Patrimônio'] : []),
+                        'Contrato','Cliente','Qtd','Período','Status'
+                      ].map(h=>(
                         <th key={h} style={{textAlign:'left',padding:'6px 10px',fontSize:11,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:700}}>{h}</th>
                       ))}
                     </tr>
@@ -1476,21 +1500,22 @@ export default function EquipamentosPage() {
                   <tbody>
                     {contratosLocado.map((c,i)=>(
                       <tr key={i} style={{borderBottom:'1px solid rgba(255,255,255,0.05)',background:i%2===0?'transparent':'rgba(255,255,255,0.02)'}}>
-                        <td style={{padding:'10px 10px',fontFamily:'monospace',color:'var(--t-secondary)',fontWeight:600}}>
-                          {c.patrimonio_num}
-                        </td>
+                        {modalLocado?.controla_patrimonio && (
+                          <td style={{padding:'10px 10px',fontFamily:'monospace',color:'var(--t-secondary)',fontWeight:600}}>
+                            {c.patrimonio_num}
+                          </td>
+                        )}
                         <td style={{padding:'10px 10px'}}>
-                          <a
-                            href={`/contratos/${c.contrato_id}`}
-                            onClick={()=>setModalLocado(null)}
-                            style={{color:'#818cf8',fontWeight:700,fontFamily:'monospace',textDecoration:'none',display:'inline-flex',alignItems:'center',gap:4}}
-                          >
-                            {c.contrato_num}
-                            <span style={{fontSize:10,opacity:0.7}}>↗</span>
+                          <a href={`/contratos/${c.contrato_id}`} onClick={()=>setModalLocado(null)}
+                            style={{color:'#818cf8',fontWeight:700,fontFamily:'monospace',textDecoration:'none',display:'inline-flex',alignItems:'center',gap:4}}>
+                            {c.contrato_num}<span style={{fontSize:10,opacity:0.7}}>↗</span>
                           </a>
                         </td>
-                        <td style={{padding:'10px 10px',color:'var(--t-primary)',maxWidth:160,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
+                        <td style={{padding:'10px 10px',color:'var(--t-primary)',maxWidth:150,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>
                           {c.cliente || '—'}
+                        </td>
+                        <td style={{padding:'10px 10px',textAlign:'center',fontWeight:700,color:'var(--t-secondary)'}}>
+                          {c.quantidade}
                         </td>
                         <td style={{padding:'10px 10px',color:'var(--t-muted)',fontSize:12,whiteSpace:'nowrap'}}>
                           {c.data_inicio ? new Date(c.data_inicio+'T12:00:00').toLocaleDateString('pt-BR') : '—'}
