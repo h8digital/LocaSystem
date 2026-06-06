@@ -186,7 +186,7 @@ export default function FinanceiroPage() {
     setKpis({
       total:     lt.reduce((s,f) => s + Number(f.valor), 0),
       recebido:  lt.reduce((s,f) => s + Number(f.valor_recebido ?? 0), 0),
-      pendente:  lt.filter(f=>f.status!=='pago'&&f.status!=='cancelado')
+      pendente:  lt.filter(f=>f.status!=='pago'&&f.status!=='cancelada')
                    .reduce((s,f) => s + Number(f.saldo_restante ?? f.valor), 0),
       vencidas:  lt.filter(f=>f.status==='pendente'&&f.data_vencimento<hoje)
                    .reduce((s,f) => s + Number(f.saldo_restante ?? f.valor), 0),
@@ -554,7 +554,7 @@ export default function FinanceiroPage() {
                   </Td>
                   <td style={{ padding:'8px 12px', borderBottom:'1px solid rgba(255,255,255,0.05)', whiteSpace:'nowrap' }}>
                     <div style={{ display:'flex', gap:4, alignItems:'center', justifyContent:'flex-end' }}>
-                      {f.status !== 'pago' && f.status !== 'cancelado' && (
+                      {f.status !== 'pago' && f.status !== 'cancelada' && (
                         <button onClick={() => abrirPainel(f)}
                           style={{ background:'linear-gradient(135deg,#6366f1,#818cf8)',
                             color:'#fff', border:'none', borderRadius:'var(--r-sm)',

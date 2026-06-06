@@ -279,7 +279,13 @@ export default function CriarContratoPage() {
   
   async function loadPatrimonios(produtoId:number) {
     setLoadingPats(true)
-    const {data}=await supabase.from('patrimonios').select('id,numero_patrimonio,numero_serie,status').eq('produto_id',produtoId).eq('status','disponivel').order('numero_patrimonio')
+    const {data}=await supabase.from('patrimonios')
+      .select('id,numero_patrimonio,numero_serie,status,finalidade')
+      .eq('produto_id', produtoId)
+      .eq('status', 'disponivel')
+      .eq('finalidade', 'locacao')   // só patrimônios para locação
+      .is('deleted_at', null)        // não deletados
+      .order('numero_patrimonio')
     setPatrimonios(data??[]); setLoadingPats(false)
   }
 

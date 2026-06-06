@@ -21,7 +21,7 @@ export default function RelatoriosPage() {
       data = d ?? []
       setTotal(data.reduce((s, f) => s + Number(f.valor_pago), 0))
     } else if (rel === 'inadimplencia') {
-      const { data: d } = await supabase.from('faturas').select('numero, valor, data_vencimento, contratos(numero, clientes(nome, celular))').in('status', ['vencido', 'pendente']).lt('data_vencimento', new Date().toISOString().split('T')[0]).order('data_vencimento')
+      const { data: d } = await supabase.from('faturas').select('numero, valor, data_vencimento, contratos(numero, clientes(nome, celular))').in('status', ['vencida', 'pendente']).lt('data_vencimento', new Date().toISOString().split('T')[0]).order('data_vencimento')
       data = d ?? []
       setTotal(data.reduce((s, f) => s + Number(f.valor), 0))
     } else if (rel === 'contratos') {
