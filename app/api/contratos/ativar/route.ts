@@ -51,10 +51,19 @@ export async function POST(req: NextRequest) {
       if (item.patrimonio_id) {
         const { data: pat } = await sb.from('patrimonios').select('status, numero_patrimonio').eq('id', item.patrimonio_id).single()
         if (pat?.status === 'locado') {
-          return NextResponse.json({
-            ok: false,
-            error: `O patrimônio "${pat.numero_patrimonio}" já está locado em outro contrato ativo.`
-          })
+          // Verificar se pertence a este mesmo contrato (marcado na criação) ou a outro
+          const { data: outroContrato } = await sb.from('contrato_itens')
+            .select('contrato_id')
+            .eq('patrimonio_id', item.patrimonio_id)
+            .neq('contrato_id', contrato_id)
+            .limit(1).maybeSingle()
+          if (outroContrato) {
+            return NextResponse.json({
+              ok: false,
+              error: `O patrimônio "${pat.numero_patrimonio}" já está locado em outro contrato ativo.`
+            })
+          }
+          // Pertence a este contrato — OK, já estava marcado na criação
         }
         if (pat?.status === 'manutencao') {
           return NextResponse.json({

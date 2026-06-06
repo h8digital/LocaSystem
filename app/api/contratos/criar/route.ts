@@ -77,8 +77,17 @@ export async function POST(req: NextRequest) {
         valor_limpeza:       Number(item.valor_limpeza) || 0,
       })
       if (item.patrimonio_id) {
-        // NÃO marcar como locado aqui — só na ativação do contrato
-        // A marcação prematura impede a ativação (verifica status='locado')
+        // Verificar se patrimônio está disponível antes de reservar
+        const { data: pat } = await sb.from('patrimonios')
+          .select('status, numero_patrimonio').eq('id', item.patrimonio_id).single()
+        if (pat?.status === 'locado') {
+          return NextResponse.json({ ok: false, error: `Patrimônio "${pat.numero_patrimonio}" já está locado em outro contrato.` })
+        }
+        if (pat?.status === 'manutencao') {
+          return NextResponse.json({ ok: false, error: `Patrimônio "${pat.numero_patrimonio}" está em manutenção.` })
+        }
+        // Marcar como locado imediatamente ao criar o contrato
+        await sb.from('patrimonios').update({ status: 'locado' }).eq('id', item.patrimonio_id)
       }
     }
 
