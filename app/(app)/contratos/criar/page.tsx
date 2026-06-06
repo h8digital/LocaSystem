@@ -133,8 +133,14 @@ export default function CriarContratoPage() {
   const [loadingPats,      setLoadingPats]      = useState(false)
 
   const F = (k:string) => ({ value:form[k]??'', onChange:(e:any)=>setForm((f:any)=>({...f,[k]:e.target.value})) })
+
+  // Para mensal sem data_fim, usar o número de dias do período (ex: 30)
+  // para que o cálculo de preço seja correto
+  const periodoSelecionado = periodos.find((x:any) => String(x.id) === String(form.periodo_id))
+  const diasPeriodo = periodoSelecionado?.dias ?? 30
   const dias = form.data_inicio && form.data_fim
     ? Math.max(1, Math.ceil((new Date(form.data_fim).getTime()-new Date(form.data_inicio).getTime())/86400000))
+    : isMensal(form.periodo_id) ? diasPeriodo  // mensal: usa 30 dias do período
     : 1
   const subtotal       = itens.reduce((s,i)=>s+Number(i.total),0)
   const totalLimpeza   = itens.reduce((s,i)=>s+Number(i.valor_limpeza||0),0)
@@ -171,7 +177,7 @@ export default function CriarContratoPage() {
         data_inicio: new Date().toISOString().split('T')[0],
       }))
 
-      // Pré-preencher itens com preços do novo período (será recalculado ao selecionar período)
+      // Pré-preencher itens — preços serão recalculados ao selecionar período
       const novosItens = (ct.contrato_itens ?? []).map((ci:any) => {
         const prod = ci.produtos
         return {
@@ -180,7 +186,7 @@ export default function CriarContratoPage() {
           patrimonio_id:  ci.patrimonio_id,
           patrimonio_num: ci.patrimonio_num ?? null,
           quantidade:     ci.quantidade,
-          preco_unitario: Number(prod?.preco_locacao_diario ?? ci.preco_unitario),
+          preco_unitario: 0, // será recalculado quando o período for selecionado
           tipo_item:      'locacao',
           descricao_livre:null,
           preco_diario:   Number(prod?.preco_locacao_diario ?? 0),
@@ -190,7 +196,7 @@ export default function CriarContratoPage() {
           taxa_limpeza_contratada: Number(prod?.taxa_limpeza_contratada ?? 0),
           taxa_limpeza_avulsa: Number(prod?.taxa_limpeza_avulsa ?? 0),
           valor_limpeza:  0,
-          total: Number(prod?.preco_locacao_diario ?? ci.preco_unitario),
+          total: 0,
           _produto: prod,
           _descricaoCobranca: 'Selecione o período para calcular',
         }
@@ -211,7 +217,8 @@ export default function CriarContratoPage() {
     setItens(prev => prev.map(it => {
       if (!it._produto) return it
       const p = periodos.find((x:any) => String(x.id) === String(form.periodo_id))
-      const res = calcularPrecoItem(it._produto as PrecosProduto, dias, p?.nome ?? '', p?.dias ?? dias ?? 1)
+      const diasCalculo = isMensal(form.periodo_id) && !form.data_fim ? diasPeriodo : dias
+      const res = calcularPrecoItem(it._produto as PrecosProduto, diasCalculo, p?.nome ?? '', p?.dias ?? diasCalculo)
       const qtd = it._produto.controla_patrimonio ? 1 : it.quantidade
       return { ...it, preco_unitario: res.totalItem, total: res.totalItem * qtd, _descricaoCobranca: res.descricao }
     }))
@@ -334,14 +341,17 @@ export default function CriarContratoPage() {
   function getPrecoParaPeriodo(prod:any): number {
     if (!prod) return 0
     const p = periodos.find((x:any) => String(x.id) === String(form.periodo_id))
-    const res = calcularPrecoItem(prod as PrecosProduto, dias, p?.nome ?? '', p?.dias ?? dias ?? 1)
+    // Para mensal sem data_fim, usar os dias do período (30); senão usar dias reais
+    const diasCalculo = isMensal(form.periodo_id) && !form.data_fim ? diasPeriodo : dias
+    const res = calcularPrecoItem(prod as PrecosProduto, diasCalculo, p?.nome ?? '', p?.dias ?? diasCalculo)
     return res.totalItem
   }
 
   function getDescricaoCobranca(prod:any): string {
     if (!prod) return ''
     const p = periodos.find((x:any) => String(x.id) === String(form.periodo_id))
-    const res = calcularPrecoItem(prod as PrecosProduto, dias, p?.nome ?? '', p?.dias ?? dias ?? 1)
+    const diasCalculo = isMensal(form.periodo_id) && !form.data_fim ? diasPeriodo : dias
+    const res = calcularPrecoItem(prod as PrecosProduto, diasCalculo, p?.nome ?? '', p?.dias ?? diasCalculo)
     return res.descricao
   }
 
@@ -385,7 +395,14 @@ export default function CriarContratoPage() {
 
   function selecionarProduto(id:number|null, row:any|null) {
     setItemProdutoId(id); setItemProduto(row); setItemProdutoNome(row?.nome??'')
-    setItemPreco(getPrecoParaPeriodo(row))
+    const diasCalculo = isMensal(form.periodo_id) && !form.data_fim ? diasPeriodo : dias
+    const p = periodos.find((x:any) => String(x.id) === String(form.periodo_id))
+    if (row && p) {
+      const res = calcularPrecoItem(row as PrecosProduto, diasCalculo, p.nome, p.dias ?? diasCalculo)
+      setItemPreco(res.totalItem)
+    } else {
+      setItemPreco(getPrecoParaPeriodo(row))
+    }
     setItemPatrimonioId(null); setItemPatrimonioNome(''); setPatrimonios([])
     if(id && row?.controla_patrimonio) loadPatrimonios(id)
   }
@@ -942,7 +959,9 @@ export default function CriarContratoPage() {
             <div style={{ padding:'16px', display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
               {[
                 { l:'Cliente',    v: clienteNome },
-                { l:'Período',    v: `${fmt.date(form.data_inicio)} → ${fmt.date(form.data_fim)} (${dias}d)` },
+                { l:'Período',    v: isMensal(form.periodo_id) && !form.data_fim
+                  ? `${fmt.date(form.data_inicio)} → em aberto (mensal recorrente)`
+                  : `${fmt.date(form.data_inicio)} → ${fmt.date(form.data_fim)} (${dias}d)` },
                 { l:'Pagamento',  v: form.forma_pagamento.replace(/_/g,' ').replace(/\b\w/g,(c:string)=>c.toUpperCase()) },
                 { l:'Local de uso', v: enderecoUsoLabel || 'Não informado' },
                 { l:'Itens',      v: `${itens.length} equipamento(s)` },
