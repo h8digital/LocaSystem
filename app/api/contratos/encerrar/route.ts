@@ -38,7 +38,7 @@ export async function POST(req: NextRequest) {
 
     // ── Carregar contrato completo ────────────────────────────────────────────
     const { data: contrato } = await sb.from('contratos')
-      .select('id, numero, status, total, subtotal, frete, caucao, desconto, acrescimo, data_inicio, data_fim, clientes(nome)')
+      .select('id, numero, status, total, subtotal, frete, caucao, desconto, acrescimo, data_inicio, data_fim, tipo_contrato, clientes(nome)')
       .eq('id', contrato_id).single()
     if (!contrato) return NextResponse.json({ ok: false, error: 'Contrato não encontrado.' })
 
