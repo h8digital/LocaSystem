@@ -357,9 +357,32 @@ export default function VerContratoPage() {
       })
       const d = await res.json()
       if (!d.ok) { setErroAsaas(d.error); setGerandoAsaas(false); return }
+      if (d.ja_paga) {
+        setModalAsaas(false)
+        await load()
+        return
+      }
       setAsaasResult(d)
       await load()
     } catch(e: any) { setErroAsaas(e.message) }
+    setGerandoAsaas(false)
+  }
+
+  async function sincronizarAsaas(faturaId: number) {
+    setGerandoAsaas(true)
+    try {
+      const res = await fetch('/api/asaas/sincronizar', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ fatura_id: faturaId }),
+      })
+      const d = await res.json()
+      if (d.atualizadas > 0) {
+        setModalAsaas(false)
+        await load()
+      } else {
+        setErroAsaas('Pagamento ainda não confirmado no Asaas. Tente novamente em instantes.')
+      }
+    } catch(e: any) { setErroAsaas((e as any).message) }
     setGerandoAsaas(false)
   }
 
@@ -1628,16 +1651,32 @@ export default function VerContratoPage() {
             <div style={{padding:'20px 24px',display:'flex',flexDirection:'column',gap:16,overflowY:'auto'}}>
 
               {!asaasResult ? (<>
-                {/* Seletor de tipo */}
-                <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
-                  {([['PIX','⚡ PIX','Pagamento instantâneo'],['BOLETO','🏦 Boleto','Vencimento configurável'],['PIX_BOLETO','⚡🏦 Ambos','PIX + Boleto juntos']] as const).map(([val,label,desc])=>(
-                    <button key={val} onClick={()=>setTipoAsaas(val as any)}
-                      style={{padding:'12px 8px',borderRadius:'var(--r-md)',border:`2px solid ${tipoAsaas===val?'var(--c-primary)':'var(--border)'}`,background:tipoAsaas===val?'rgba(99,102,241,0.1)':'transparent',cursor:'pointer',textAlign:'center'}}>
-                      <div style={{fontSize:16,marginBottom:4}}>{label}</div>
-                      <div style={{fontSize:11,color:'var(--t-muted)'}}>{desc}</div>
-                    </button>
-                  ))}
-                </div>
+                {/* Se já tem cobrança Asaas — oferecer sincronização */}
+                {fatAsaas.asaas_payment_id ? (
+                  <div style={{background:'rgba(251,191,36,0.08)',border:'1px solid rgba(251,191,36,0.2)',borderRadius:'var(--r-md)',padding:'14px 16px'}}>
+                    <div style={{fontWeight:600,color:'#fbbf24',fontSize:13,marginBottom:6}}>
+                      ⚡ Cobrança já gerada nesta fatura
+                    </div>
+                    <div style={{fontSize:12,color:'var(--t-muted)',marginBottom:10}}>
+                      ID Asaas: <code style={{color:'var(--t-secondary)'}}>{fatAsaas.asaas_payment_id}</code>
+                      {fatAsaas.asaas_status && <> · Status: <strong>{fatAsaas.asaas_status}</strong></>}
+                    </div>
+                    <Btn onClick={()=>sincronizarAsaas(fatAsaas.id)} loading={gerandoAsaas} style={{width:'100%'}}>
+                      🔄 Sincronizar Status com Asaas
+                    </Btn>
+                  </div>
+                ) : (
+                  /* Seletor de tipo — nova cobrança */
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+                    {([['PIX','⚡ PIX','Pagamento instantâneo'],['BOLETO','🏦 Boleto','Vencimento configurável'],['PIX_BOLETO','⚡🏦 Ambos','PIX + Boleto juntos']] as const).map(([val,label,desc])=>(
+                      <button key={val} onClick={()=>setTipoAsaas(val as any)}
+                        style={{padding:'12px 8px',borderRadius:'var(--r-md)',border:`2px solid ${tipoAsaas===val?'var(--c-primary)':'var(--border)'}`,background:tipoAsaas===val?'rgba(99,102,241,0.1)':'transparent',cursor:'pointer',textAlign:'center'}}>
+                        <div style={{fontSize:16,marginBottom:4}}>{label}</div>
+                        <div style={{fontSize:11,color:'var(--t-muted)'}}>{desc}</div>
+                      </button>
+                    ))}
+                  </div>
+                )}
 
                 {erroAsaas && (
                   <div style={{background:'rgba(248,113,113,0.1)',border:'1px solid rgba(248,113,113,0.3)',borderRadius:'var(--r-md)',padding:'10px 14px',color:'#f87171',fontSize:13}}>
@@ -1684,9 +1723,11 @@ export default function VerContratoPage() {
             <div style={{padding:'14px 24px',borderTop:'1px solid var(--border)',display:'flex',gap:10,flexShrink:0}}>
               {!asaasResult ? (<>
                 <Btn variant="secondary" style={{flex:1}} onClick={()=>setModalAsaas(false)}>Cancelar</Btn>
-                <Btn style={{flex:2}} loading={gerandoAsaas} onClick={gerarCobrancaAsaas}>
-                  💳 Gerar Cobrança {tipoAsaas==='PIX'?'PIX':tipoAsaas==='BOLETO'?'Boleto':'PIX + Boleto'}
-                </Btn>
+                {!fatAsaas.asaas_payment_id && (
+                  <Btn style={{flex:2}} loading={gerandoAsaas} onClick={gerarCobrancaAsaas}>
+                    💳 Gerar Cobrança {tipoAsaas==='PIX'?'PIX':tipoAsaas==='BOLETO'?'Boleto':'PIX + Boleto'}
+                  </Btn>
+                )}
               </>) : (
                 <Btn style={{flex:1}} onClick={()=>setModalAsaas(false)}>Fechar</Btn>
               )}

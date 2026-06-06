@@ -1,4 +1,4 @@
-// build: 2026-06-05 — Fase 4: Integração Asaas
+// build: 2026-06-06 — Fase 4 fix: QR Code extraído da resposta da criação
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 export const runtime = 'nodejs'
@@ -65,21 +65,37 @@ export async function POST(req: NextRequest) {
     if (!['pendente','vencida'].includes(fat.status))
       return NextResponse.json({ ok:false, error:`Fatura "${fat.status}" não pode ser cobrada.` })
 
-    // Cobrança já existe e está ativa — retornar dados
+    // Cobrança já existe — buscar dados atualizados no Asaas
     if (fat.asaas_payment_id) {
       const p = await api(cfg, `/payments/${fat.asaas_payment_id}`)
-      if (p.id && !['CANCELLED','REFUNDED','OVERDUE'].includes(p.status))
+      if (p.id && !['CANCELLED','REFUNDED'].includes(p.status)) {
+        // Se já foi paga, sincronizar
+        if (['RECEIVED','CONFIRMED'].includes(p.status)) {
+          await sb.from('faturas').update({
+            status:         'pago',
+            asaas_status:   p.status,
+            valor_pago:     Number(p.value ?? fat.valor),
+            valor_recebido: Number(p.value ?? fat.valor),
+            saldo_restante: 0,
+            data_pagamento: p.paymentDate ?? new Date().toISOString().split('T')[0],
+            forma_pagamento: p.billingType?.toLowerCase() ?? 'pix',
+          }).eq('id', fatura_id)
+          return NextResponse.json({ ok:true, ja_paga:true, status:'RECEIVED' })
+        }
         return NextResponse.json({ ok:true, ja_existe:true,
           pix_qrcode: fat.pix_qrcode, pix_copia_cola: fat.pix_copia_cola,
-          boleto_url: fat.boleto_url, boleto_linha_digitavel: fat.boleto_linha_digitavel })
+          boleto_url: fat.boleto_url, boleto_linha_digitavel: fat.boleto_linha_digitavel,
+          asaas_status: p.status })
+      }
     }
 
     const cli = (fat.contratos as any)?.clientes
     if (!cli) return NextResponse.json({ ok:false, error:'Cliente não encontrado.' })
 
     const customerId = await upsertCliente(cfg, cli)
-
     const billingType = tipo==='PIX_BOLETO' ? 'UNDEFINED' : tipo
+
+    // Criar pagamento
     const pgto = await api(cfg, '/payments', 'POST', {
       customer:          customerId,
       billingType,
@@ -92,19 +108,28 @@ export async function POST(req: NextRequest) {
     })
     if (!pgto.id) return NextResponse.json({ ok:false, error:'Asaas: '+JSON.stringify(pgto) })
 
-    // QR Code PIX
+    // ── QR Code PIX: buscar logo após criação ──────────────────────────────
+    // O Asaas gera o QR Code em segundos após a criação — buscamos imediatamente
     let pixQrcode=null, pixCopiaCola=null
     if (['PIX','UNDEFINED'].includes(billingType)) {
+      // Aguardar 1s para o Asaas gerar o QR Code
+      await new Promise(r => setTimeout(r, 1500))
       const qr = await api(cfg, `/payments/${pgto.id}/pixQrCode`)
-      pixQrcode    = qr.encodedImage ?? null
-      pixCopiaCola = qr.payload ?? null
+      if (!qr.errors) {
+        pixQrcode    = qr.encodedImage ?? null
+        pixCopiaCola = qr.payload ?? null
+      }
     }
 
-    // Boleto
-    let boletoUrl = pgto.bankSlipUrl ?? null, boletoLinha=null
+    // ── Boleto: buscar linha digitável ────────────────────────────────────
+    let boletoUrl = pgto.bankSlipUrl ?? null
+    let boletoLinha = null
     if (['BOLETO','UNDEFINED'].includes(billingType)) {
+      await new Promise(r => setTimeout(r, 1500))
       const bol = await api(cfg, `/payments/${pgto.id}/identificationField`)
-      boletoLinha = bol.identificationField ?? null
+      if (!bol.errors) boletoLinha = bol.identificationField ?? null
+      // Boleto URL pode estar no invoiceUrl se bankSlipUrl ainda não gerado
+      if (!boletoUrl) boletoUrl = pgto.invoiceUrl ?? null
     }
 
     await sb.from('faturas').update({
