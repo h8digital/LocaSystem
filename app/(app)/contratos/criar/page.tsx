@@ -244,6 +244,75 @@ export default function CriarContratoPage() {
     }
   }
 
+  // ── Novo endereço inline ────────────────────────────────────
+  const [showNovoEnd,   setShowNovoEnd]   = useState(false)
+  const [salvandoEnd,   setSalvandoEnd]   = useState(false)
+  const [buscandoCep,   setBuscandoCep]   = useState(false)
+  const [novoEnd,       setNovoEnd]       = useState<any>({
+    tipo:'obra', cep:'', logradouro:'', numero:'', complemento:'',
+    bairro:'', cidade:'', estado:'', referencia:'', principal:false, flag_obra_entrega:true,
+  })
+
+  async function buscarCep(cep: string) {
+    const c = cep.replace(/\D/g,'')
+    if (c.length !== 8) return
+    setBuscandoCep(true)
+    try {
+      const res = await fetch(`https://viacep.com.br/ws/${c}/json/`)
+      const d   = await res.json()
+      if (!d.erro) {
+        setNovoEnd((p:any) => ({
+          ...p,
+          logradouro: d.logradouro || p.logradouro,
+          bairro:     d.bairro     || p.bairro,
+          cidade:     d.localidade || p.cidade,
+          estado:     d.uf         || p.estado,
+          ibge:       d.ibge       || '',
+        }))
+      }
+    } catch(_) {}
+    setBuscandoCep(false)
+  }
+
+  async function salvarNovoEndereco() {
+    if (!novoEnd.logradouro || !novoEnd.numero || !novoEnd.cidade) {
+      alert('Preencha pelo menos logradouro, número e cidade.')
+      return
+    }
+    if (!clienteId) return
+    setSalvandoEnd(true)
+    const { data, error } = await supabase.from('cliente_enderecos').insert({
+      cliente_id:        clienteId,
+      tipo:              novoEnd.tipo || 'obra',
+      cep:               novoEnd.cep?.replace(/\D/g,'') || null,
+      logradouro:        novoEnd.logradouro,
+      numero:            novoEnd.numero,
+      complemento:       novoEnd.complemento || null,
+      bairro:            novoEnd.bairro || null,
+      cidade:            novoEnd.cidade,
+      estado:            novoEnd.estado || null,
+      referencia:        novoEnd.referencia || null,
+      principal:         novoEnd.principal || false,
+      flag_obra_entrega: novoEnd.flag_obra_entrega || false,
+      ativo:             1,
+    }).select().single()
+    if (error) { alert('Erro ao salvar endereço: ' + error.message); setSalvandoEnd(false); return }
+
+    // Atualizar lista e selecionar automaticamente o novo
+    setEnderecosCliente((prev:any) => [data, ...prev])
+    selecionarEnderecoUso(data.id, data)
+    setShowNovoEnd(false)
+    setNovoEnd({ tipo:'obra', cep:'', logradouro:'', numero:'', complemento:'', bairro:'', cidade:'', estado:'', referencia:'', principal:false, flag_obra_entrega:true })
+    setSalvandoEnd(false)
+  }
+
+  function NE(field: string) {
+    return {
+      value: novoEnd[field] ?? '',
+      onChange: (e: any) => setNovoEnd((p:any) => ({ ...p, [field]: e.target.value })),
+    }
+  }
+
   async function selecionarCliente(id:number|null, row:any|null) {
     setClienteId(id); setClienteNome(row?.nome??''); setClienteData(row)
     setEnderecoUsoId(null); setEnderecoUsoLabel(''); setEnderecoUsoData(null); setEnderecosCliente([])
@@ -512,9 +581,14 @@ export default function CriarContratoPage() {
             <div style={{ display:'flex', alignItems:'center', gap:8, color:'var(--t-muted)' }}>
               <div style={{display:"inline-block",width:6,height:6,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out infinite",verticalAlign:"middle",flexShrink:0}}/> Carregando endereços...
             </div>
-          ) : enderecosCliente.length===0 ? (
-            <div style={{ background:'var(--c-warning-light)', border:'1px solid var(--c-warning)', borderRadius:'var(--r-md)', padding:'12px 16px', fontSize:'var(--fs-md)', color:'var(--c-warning-text)' }}>
-              Este cliente não possui endereços cadastrados. Cadastre na ficha do cliente ou continue sem endereço.
+          ) : enderecosCliente.length===0 && !showNovoEnd ? (
+            <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+              <div style={{ background:'rgba(251,191,36,0.08)', border:'1px solid rgba(251,191,36,0.25)', borderRadius:'var(--r-md)', padding:'12px 16px', fontSize:'var(--fs-md)', color:'#fbbf24' }}>
+                ⚠️ Este cliente não possui endereços cadastrados.
+              </div>
+              <Btn onClick={()=>setShowNovoEnd(true)} size="sm" style={{ alignSelf:'flex-start' }}>
+                + Cadastrar Novo Endereço
+              </Btn>
             </div>
           ) : (
             <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
@@ -551,7 +625,99 @@ export default function CriarContratoPage() {
             </div>
           )}
 
-          {(enderecoUsoId || enderecosCliente.length===0) && (
+          {/* Botão novo endereço (quando já existem endereços) */}
+          {clienteId && !showNovoEnd && enderecosCliente.length > 0 && (
+            <Btn onClick={()=>setShowNovoEnd(true)} size="sm" variant="secondary" style={{ alignSelf:'flex-start' }}>
+              + Novo Endereço de Entrega
+            </Btn>
+          )}
+
+          {/* Formulário inline de novo endereço */}
+          {showNovoEnd && (
+            <div style={{ background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.25)', borderRadius:'var(--r-lg)', padding:'18px 20px', display:'flex', flexDirection:'column', gap:14 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+                <div style={{ fontWeight:700, color:'#a5b4fc', fontSize:14 }}>📍 Novo Endereço de Entrega</div>
+                <button onClick={()=>setShowNovoEnd(false)} style={{ background:'none', border:'none', color:'var(--t-muted)', cursor:'pointer', fontSize:18 }}>×</button>
+              </div>
+
+              {/* Tipo */}
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <FormField label="Tipo de endereço">
+                  <select className={inputCls} {...NE('tipo')}>
+                    {['obra','residencial','comercial','industrial','rural','outro'].map(t=>(
+                      <option key={t} value={t}>{t.charAt(0).toUpperCase()+t.slice(1)}</option>
+                    ))}
+                  </select>
+                </FormField>
+                <FormField label="CEP">
+                  <div style={{ position:'relative' }}>
+                    <input className={inputCls} placeholder="00000-000"
+                      value={novoEnd.cep}
+                      onChange={e=>setNovoEnd((p:any)=>({...p, cep:e.target.value}))}
+                      onBlur={e=>buscarCep(e.target.value)}
+                      maxLength={9}/>
+                    {buscandoCep && <span style={{ position:'absolute', right:10, top:'50%', transform:'translateY(-50%)', fontSize:11, color:'var(--t-muted)' }}>Buscando...</span>}
+                  </div>
+                </FormField>
+              </div>
+
+              <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:12 }}>
+                <FormField label="Logradouro *">
+                  <input className={inputCls} placeholder="Rua, Av, Rodovia..." {...NE('logradouro')}/>
+                </FormField>
+                <FormField label="Número *">
+                  <input className={inputCls} placeholder="S/N" {...NE('numero')}/>
+                </FormField>
+              </div>
+
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
+                <FormField label="Complemento">
+                  <input className={inputCls} placeholder="Apto, Sala, Galpão..." {...NE('complemento')}/>
+                </FormField>
+                <FormField label="Bairro">
+                  <input className={inputCls} {...NE('bairro')}/>
+                </FormField>
+              </div>
+
+              <div style={{ display:'grid', gridTemplateColumns:'2fr 1fr', gap:12 }}>
+                <FormField label="Cidade *">
+                  <input className={inputCls} {...NE('cidade')}/>
+                </FormField>
+                <FormField label="Estado">
+                  <input className={inputCls} maxLength={2} placeholder="RS" {...NE('estado')}
+                    onChange={e=>setNovoEnd((p:any)=>({...p, estado:e.target.value.toUpperCase()}))}/>
+                </FormField>
+              </div>
+
+              <FormField label="Referência / Ponto de referência">
+                <input className={inputCls} placeholder="Ex: Próximo ao Sicredi, portão verde..." {...NE('referencia')}/>
+              </FormField>
+
+              <div style={{ display:'flex', gap:16, alignItems:'center' }}>
+                <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontSize:13 }}>
+                  <input type="checkbox" checked={novoEnd.flag_obra_entrega}
+                    onChange={e=>setNovoEnd((p:any)=>({...p, flag_obra_entrega:e.target.checked}))}
+                    style={{ accentColor:'var(--c-primary)' }}/>
+                  <span style={{ color:'var(--t-secondary)' }}>Endereço de obra/entrega</span>
+                </label>
+                <label style={{ display:'flex', alignItems:'center', gap:6, cursor:'pointer', fontSize:13 }}>
+                  <input type="checkbox" checked={novoEnd.principal}
+                    onChange={e=>setNovoEnd((p:any)=>({...p, principal:e.target.checked}))}
+                    style={{ accentColor:'var(--c-primary)' }}/>
+                  <span style={{ color:'var(--t-secondary)' }}>Definir como endereço principal</span>
+                </label>
+              </div>
+
+              <div style={{ display:'flex', gap:10 }}>
+                <Btn variant="secondary" style={{ flex:1 }} onClick={()=>setShowNovoEnd(false)}>Cancelar</Btn>
+                <Btn style={{ flex:2 }} loading={salvandoEnd} onClick={salvarNovoEndereco}>
+                  💾 Salvar e Selecionar Este Endereço
+                </Btn>
+              </div>
+            </div>
+          )}
+
+          {(enderecoUsoId || enderecosCliente.length===0) && !showNovoEnd && (
             <FormField label="Referência / Observações do local">
               <input value={localReferencia} onChange={e=>setLocalReferencia(e.target.value)}
                 className={inputCls} placeholder="Ex: Obra no 3º andar, portão azul, solicitar João"/>
