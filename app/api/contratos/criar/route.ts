@@ -80,13 +80,30 @@ export async function POST(req: NextRequest) {
         // Verificar se patrimônio está disponível antes de reservar
         const { data: pat } = await sb.from('patrimonios')
           .select('status, numero_patrimonio').eq('id', item.patrimonio_id).single()
+
         if (pat?.status === 'locado') {
-          return NextResponse.json({ ok: false, error: `Patrimônio "${pat.numero_patrimonio}" já está locado em outro contrato.` })
+          // Verificar se está em contrato ativo real (não apenas rascunho)
+          const { data: contratoAtivo } = await sb.from('contrato_itens')
+            .select('contrato_id, contratos!inner(status)')
+            .eq('patrimonio_id', item.patrimonio_id)
+            .in('contratos.status', ['ativo','em_devolucao','pendente_manutencao'])
+            .limit(1).maybeSingle()
+
+          if (contratoAtivo) {
+            return NextResponse.json({ ok: false, error: `Patrimônio "${pat.numero_patrimonio}" já está locado em um contrato ativo.` })
+          }
+          // Estava preso em rascunho/encerrado — liberar e continuar
+          // (o trigger deveria ter feito isso, mas garantimos aqui)
         }
+
         if (pat?.status === 'manutencao') {
           return NextResponse.json({ ok: false, error: `Patrimônio "${pat.numero_patrimonio}" está em manutenção.` })
         }
-        // Marcar como locado imediatamente ao criar o contrato
+        if (pat?.status === 'descartado') {
+          return NextResponse.json({ ok: false, error: `Patrimônio "${pat.numero_patrimonio}" está descartado.` })
+        }
+
+        // Marcar como locado
         await sb.from('patrimonios').update({ status: 'locado' }).eq('id', item.patrimonio_id)
       }
     }

@@ -348,14 +348,37 @@ export default function CriarContratoPage() {
   
   async function loadPatrimonios(produtoId:number) {
     setLoadingPats(true)
-    const {data}=await supabase.from('patrimonios')
+    // Buscar todos disponíveis + os locados que estão apenas em rascunho/encerrado
+    const { data: disponiveis } = await supabase.from('patrimonios')
       .select('id,numero_patrimonio,numero_serie,status,finalidade')
       .eq('produto_id', produtoId)
       .eq('status', 'disponivel')
-      .eq('finalidade', 'locacao')   // só patrimônios para locação
-      .is('deleted_at', null)        // não deletados
+      .eq('finalidade', 'locacao')
+      .is('deleted_at', null)
       .order('numero_patrimonio')
-    setPatrimonios(data??[]); setLoadingPats(false)
+
+    // Patrimônios "locados" mas sem contrato ativo real (presos em rascunho)
+    const { data: locados } = await supabase.from('patrimonios')
+      .select('id,numero_patrimonio,numero_serie,status,finalidade')
+      .eq('produto_id', produtoId)
+      .eq('status', 'locado')
+      .eq('finalidade', 'locacao')
+      .is('deleted_at', null)
+      .order('numero_patrimonio')
+
+    // Filtrar locados: só incluir os que NÃO têm contrato ativo
+    const liberaveis: any[] = []
+    for (const pat of (locados ?? [])) {
+      const { data: ativo } = await supabase.from('contrato_itens')
+        .select('contrato_id, contratos!inner(status)')
+        .eq('patrimonio_id', pat.id)
+        .in('contratos.status' as any, ['ativo','em_devolucao','pendente_manutencao'])
+        .limit(1).maybeSingle()
+      if (!ativo) liberaveis.push({ ...pat, status: 'disponivel' }) // trata como disponível
+    }
+
+    setPatrimonios([...(disponiveis ?? []), ...liberaveis])
+    setLoadingPats(false)
   }
 
   function selecionarProduto(id:number|null, row:any|null) {
