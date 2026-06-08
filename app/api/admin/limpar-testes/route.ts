@@ -1,5 +1,6 @@
 // build: 2026-06-06 — Limpeza de dados de teste (apenas admin)
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAdmin } from '@/lib/auth-api'
 import { createClient } from '@supabase/supabase-js'
 export const runtime = 'nodejs'
 

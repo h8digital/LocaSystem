@@ -1,5 +1,6 @@
 // build: 2026-05-29 18:10:30
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-api'
 import { createClient } from '@supabase/supabase-js'
 export const runtime = 'nodejs'
 

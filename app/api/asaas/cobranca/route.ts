@@ -1,5 +1,6 @@
 // build: 2026-06-06 — Fase 4 fix: QR Code extraído da resposta da criação
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-api'
 import { createClient } from '@supabase/supabase-js'
 export const runtime = 'nodejs'
 

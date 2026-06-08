@@ -1,5 +1,6 @@
 // build: 2026-06-06 — Cancelar cobrança no Asaas
 import { NextRequest, NextResponse } from 'next/server'
+import { requireAuth } from '@/lib/auth-api'
 import { createClient } from '@supabase/supabase-js'
 export const runtime = 'nodejs'
 
