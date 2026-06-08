@@ -106,8 +106,22 @@ function maskCNPJ(v: string) {
 }
 function maskPhone(v: string) {
   const d = v.replace(/\D/g,'').slice(0,11)
-  if (d.length <= 10) return d.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3')
-  return d.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3')
+  if (d.length <= 10) return d.replace(/^(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3')
+  return d.replace(/^(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3')
+}
+function maskWhatsApp(v: string) {
+  // Permite: +55 51 99999-9999 ou 55 51 99999-9999
+  // Preserva o + inicial se houver
+  const temPlus = v.trimStart().startsWith('+')
+  const d = v.replace(/\D/g,'').slice(0,13) // DDI(2) + DDD(2) + número(9) = 13
+  if (!d) return ''
+  // Formatar: +55 (51) 99999-9999
+  let r = d
+  if (d.length <= 2)  r = d
+  else if (d.length <= 4)  r = d.slice(0,2) + ' (' + d.slice(2)
+  else if (d.length <= 9)  r = d.slice(0,2) + ' (' + d.slice(2,4) + ') ' + d.slice(4)
+  else if (d.length <= 13) r = d.slice(0,2) + ' (' + d.slice(2,4) + ') ' + d.slice(4,9) + '-' + d.slice(9)
+  return (temPlus ? '+' : '') + r
 }
 function maskCEP(v: string) {
   return v.replace(/\D/g,'').slice(0,8).replace(/(\d{5})(\d)/,'$1-$2')
@@ -484,14 +498,15 @@ export default function ParametrosPage() {
                             let v = e.target.value
                             if (f.k === 'empresa_cnpj')     v = maskCNPJ(v)
                             if (f.k === 'empresa_telefone') v = maskPhone(v)
-                            if (f.k === 'empresa_whatsapp') v = maskPhone(v)
+                            if (f.k === 'empresa_whatsapp') v = maskWhatsApp(v)
                             if (f.k === 'empresa_ie')       v = maskIE(v)
                             setParams(p=>({...p,[f.k]:v}))
                           }}
                           className={inpSm}
                           placeholder={
                             f.k==='empresa_cnpj' ? '00.000.000/0000-00' :
-                            f.k==='empresa_telefone' || f.k==='empresa_whatsapp' ? '(00) 00000-0000' :
+                            f.k==='empresa_telefone' ? '(00) 00000-0000' :
+                            f.k==='empresa_whatsapp' ? '+55 (51) 99999-9999' :
                             undefined
                           }
                           style={f.mono?{fontFamily:'var(--font-mono)'}:undefined}
