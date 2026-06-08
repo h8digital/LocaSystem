@@ -9,6 +9,8 @@ const sb = createClient(
 )
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth()
+  if ('error' in auth) return auth.error
   try {
     const formData = await req.formData()
     const file = formData.get('file') as File

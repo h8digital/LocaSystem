@@ -9,6 +9,8 @@ const sb = createClient(
 )
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth()
+  if ('error' in auth) return auth.error
   try {
     const { fatura_id } = await req.json().catch(()=>({}))
     const { data: params } = await sb.from('parametros').select('chave,valor')

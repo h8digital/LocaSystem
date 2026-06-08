@@ -9,6 +9,8 @@ const sb = createClient(
 )
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth()
+  if ('error' in auth) return auth.error
   try {
     const { payment_id } = await req.json()
     if (!payment_id) return NextResponse.json({ ok: false, error: 'payment_id obrigatório' })

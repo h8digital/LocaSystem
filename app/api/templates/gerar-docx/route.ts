@@ -3,6 +3,8 @@ import { NextRequest, NextResponse } from 'next/server'
 export const runtime = 'nodejs'
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth()
+  if ('error' in auth) return auth.error
   try {
     const { docx_base64, tags } = await req.json()
     if (!docx_base64) return NextResponse.json({ ok: false, error: 'Base64 do DOCX não informado' })

@@ -53,6 +53,8 @@ async function upsertCliente(cfg: Record<string,string>, cli: any): Promise<stri
 }
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth()
+  if ('error' in auth) return auth.error
   try {
     const { fatura_id, tipo='PIX' } = await req.json()
     const cfg = await getConfig()

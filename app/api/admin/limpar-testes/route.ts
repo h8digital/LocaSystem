@@ -9,6 +9,8 @@ const sb = createClient(
 )
 
 export async function POST(req: NextRequest) {
+  const auth = await requireAdmin()
+  if ('error' in auth) return auth.error
   try {
     const { confirmar, modo } = await req.json()
     if (confirmar !== 'CONFIRMAR_LIMPEZA') {

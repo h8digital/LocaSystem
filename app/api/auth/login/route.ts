@@ -50,9 +50,11 @@ export async function POST(req: NextRequest) {
       comissao: user.comissao_percentual
     }), {
       httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
       maxAge: 7200,
       path: '/',
       sameSite: 'lax',
+      secure: process.env.NODE_ENV === 'production',
     })
 
     return NextResponse.json({

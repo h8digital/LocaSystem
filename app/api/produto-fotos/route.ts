@@ -26,6 +26,8 @@ export async function GET(req: NextRequest) {
 
 // POST /api/produto-fotos  (multipart/form-data)
 export async function POST(req: NextRequest) {
+  const auth = await requireAuth()
+  if ('error' in auth) return auth.error
   try {
     const formData = await req.formData()
     const produtoId = formData.get('produto_id') as string
@@ -77,6 +79,8 @@ export async function POST(req: NextRequest) {
 
 // DELETE /api/produto-fotos?id=X
 export async function DELETE(req: NextRequest) {
+  const auth = await requireAuth()
+  if ('error' in auth) return auth.error
   try {
     const id = req.nextUrl.searchParams.get('id')
     if (!id) return NextResponse.json({ ok: false, error: 'id obrigatório' })
@@ -105,6 +109,8 @@ export async function DELETE(req: NextRequest) {
 
 // PATCH /api/produto-fotos?id=X  — definir como principal
 export async function PATCH(req: NextRequest) {
+  const auth = await requireAuth()
+  if ('error' in auth) return auth.error
   try {
     const id = req.nextUrl.searchParams.get('id')
     const { produto_id } = await req.json()
