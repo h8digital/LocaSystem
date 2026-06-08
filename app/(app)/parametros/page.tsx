@@ -94,6 +94,26 @@ function InfoBox({ type='info', children }: { type?:'info'|'warning'|'success'; 
   )
 }
 
+
+// ── Funções de máscara ────────────────────────────────────────────────────────
+function maskCNPJ(v: string) {
+  const d = v.replace(/\D/g,'').slice(0,14)
+  return d
+    .replace(/^(\d{2})(\d)/,'$1.$2')
+    .replace(/^(\d{2})\.(\d{3})(\d)/,'$1.$2.$3')
+    .replace(/^(\d{2})\.(\d{3})\.(\d{3})(\d)/,'$1.$2.$3\/$4')
+    .replace(/^(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})(\d)/,'$1.$2.$3\/$4-$5')
+}
+function maskPhone(v: string) {
+  const d = v.replace(/\D/g,'').slice(0,11)
+  if (d.length <= 10) return d.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3')
+  return d.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3')
+}
+function maskCEP(v: string) {
+  return v.replace(/\D/g,'').slice(0,8).replace(/(\d{5})(\d)/,'$1-$2')
+}
+function maskIE(v: string) { return v.replace(/[^0-9A-Za-z.\/\-]/g,'').slice(0,20) }
+
 // ─── Campos fixos ─────────────────────────────────────────────────────────────
 const CAMPOS_EMPRESA = [
   { k:'empresa_nome',     l:'Razão Social',         full:true,  mono:false },
@@ -458,8 +478,24 @@ export default function ParametrosPage() {
                   {CAMPOS_EMPRESA.map((f:any) => (
                     <div key={f.k} style={{ gridColumn: f.full ? 'span 2' : undefined }}>
                       <FormField label={f.l}>
-                        <input value={params[f.k]??''} onChange={e=>setParams(p=>({...p,[f.k]:e.target.value}))}
-                          className={inpSm} style={f.mono?{fontFamily:'var(--font-mono)'}:undefined}/>
+                        <input
+                          value={params[f.k]??''}
+                          onChange={e => {
+                            let v = e.target.value
+                            if (f.k === 'empresa_cnpj')     v = maskCNPJ(v)
+                            if (f.k === 'empresa_telefone') v = maskPhone(v)
+                            if (f.k === 'empresa_whatsapp') v = maskPhone(v)
+                            if (f.k === 'empresa_ie')       v = maskIE(v)
+                            setParams(p=>({...p,[f.k]:v}))
+                          }}
+                          className={inpSm}
+                          placeholder={
+                            f.k==='empresa_cnpj' ? '00.000.000/0000-00' :
+                            f.k==='empresa_telefone' || f.k==='empresa_whatsapp' ? '(00) 00000-0000' :
+                            undefined
+                          }
+                          style={f.mono?{fontFamily:'var(--font-mono)'}:undefined}
+                        />
                       </FormField>
                     </div>
                   ))}
@@ -470,7 +506,7 @@ export default function ParametrosPage() {
                 <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr 1fr 1fr', gap:12 }}>
                   <FormField label="CEP">
                     <input value={params['empresa_cep']??''} className={inpSm} placeholder="00000-000"
-                      onChange={e=>setParams(p=>({...p,empresa_cep:e.target.value}))}
+                      onChange={e=>setParams(p=>({...p,empresa_cep:maskCEP(e.target.value)}))}
                       onBlur={async e=>{
                         const cep=e.target.value.replace(/\D/g,''); if(cep.length!==8) return
                         const r=await fetch(`https://viacep.com.br/ws/${cep}/json/`); const d=await r.json()
