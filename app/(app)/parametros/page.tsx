@@ -165,8 +165,18 @@ export default function ParametrosPage() {
   // ── Salvar ERP ────────────────────────────────────────────────────────────
   async function salvarERP() {
     setSaving(true)
-    for (const [chave, valor] of Object.entries(params))
-      await supabase.from('parametros').update({ valor }).eq('chave', chave)
+    // upsert garante que chaves novas são criadas e existentes são atualizadas
+    const chavesERP = [
+      ...CAMPOS_EMPRESA.map(c => c.k),
+      'empresa_cep','empresa_logradouro','empresa_numero','empresa_complemento',
+      'empresa_bairro','empresa_cidade','empresa_estado','empresa_endereco',
+      'empresa_logo_url',
+    ]
+    for (const chave of chavesERP) {
+      if (params[chave] !== undefined)
+        await supabase.from('parametros')
+          .upsert({ chave, valor: params[chave] ?? '' }, { onConflict: 'chave' })
+    }
     for (const p of periodos)
       if (p.id) await supabase.from('periodos_locacao')
         .update({ nome:p.nome, dias:p.dias, desconto_percentual:p.desconto_percentual, ativo:p.ativo?1:0 }).eq('id',p.id)
