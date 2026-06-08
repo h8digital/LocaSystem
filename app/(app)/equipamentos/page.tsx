@@ -1490,8 +1490,8 @@ export default function EquipamentosPage() {
               ) : (
                 <div style={{display:'flex',flexDirection:'column',gap:8}}>
                   {/* Cabeçalho */}
-                  <div style={{display:'grid',gridTemplateColumns:modalLocado?.controla_patrimonio?'90px 1fr 1fr 50px 80px':'1fr 1fr 50px 80px',gap:8,padding:'6px 12px',borderBottom:'1px solid var(--border)'}}>
-                    {modalLocado?.controla_patrimonio && <div style={{fontSize:11,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:700}}>Patrimônio</div>}
+                  <div style={{display:'grid',gridTemplateColumns:!!(modalLocado?.controla_patrimonio)?'90px 1fr 1fr 50px 80px':'1fr 1fr 50px 80px',gap:8,padding:'6px 12px',borderBottom:'1px solid var(--border)'}}>
+                    {!!(modalLocado?.controla_patrimonio) && <div style={{fontSize:11,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:700}}>Patrimônio</div>}
                     <div style={{fontSize:11,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:700}}>Contrato · Cliente</div>
                     <div style={{fontSize:11,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:700}}>Período</div>
                     <div style={{fontSize:11,color:'var(--t-muted)',textTransform:'uppercase',letterSpacing:'0.05em',fontWeight:700,textAlign:'center'}}>Qtd</div>
@@ -1499,8 +1499,8 @@ export default function EquipamentosPage() {
                   </div>
                   {/* Linhas */}
                   {contratosLocado.map((c,i)=>(
-                    <div key={i} style={{display:'grid',gridTemplateColumns:modalLocado?.controla_patrimonio?'90px 1fr 1fr 50px 80px':'1fr 1fr 50px 80px',gap:8,padding:'10px 12px',borderRadius:8,background:i%2===0?'transparent':'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.04)',alignItems:'center'}}>
-                      {modalLocado?.controla_patrimonio && (
+                    <div key={i} style={{display:'grid',gridTemplateColumns:!!(modalLocado?.controla_patrimonio)?'90px 1fr 1fr 50px 80px':'1fr 1fr 50px 80px',gap:8,padding:'10px 12px',borderRadius:8,background:i%2===0?'transparent':'rgba(255,255,255,0.02)',border:'1px solid rgba(255,255,255,0.04)',alignItems:'center'}}>
+                      {!!(modalLocado?.controla_patrimonio) && (
                         <div style={{fontFamily:'monospace',color:'var(--t-secondary)',fontWeight:700,fontSize:12}}>
                           {c.patrimonio_num}
                         </div>
