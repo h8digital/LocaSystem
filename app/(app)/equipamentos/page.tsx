@@ -109,13 +109,14 @@ export default function EquipamentosPage() {
     const lista: any[] = []
 
     if (produto.controla_patrimonio) {
-      // Com patrimônio: buscar via patrimonios locados
+      // Com patrimônio: buscar via patrimonios COM status locado
+      // e filtrar apenas itens NÃO totalmente devolvidos
       const { data } = await supabase
         .from('patrimonios')
         .select(`
           id, numero_patrimonio, status,
           contrato_itens(
-            id, quantidade,
+            id, quantidade, qtd_devolvida,
             contratos(id, numero, status, data_inicio, data_fim, clientes(nome))
           )
         `)
@@ -126,6 +127,9 @@ export default function EquipamentosPage() {
         for (const ci of (pat.contrato_itens ?? [])) {
           const ct = (Array.isArray(ci.contratos) ? ci.contratos[0] : ci.contratos) as any
           if (!ct || ['encerrado','cancelado'].includes(ct.status)) continue
+          // Ignorar itens totalmente devolvidos
+          const devolvido = Number(ci.qtd_devolvida ?? 0) >= Number(ci.quantidade ?? 1)
+          if (devolvido) continue
           lista.push({
             patrimonio_num: pat.numero_patrimonio,
             contrato_id:    ct.id,
@@ -140,10 +144,11 @@ export default function EquipamentosPage() {
       }
     } else {
       // Sem patrimônio: buscar via contrato_itens pelo produto_id
+      // filtrar apenas contratos ativos e itens não devolvidos
       const { data } = await supabase
         .from('contrato_itens')
         .select(`
-          id, quantidade,
+          id, quantidade, qtd_devolvida,
           contratos(id, numero, status, data_inicio, data_fim, clientes(nome))
         `)
         .eq('produto_id', produto.id)
@@ -151,6 +156,11 @@ export default function EquipamentosPage() {
       for (const ci of (data ?? [])) {
         const ct = (Array.isArray(ci.contratos) ? ci.contratos[0] : ci.contratos) as any
         if (!ct || ['encerrado','cancelado'].includes(ct.status)) continue
+        // Ignorar itens totalmente devolvidos
+        const devolvido = Number(ci.qtd_devolvida ?? 0) >= Number(ci.quantidade ?? 1)
+        if (devolvido) continue
+        // Calcular quantidade ainda em campo
+        const emCampo = Number(ci.quantidade ?? 0) - Number(ci.qtd_devolvida ?? 0)
         lista.push({
           patrimonio_num: '—',
           contrato_id:    ct.id,
@@ -159,7 +169,7 @@ export default function EquipamentosPage() {
           cliente:        ct.clientes?.nome,
           data_inicio:    ct.data_inicio,
           data_fim:       ct.data_fim,
-          quantidade:     ci.quantidade,
+          quantidade:     emCampo,
         })
       }
     }
@@ -208,11 +218,12 @@ export default function EquipamentosPage() {
     if (idsQtd.length > 0) {
       const { data: cis } = await supabase
         .from('contrato_itens')
-        .select('produto_id, quantidade, contratos(status)')
+        .select('produto_id, quantidade, qtd_devolvida, contratos(status)')
         .in('produto_id', idsQtd)
       ;(cis ?? []).forEach((ci: any) => {
         if (ci.contratos?.status === 'ativo') {
-          locadoMap[ci.produto_id] = (locadoMap[ci.produto_id] ?? 0) + Number(ci.quantidade)
+          const emCampo = Math.max(0, Number(ci.quantidade) - Number(ci.qtd_devolvida ?? 0))
+          if (emCampo > 0) locadoMap[ci.produto_id] = (locadoMap[ci.produto_id] ?? 0) + emCampo
         }
       })
     }
