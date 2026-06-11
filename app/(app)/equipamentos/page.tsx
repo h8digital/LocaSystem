@@ -328,7 +328,7 @@ export default function EquipamentosPage() {
     setPatsLoading(true)
     const { data } = await supabase
       .from('patrimonios')
-      .select('id, numero_patrimonio, numero_serie, status, data_aquisicao, valor_aquisicao, observacoes, contrato_itens!contrato_itens_patrimonio_id_fkey(id, contratos(status))')
+      .select('id, numero_patrimonio, numero_serie, status, data_aquisicao, valor_aquisicao, observacoes, contrato_itens!contrato_itens_patrimonio_id_fkey(id, quantidade, qtd_devolvida, contratos(status, numero))')
       .eq('produto_id', produtoId)
       .is('deleted_at', null)
       .order('numero_patrimonio')
@@ -381,7 +381,7 @@ export default function EquipamentosPage() {
       { data: devItens },
       { data: manutencoes },
     ] = await Promise.all([
-      supabase.from('contrato_itens').select('id, contratos(status,numero)').eq('patrimonio_id', pat.id),
+      supabase.from('contrato_itens').select('id, quantidade, qtd_devolvida, contratos(status,numero)').eq('patrimonio_id', pat.id),
       supabase.from('estoque_movimentacoes').select('id').eq('patrimonio_id', pat.id).limit(1),
       supabase.from('devolucao_itens').select('id').eq('patrimonio_id', pat.id).limit(1),
       supabase.from('manutencoes').select('id').eq('patrimonio_id', pat.id).limit(1),
@@ -389,6 +389,7 @@ export default function EquipamentosPage() {
 
     const contratosAtivos = (contratos ?? []).filter((ci:any) =>
       ['ativo','em_devolucao','pendente_manutencao'].includes(ci.contratos?.status)
+      && Number(ci.qtd_devolvida ?? 0) < Number(ci.quantidade ?? 1)
     )
     if (contratosAtivos.length > 0) {
       alert('Patrimônio ' + pat.numero_patrimonio + ' possui contrato ativo (' + (contratosAtivos[0].contratos as any)?.numero + ') — não pode ser excluído.')
@@ -439,6 +440,7 @@ export default function EquipamentosPage() {
 
     const contratosAtivos = (contratos ?? []).filter((ci:any) =>
       ['ativo','em_devolucao','pendente_manutencao'].includes(ci.contratos?.status)
+      && Number(ci.qtd_devolvida ?? 0) < Number(ci.quantidade ?? 1)
     )
     if (contratosAtivos.length > 0) {
       alert('O produto "' + nome + '" possui ' + contratosAtivos.length + ' contrato(s) ativo(s) e não pode ser inativado.\n\nEncerre os contratos antes de inativar o produto.')
@@ -1389,6 +1391,7 @@ export default function EquipamentosPage() {
                   {patsPanel.map((pat: any) => {
                     const temContratoAtivo = (pat.contrato_itens ?? []).some((ci: any) =>
                       ['ativo','em_devolucao','pendente_manutencao'].includes(ci.contratos?.status)
+                      && Number(ci.qtd_devolvida ?? 0) < Number(ci.quantidade ?? 1)
                     )
                     const statusColors: Record<string,string> = {
                       disponivel: '#16a34a', locado: 'var(--c-primary)',
