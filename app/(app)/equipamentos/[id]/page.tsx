@@ -72,7 +72,7 @@ export default function EquipamentoDetalhe() {
         .eq('id', Number(id))
         .single(),
       supabase.from('patrimonios')
-        .select('*, contrato_itens!contrato_itens_patrimonio_id_fkey(contrato_id, contratos(id,numero,status,data_inicio,data_fim,clientes(nome)))')
+        .select('*, contrato_itens!contrato_itens_patrimonio_id_fkey(contrato_id, quantidade, qtd_devolvida, contratos(id,numero,status,data_inicio,data_fim,clientes(nome)))')
         .eq('produto_id', Number(id))
         .is('deleted_at', null)
         .order('numero_patrimonio'),
@@ -393,7 +393,10 @@ export default function EquipamentoDetalhe() {
                 <tbody>
                   {patsPagina.map((pat: any) => {
                     const ci = (pat.contrato_itens ?? [])
-                      .find((c: any) => ['ativo','em_devolucao','pendente_manutencao'].includes(c.contratos?.status))
+                      .find((c: any) =>
+                        ['ativo','em_devolucao','pendente_manutencao'].includes(c.contratos?.status)
+                        && Number(c.qtd_devolvida ?? 0) < Number(c.quantidade ?? 1)
+                      )
                     const color = STATUS_COLOR[pat.status] ?? 'var(--t-muted)'
                     return (
                       <tr key={pat.id}>
