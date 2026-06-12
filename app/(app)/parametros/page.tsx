@@ -241,6 +241,13 @@ export default function ParametrosPage() {
     ]
     for (const chave of chaves)
       await supabase.from('site_config').upsert({ chave, valor: params[chave] ?? '' }, { onConflict:'chave' })
+
+    // Recalcular horario_funcionamento combinado (usado em outras telas do site)
+    const partes = [params['horario_seg_sex'], params['horario_sabado'], params['horario_domingo']]
+      .filter((v): v is string => !!v && v.trim() !== '')
+    await supabase.from('site_config')
+      .upsert({ chave:'horario_funcionamento', valor: partes.join(' | ') }, { onConflict:'chave' })
+
     setSavingSite(false); setOkSite(true)
     setTimeout(() => setOkSite(false), 3000)
   }
