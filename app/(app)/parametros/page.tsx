@@ -736,19 +736,9 @@ export default function ParametrosPage() {
 
               <div className="ds-card">
                 <div className="ds-card-header">
-                  <span className="ds-card-title">🔄 Faturamento Mensal Automático</span>
+                  <span className="ds-card-title">📡 Webhook de Pagamentos (Asaas)</span>
                 </div>
                 <div className="ds-card-body">
-                  <div style={{ fontSize:'var(--fs-md)', color:'var(--t-secondary)', lineHeight:1.6, marginBottom:14 }}>
-                    Contratos com período <strong>Mensal</strong> geram faturas automaticamente todo dia configurado no contrato (campo "Dia de Vencimento").
-                    O processo roda diariamente às <strong>6h da manhã</strong> via Supabase Edge Function.
-                  </div>
-                  <div style={{ background:'rgba(52,211,153,0.06)', border:'1px solid rgba(52,211,153,0.2)', borderRadius:'var(--r-md)', padding:'12px 16px', marginBottom:12 }}>
-                    <div style={{ fontWeight:700, color:'#34d399', marginBottom:4, fontSize:'var(--fs-md)' }}>✅ Cron job ativo</div>
-                    <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-muted)' }}>
-                      Edge Function <code>gerar-faturas-recorrentes</code> agendada para rodar diariamente às 9h UTC (6h BRT).
-                    </div>
-                  </div>
                   <div style={{ background:'rgba(99,102,241,0.06)', border:'1px solid rgba(99,102,241,0.2)', borderRadius:'var(--r-md)', padding:'14px 16px' }}>
                     <div style={{ fontWeight:700, color:'#a5b4fc', marginBottom:10, fontSize:'var(--fs-md)' }}>📡 Configurar Webhook no Asaas</div>
                     <div style={{ fontSize:'var(--fs-sm)', color:'var(--t-secondary)', lineHeight:1.7, marginBottom:10 }}>

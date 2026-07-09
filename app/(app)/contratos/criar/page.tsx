@@ -112,7 +112,7 @@ export default function CriarContratoPage() {
     periodo_id:'', data_inicio: new Date().toISOString().split('T')[0],
     data_fim:'', forma_pagamento:'pix', caucao:0,
     desconto:0, acrescimo:0, frete:0, comissao_percentual:0, observacoes:'',
-    tipo_contrato:'unico', dia_vencimento:'', data_venc_fatura:'',
+    tipo_contrato:'unico', data_venc_fatura:'',
   })
 
   // Passo 2 — local de uso
@@ -136,13 +136,8 @@ export default function CriarContratoPage() {
 
   const F = (k:string) => ({ value:form[k]??'', onChange:(e:any)=>setForm((f:any)=>({...f,[k]:e.target.value})) })
 
-  // Para mensal sem data_fim, usar o número de dias do período (ex: 30)
-  // para que o cálculo de preço seja correto
-  const periodoSelecionado = periodos.find((x:any) => String(x.id) === String(form.periodo_id))
-  const diasPeriodo = periodoSelecionado?.dias ?? 30
   const dias = form.data_inicio && form.data_fim
     ? Math.max(1, Math.ceil((new Date(form.data_fim).getTime()-new Date(form.data_inicio).getTime())/86400000))
-    : isMensal(form.periodo_id) ? diasPeriodo  // mensal: usa 30 dias do período
     : 1
   const subtotal       = itens.reduce((s,i)=>s+Number(i.total),0)
   const totalLimpeza   = itens.reduce((s,i)=>s+Number(i.valor_limpeza||0),0)
@@ -219,8 +214,7 @@ export default function CriarContratoPage() {
     setItens(prev => prev.map(it => {
       if (!it._produto) return it
       const p = periodos.find((x:any) => String(x.id) === String(form.periodo_id))
-      const diasCalculo = isMensal(form.periodo_id) && !form.data_fim ? diasPeriodo : dias
-      const res = calcularPrecoItem(it._produto as PrecosProduto, diasCalculo, p?.nome ?? '', p?.dias ?? diasCalculo)
+      const res = calcularPrecoItem(it._produto as PrecosProduto, dias, p?.nome ?? '', p?.dias ?? dias)
       const qtd = it._produto.controla_patrimonio ? 1 : it.quantidade
       return { ...it, preco_unitario: res.totalItem, total: res.totalItem * qtd, _descricaoCobranca: res.descricao }
     }))
@@ -237,19 +231,15 @@ export default function CriarContratoPage() {
     return 'diario'
   }
 
-  function isMensal(pid: string): boolean {
-    const p = periodos.find((x:any) => String(x.id) === String(pid))
-    return tipoContratoDoPeriodo(p?.nome ?? '') === 'mensal'
-  }
-
   function aplicarPeriodo(pid:string) {
     const p = periodos.find((x:any)=>x.id==pid)
     const tipo = tipoContratoDoPeriodo(p?.nome ?? '')
-    if (p && form.data_inicio && tipo !== 'mensal') {
+    if (p && form.data_inicio) {
+      // Mesma regra para todos os períodos, incluindo mensal: devolução prevista = início + dias do período
       const fim = new Date(form.data_inicio); fim.setDate(fim.getDate() + p.dias)
       setForm((f:any)=>({...f, periodo_id:pid, tipo_contrato:tipo, data_fim:fim.toISOString().split('T')[0]}))
     } else {
-      setForm((f:any)=>({...f, periodo_id:pid, tipo_contrato:tipo, data_fim: tipo==='mensal' ? '' : f.data_fim}))
+      setForm((f:any)=>({...f, periodo_id:pid, tipo_contrato:tipo}))
     }
   }
 
@@ -343,17 +333,14 @@ export default function CriarContratoPage() {
   function getPrecoParaPeriodo(prod:any): number {
     if (!prod) return 0
     const p = periodos.find((x:any) => String(x.id) === String(form.periodo_id))
-    // Para mensal sem data_fim, usar os dias do período (30); senão usar dias reais
-    const diasCalculo = isMensal(form.periodo_id) && !form.data_fim ? diasPeriodo : dias
-    const res = calcularPrecoItem(prod as PrecosProduto, diasCalculo, p?.nome ?? '', p?.dias ?? diasCalculo)
+    const res = calcularPrecoItem(prod as PrecosProduto, dias, p?.nome ?? '', p?.dias ?? dias)
     return res.totalItem
   }
 
   function getDescricaoCobranca(prod:any): string {
     if (!prod) return ''
     const p = periodos.find((x:any) => String(x.id) === String(form.periodo_id))
-    const diasCalculo = isMensal(form.periodo_id) && !form.data_fim ? diasPeriodo : dias
-    const res = calcularPrecoItem(prod as PrecosProduto, diasCalculo, p?.nome ?? '', p?.dias ?? diasCalculo)
+    const res = calcularPrecoItem(prod as PrecosProduto, dias, p?.nome ?? '', p?.dias ?? dias)
     return res.descricao
   }
 
@@ -397,10 +384,9 @@ export default function CriarContratoPage() {
 
   function selecionarProduto(id:number|null, row:any|null) {
     setItemProdutoId(id); setItemProduto(row); setItemProdutoNome(row?.nome??'')
-    const diasCalculo = isMensal(form.periodo_id) && !form.data_fim ? diasPeriodo : dias
     const p = periodos.find((x:any) => String(x.id) === String(form.periodo_id))
     if (row && p) {
-      const res = calcularPrecoItem(row as PrecosProduto, diasCalculo, p.nome, p.dias ?? diasCalculo)
+      const res = calcularPrecoItem(row as PrecosProduto, dias, p.nome, p.dias ?? dias)
       setItemPreco(res.totalItem)
     } else {
       setItemPreco(getPrecoParaPeriodo(row))
@@ -440,7 +426,7 @@ export default function CriarContratoPage() {
     if(passo===1){
       if(!clienteId)        return 'Selecione o cliente.'
       if(!form.data_inicio) return 'Informe a data de início.'
-      if(!form.data_fim && !isMensal(form.periodo_id)) return 'Informe a data de fim.'
+      if(!form.data_fim) return 'Informe a data de fim.'
       if(!form.periodo_id)  return 'Selecione um período.'
     }
     if(passo===3){
@@ -607,32 +593,17 @@ export default function CriarContratoPage() {
             <FormField label="Data de Início" required>
               <input type="date" {...F('data_inicio')} className={inputCls}/>
             </FormField>
-            {isMensal(form.periodo_id) ? (
-              <FormField label="Dia de Vencimento Mensal" hint="Ex: 5 = todo dia 5 do mês">
-                <input type="number" min="1" max="28" className={inputCls}
-                  placeholder="Ex: 5"
-                  value={form.dia_vencimento ?? ''}
-                  onChange={e=>setForm((f:any)=>({...f, dia_vencimento:e.target.value}))}/>
-              </FormField>
-            ) : (
-              <FormField label="Data de Fim" required>
-                <input type="date" {...F('data_fim')} min={form.data_inicio} className={inputCls}/>
-              </FormField>
-            )}
+            <FormField label="Data de Fim" required>
+              <input type="date" {...F('data_fim')} min={form.data_inicio} className={inputCls}/>
+            </FormField>
           </div>
 
-          {form.data_inicio && (isMensal(form.periodo_id) ? (
-            <div style={{ background:'rgba(99,102,241,0.08)', border:'1px solid rgba(99,102,241,0.25)', borderRadius:'var(--r-sm)',
-              padding:'8px 14px', fontSize:'var(--fs-md)', color:'#a5b4fc', fontWeight:500 }}>
-              📅 Contrato mensal recorrente — inicia em {form.data_inicio ? new Date(form.data_inicio+'T12:00:00').toLocaleDateString('pt-BR') : '—'}
-              {form.dia_vencimento ? ` · vence todo dia ${form.dia_vencimento}` : ' · configure o dia de vencimento'}
-            </div>
-          ) : form.data_fim && (
+          {form.data_inicio && form.data_fim && (
             <div style={{ background:'var(--c-info-light)', border:'1px solid var(--c-info)', borderRadius:'var(--r-sm)',
               padding:'8px 14px', fontSize:'var(--fs-md)', color:'var(--c-info-text)', fontWeight:500 }}>
               Duração: <strong>{dias} dia(s)</strong>
             </div>
-          ))}
+          )}
 
           <FormField label="Observações">
             <textarea {...F('observacoes')} rows={2} className={textareaCls} placeholder="Observações gerais do contrato..."/>
@@ -996,9 +967,7 @@ export default function CriarContratoPage() {
             <div style={{ padding:'16px', display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
               {[
                 { l:'Cliente',    v: clienteNome },
-                { l:'Período',    v: isMensal(form.periodo_id) && !form.data_fim
-                  ? `${fmt.date(form.data_inicio)} → em aberto (mensal recorrente)`
-                  : `${fmt.date(form.data_inicio)} → ${fmt.date(form.data_fim)} (${dias}d)` },
+                { l:'Período',    v: `${fmt.date(form.data_inicio)} → ${fmt.date(form.data_fim)} (${dias}d)` },
                 { l:'Pagamento',  v: form.forma_pagamento.replace(/_/g,' ').replace(/\b\w/g,(c:string)=>c.toUpperCase()) },
                 { l:'Local de uso', v: enderecoUsoLabel || 'Não informado' },
                 { l:'Itens',      v: `${itens.length} equipamento(s)` },

@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
       usuario_id:           user.id,
       periodo_id:           contrato.periodo_id || null,
       data_inicio:          contrato.data_inicio,
-      data_fim:             contrato.data_fim || null,  // mensal: null (sem data fim)
+      data_fim:             contrato.data_fim || null,
       forma_pagamento:      contrato.forma_pagamento || 'pix',
       caucao:               Number(contrato.caucao) || 0,
       subtotal:             Number(subtotal) || 0,
@@ -41,7 +41,6 @@ export async function POST(req: NextRequest) {
       total:                Number(total) || 0,
       frete:                Number(contrato.frete) || 0,
       tipo_contrato:        contrato.tipo_contrato || 'unico',
-      dia_vencimento:       contrato.dia_vencimento ? Number(contrato.dia_vencimento) : null,
       data_venc_fatura:     contrato.data_venc_fatura || null,
       comissao_percentual:  Number(contrato.comissao_percentual) || 0,
       comissao_valor:       Number(comissao_valor) || 0,
@@ -118,27 +117,17 @@ export async function POST(req: NextRequest) {
     const numFatura = numFatData as string
 
     const hoje = new Date().toISOString().split('T')[0]
-    // Para mensal: vencimento no dia configurado do mês atual, ou hoje
-    let dataVenc = contrato.data_venc_fatura || contrato.data_fim || null
-    if (!dataVenc && contrato.tipo_contrato === 'mensal' && contrato.dia_vencimento) {
-      const dv = Number(contrato.dia_vencimento)
-      const now = new Date()
-      const venc = new Date(now.getFullYear(), now.getMonth(), Math.min(dv, 28))
-      if (venc < now) venc.setMonth(venc.getMonth() + 1)
-      dataVenc = venc.toISOString().split('T')[0]
-    }
-    if (!dataVenc) dataVenc = hoje
+    const dataVenc = contrato.data_venc_fatura || contrato.data_fim || hoje
     await sb.from('faturas').insert({
       contrato_id:     c.id,
       numero:          numFatura,
-      tipo:            contrato.tipo_contrato === 'recorrente' ? 'recorrente' : 'locacao',
+      tipo:            'locacao',
       status:          'pendente',
       valor:           Number(total),
       valor_recebido:  0,
       saldo_restante:  Number(total),
       data_emissao:    hoje,
-      data_vencimento: dataVenc || hoje,
-      competencia:     contrato.tipo_contrato === 'recorrente' ? hoje.slice(0,7) + '-01' : null,
+      data_vencimento: dataVenc,
       parcela_num:     1,
       descricao:       `Locação — Contrato ${numero}`,
       forma_pagamento: contrato.forma_pagamento || null,
