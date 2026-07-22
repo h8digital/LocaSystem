@@ -6,39 +6,7 @@ import { usePathname } from 'next/navigation'
 import { SlidePanel } from '@/components/ui'
 import { fmt } from '@/lib/supabase'
 import { APP_VERSION, CHANGELOG } from '@/lib/changelog'
-
-const NAV: { section: string; items: { href: string; icon: string; label: string }[] }[] = [
-  {
-    section: 'Principal',
-    items: [
-      { href: '/dashboard',  icon: '⊞',  label: 'Dashboard'  },
-    ],
-  },
-  {
-    section: 'Comercial',
-    items: [
-      { href: '/cotacoes',   icon: '📋', label: 'Cotações'   },
-      { href: '/contratos',  icon: '📄', label: 'Contratos'  },
-      { href: '/clientes',   icon: '👥', label: 'Clientes'   },
-      { href: '/financeiro', icon: '💰', label: 'Financeiro' },
-    ],
-  },
-  {
-    section: 'Estoque',
-    items: [
-      { href: '/equipamentos', icon: '🔧', label: 'Equipamentos' },
-      { href: '/manutencoes',  icon: '🔩', label: 'Manutenções'  },
-    ],
-  },
-  {
-    section: 'Documentos',
-    items: [
-      { href: '/relatorios',              icon: '📊', label: 'Relatórios'       },
-      { href: '/relatorios/equipamentos', icon: '📦', label: 'Catálogo'         },
-      { href: '/templates',               icon: '🖨️', label: 'Templates de Doc' },
-    ],
-  },
-]
+import { NAV_SECTIONS as NAV } from '@/lib/navigation'
 
 const allItems = NAV.flatMap(s => s.items)
 

@@ -3,22 +3,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import Notificacoes from '@/components/ui/Notificacoes'
+import { NAV_ALL } from '@/lib/navigation'
 
-// Mapa de rotas → título da página
-const PAGE_TITLES: Record<string, string> = {
-  '/dashboard':               'Dashboard',
-  '/cotacoes':                'Cotações',
-  '/contratos':               'Contratos',
-  '/clientes':                'Clientes',
-  '/financeiro':              'Financeiro',
-  '/equipamentos':            'Equipamentos',
-  '/manutencoes':             'Manutenções',
-  '/relatorios':              'Relatórios',
-  '/relatorios/equipamentos': 'Catálogo de Equipamentos',
-  '/templates':               'Templates de Documento',
-  '/usuarios':                'Usuários',
-  '/parametros':              'Parâmetros do Sistema',
-}
+// Mapa de rotas → título da página, derivado da fonte única de navegação
+const PAGE_TITLES: Record<string, string> = Object.fromEntries(
+  NAV_ALL.map(n => [n.href, n.titulo ?? n.label])
+)
 
 function getTitle(pathname: string) {
   if (PAGE_TITLES[pathname]) return PAGE_TITLES[pathname]
@@ -99,8 +89,27 @@ export default function Topbar({ user }: Props) {
         )}
       </div>
 
-      {/* Lado direito: notificações + usuário */}
+      {/* Lado direito: busca + notificações + usuário */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+
+        {/* Busca rápida (Command Palette) */}
+        <button
+          onClick={() => window.dispatchEvent(new Event('locasystem:abrir-busca'))}
+          title="Busca rápida"
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8,
+            padding: '6px 10px', borderRadius: 'var(--r-md)',
+            background: 'var(--bg-input)', border: '1px solid var(--border)',
+            color: 'var(--t-muted)', cursor: 'pointer', fontSize: 'var(--fs-md)',
+          }}
+        >
+          <span>🔍</span>
+          <span>Buscar</span>
+          <kbd style={{ fontSize: 'var(--fs-xs)', color: 'var(--t-muted)', border: '1px solid var(--border)', borderRadius: 4, padding: '1px 5px', marginLeft: 4 }}>Ctrl K</kbd>
+        </button>
+
+        {/* Divisor */}
+        <div style={{ width: 1, height: 24, background: 'var(--border)', margin: '0 6px' }} />
 
         {/* Notificações */}
         <Notificacoes />
