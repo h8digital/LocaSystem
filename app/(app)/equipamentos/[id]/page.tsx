@@ -263,7 +263,7 @@ export default function EquipamentoDetalhe() {
 
 
   return (
-    <div style={{ maxWidth: 1100, margin: '0 auto' }}>
+    <div className="ds-page-content">
 
       {/* ── CABEÇALHO ─────────────────────────────────────────────────────── */}
       <div style={{ display:'flex', alignItems:'flex-start', gap:16, marginBottom:24 }}>
