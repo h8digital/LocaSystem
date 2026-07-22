@@ -506,7 +506,7 @@ export default function CriarContratoPage() {
   }
 
   return (
-    <div style={{ maxWidth:800, margin:'0 auto', paddingBottom:60 }}>
+    <div className="ds-page-content" style={{ paddingBottom:60 }}>
 
       {/* Cabeçalho */}
       {/* Cabeçalho */}
@@ -583,7 +583,7 @@ export default function CriarContratoPage() {
           />
 
           <div className="ds-section-title" style={{ marginTop:8 }}>Período de Locação</div>
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+          <div className="form-grid-auto">
             <FormField label="Período Predefinido">
               <select value={form.periodo_id} onChange={e=>aplicarPeriodo(e.target.value)} className={selectCls}>
                 <option value="">Personalizado</option>
@@ -978,7 +978,7 @@ export default function CriarContratoPage() {
             <div style={{ padding:'12px 16px', background:'var(--bg-header)', borderBottom:'1px solid var(--border)', fontWeight:700 }}>
               Resumo do Contrato
             </div>
-            <div style={{ padding:'16px', display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:14 }}>
+            <div className="form-grid-auto" style={{ padding:'16px' }}>
               {[
                 { l:'Cliente',    v: clienteNome },
                 { l:'Período',    v: `${fmt.date(form.data_inicio)} → ${fmt.date(form.data_fim)} (${dias}d)` },
@@ -998,7 +998,7 @@ export default function CriarContratoPage() {
           {/* Ajustes financeiros */}
           <div style={{ background:'rgba(255,255,255,0.05)', backdropFilter:'blur(12px)', border:'1px solid rgba(255,255,255,0.10)', borderRadius:'var(--r-lg)', padding:'24px 28px' }}>
             <div style={{ fontSize:16, fontWeight:700, color:'rgba(255,255,255,0.9)', marginBottom:16 }}>Ajustes Financeiros</div>
-            <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+            <div className="form-grid-auto">
               {[
                 { l:'Desconto (R$)',    f:'desconto' },
                 { l:'Acréscimo (R$)',   f:'acrescimo' },

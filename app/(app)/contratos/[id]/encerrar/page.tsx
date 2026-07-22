@@ -244,7 +244,7 @@ export default function EncerrarContratoPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div style={{ maxWidth: 800, margin:'0 auto', padding:'0 0 60px' }}>
+    <div className="ds-page-content" style={{ padding:'0 0 60px' }}>
 
       {/* Cabeçalho */}
       <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:28 }}>

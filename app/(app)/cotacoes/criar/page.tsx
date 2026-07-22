@@ -249,7 +249,7 @@ export default function CriarCotacaoPage(){
   }
 
   return(
-    <div style={{maxWidth:800,margin:'0 auto',paddingBottom:60}}>
+    <div className="ds-page-content" style={{paddingBottom:60}}>
 
       {/* Cabeçalho */}
       <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:24}}>
@@ -287,7 +287,7 @@ export default function CriarCotacaoPage(){
           />
 
           <div className="ds-section-title" style={{marginTop:4}}>Período e Datas</div>
-          <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:14}}>
+          <div className="form-grid-auto">
             <FormField label="Período de Locação">
               <select className={selectCls} value={periodoId??''} onChange={e=>{
                 const id=Number(e.target.value)||null;setPeriodoId(id)
@@ -496,7 +496,7 @@ export default function CriarCotacaoPage(){
             </div>
 
             <div className="ds-section-title">Ajuste de Valor</div>
-            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:10}}>
+            <div className="form-grid-auto">
               <FormField label="Desconto %">
                 <input type="number" min="0" max="100" step="0.01" className={inputCls} value={descontoPct} onChange={e=>calcDescPct(Number(e.target.value))}/>
               </FormField>
@@ -517,7 +517,7 @@ export default function CriarCotacaoPage(){
           {/* Resumo geral */}
           <div className="ds-card" style={{overflow:'hidden'}}>
             <div style={{padding:'12px 16px',background:'var(--bg-header)',borderBottom:'1px solid var(--border)',fontWeight:700}}>Resumo da Cotação</div>
-            <div style={{padding:'16px',display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:14}}>
+            <div className="form-grid-auto" style={{padding:'16px'}}>
               {[
                 {l:'Cliente',     v:clienteNome},
                 {l:'Período',     v:periodoNome||(dataInicio&&dataFim?`${fmt.date(dataInicio)} → ${fmt.date(dataFim)}`:'Não informado')},
