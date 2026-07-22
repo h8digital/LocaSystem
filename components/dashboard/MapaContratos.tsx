@@ -61,16 +61,22 @@ export default function MapaContratos({ contratos, mapboxToken }: Props) {
             <div style="font-weight:700;font-size:13px;color:#0f172a">${c.cliente ?? 'Cliente'}</div>
             <div style="font-size:12px;color:#475569;margin-top:2px">${[c.bairro, c.cidade].filter(Boolean).join(' — ') || 'Local não informado'}</div>
             <div style="font-size:12px;color:#6366f1;font-weight:700;margin-top:4px">Contrato ${c.numero} · ${R$(c.total)}</div>
-            <div style="font-size:11px;color:#6366f1;margin-top:6px;text-decoration:underline">Ver contrato →</div>
+            <div class="ver-contrato" data-id="${c.id}" style="font-size:11px;color:#6366f1;margin-top:6px;text-decoration:underline;cursor:pointer">Ver contrato →</div>
           </div>
         `)
+
+        // Clicar no pino abre o popup (comportamento nativo do Mapbox); o link
+        // "Ver contrato →" dentro do popup é quem navega — evita a corrida entre
+        // o listener nativo de toggle do popup e um listener próprio no marcador.
+        popup.on('open', () => {
+          popup.getElement()?.querySelector('.ver-contrato')?.addEventListener('click', () => router.push(`/contratos/${c.id}`))
+        })
 
         new mapboxgl.Marker({ element: el })
           .setLngLat([c.lng, c.lat])
           .setPopup(popup)
           .addTo(map)
 
-        el.addEventListener('click', () => router.push(`/contratos/${c.id}`))
         bounds.extend([c.lng, c.lat])
       })
 
