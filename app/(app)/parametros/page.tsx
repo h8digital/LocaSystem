@@ -2,7 +2,7 @@
 'use client'
 import React, { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Btn, PageHeader, FormField, inputCls, textareaCls, Badge, SlidePanel } from '@/components/ui'
+import { Btn, PageHeader, FormField, inputCls, textareaCls, Badge, SlidePanel, DataTable } from '@/components/ui'
 
 const inpSm = inputCls
 
@@ -11,18 +11,6 @@ const IcoUp    = () => <svg width="11" height="11" viewBox="0 0 24 24" fill="non
 const IcoDown  = () => <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"><polyline points="6 9 12 15 18 9"/></svg>
 const IcoEdit  = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
 const IcoTrash = () => <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg>
-
-const TH = ({ children, center, right }: { children?: React.ReactNode; center?: boolean; right?: boolean }) => (
-  <th style={{ padding:'9px 14px', fontSize:'var(--fs-md)', fontWeight:700, color:'var(--t-muted)',
-    textTransform:'uppercase' as const, letterSpacing:'.04em',
-    textAlign: center ? 'center' as const : right ? 'right' as const : 'left' as const,
-    background:'var(--bg-header)', borderBottom:'1px solid var(--border)', borderTop:'1px solid var(--border)' }}>{children}</th>
-)
-const TD = ({ children, center, muted }: { children?: React.ReactNode; center?: boolean; muted?: boolean }) => (
-  <td style={{ padding:'10px 14px', borderBottom:'1px solid var(--border)',
-    textAlign: center ? 'center' as const : 'left' as const,
-    color: muted ? 'var(--t-muted)' : 'var(--t-primary)', fontSize:'var(--fs-base)' }}>{children}</td>
-)
 
 // ─── Componentes de navegação ─────────────────────────────────────────────────
 function NavGroup({ label, children }: { label: string; children: React.ReactNode }) {
@@ -452,7 +440,7 @@ export default function ParametrosPage() {
 
           {/* ══ EMPRESA ══════════════════════════════════════════════════ */}
           {secao === 'empresa' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:32, maxWidth:760 }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:32, maxWidth:'var(--content-max)' }}>
 
               <Section title="Logotipo">
                 <div style={{ display:'flex', alignItems:'flex-start', gap:20 }}>
@@ -578,7 +566,7 @@ export default function ParametrosPage() {
 
           {/* ══ FINANCEIRO ═══════════════════════════════════════════════ */}
           {secao === 'financeiro' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:32, maxWidth:700 }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:32, maxWidth:'var(--content-max)' }}>
 
               <Section title="Multa e Juros por Atraso no Pagamento"
                 hint="Aplicados ao registrar pagamento de fatura vencida. Padrão legal: multa 2% + juros 1% a.m.">
@@ -637,7 +625,7 @@ export default function ParametrosPage() {
 
           {/* ══ CONTRATOS ════════════════════════════════════════════════ */}
           {secao === 'contratos' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:32, maxWidth:700 }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:32, maxWidth:'var(--content-max)' }}>
 
               <Section title="Multa por Atraso na Devolução"
                 hint="Cobrada quando o cliente devolve o equipamento após o prazo contratado.">
@@ -947,7 +935,7 @@ export default function ParametrosPage() {
           )}
 
           {secao === 'site' && (
-            <div style={{ maxWidth:820 }}>
+            <div style={{ maxWidth:'var(--content-max)' }}>
               <SubTabs
                 tabs={[
                   { key:'geral',   label:'Geral & Horários'  },
@@ -1109,7 +1097,7 @@ export default function ParametrosPage() {
 
           {/* ══ PERÍODOS ═════════════════════════════════════════════════ */}
           {secao === 'periodos' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:16, maxWidth:720 }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:16, maxWidth:'var(--content-max)' }}>
               <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                 <div>
                   <div className="ds-section-title" style={{ marginBottom:4 }}>Períodos de Locação</div>
@@ -1117,129 +1105,125 @@ export default function ParametrosPage() {
                 </div>
                 <Btn size="sm" onClick={adicionarPeriodo}>+ Novo Período</Btn>
               </div>
-              <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><tr><TH>Nome</TH><TH>Dias</TH><TH center>Desconto (%)</TH><TH center>Ativo</TH><TH center>Ações</TH></tr></thead>
-                <tbody>
-                  {periodos.length===0 && <tr><td colSpan={5}><div className="ds-empty"><div className="ds-empty-title">Nenhum período cadastrado.</div></div></td></tr>}
-                  {periodos.map((p,i)=>(
-                    <tr key={p.id} style={{ background:i%2===0?'var(--bg-card)':'var(--bg-header)' }}>
-                      <TD><input value={p.nome} onChange={e=>{const a=[...periodos];a[i].nome=e.target.value;setPeriodos(a)}} className={inpSm} style={{ minWidth:140 }}/></TD>
-                      <TD><input type="number" min="1" value={p.dias} onChange={e=>{const a=[...periodos];a[i].dias=Number(e.target.value);setPeriodos(a)}} className={inpSm} style={{ width:80, textAlign:'center' }}/></TD>
-                      <TD center><input type="number" min="0" max="100" step="0.01" value={p.desconto_percentual} onChange={e=>{const a=[...periodos];a[i].desconto_percentual=Number(e.target.value);setPeriodos(a)}} className={inpSm} style={{ width:90, textAlign:'center' }}/></TD>
-                      <TD center>
+              <DataTable
+                columns={[
+                  { key:'nome', label:'Nome', render: p => {
+                      const i = periodos.indexOf(p)
+                      return <input value={p.nome} onChange={e=>{const a=[...periodos];a[i].nome=e.target.value;setPeriodos(a)}} className={inpSm} style={{ minWidth:140 }}/>
+                    }},
+                  { key:'dias', label:'Dias', render: p => {
+                      const i = periodos.indexOf(p)
+                      return <input type="number" min="1" value={p.dias} onChange={e=>{const a=[...periodos];a[i].dias=Number(e.target.value);setPeriodos(a)}} className={inpSm} style={{ width:80, textAlign:'center' }}/>
+                    }},
+                  { key:'desconto', label:'Desconto (%)', align:'center', render: p => {
+                      const i = periodos.indexOf(p)
+                      return <input type="number" min="0" max="100" step="0.01" value={p.desconto_percentual} onChange={e=>{const a=[...periodos];a[i].desconto_percentual=Number(e.target.value);setPeriodos(a)}} className={inpSm} style={{ width:90, textAlign:'center' }}/>
+                    }},
+                  { key:'ativo', label:'Ativo', align:'center', render: p => {
+                      const i = periodos.indexOf(p)
+                      return (
                         <label style={{ display:'flex', alignItems:'center', justifyContent:'center', gap:6, cursor:'pointer' }}>
                           <input type="checkbox" checked={!!p.ativo} onChange={e=>{const a=[...periodos];a[i].ativo=e.target.checked?1:0;setPeriodos(a)}} style={{ width:15, height:15, accentColor:'var(--c-primary)', cursor:'pointer' }}/>
                           <span style={{ fontSize:'var(--fs-md)', fontWeight:600, color:p.ativo?'var(--c-success-text)':'var(--t-muted)' }}>{p.ativo?'Ativo':'Inativo'}</span>
                         </label>
-                      </TD>
-                      <TD center><button onClick={()=>removerPeriodo(p.id)} className="tbl-btn del" title="Remover"><IcoTrash/></button></TD>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+                      )
+                    }},
+                ]}
+                data={periodos}
+                emptyMessage="Nenhum período cadastrado."
+                actions={p => <button onClick={()=>removerPeriodo(p.id)} className="tbl-btn del" title="Remover"><IcoTrash/></button>}
+              />
               <InfoBox type="warning">Clique em <strong>Salvar Alterações</strong> (botão superior direito) para confirmar.</InfoBox>
             </div>
           )}
 
           {/* ══ CATEGORIAS ═══════════════════════════════════════════════ */}
           {secao === 'categorias' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:16, maxWidth:620 }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:16, maxWidth:'var(--content-max)' }}>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <input value={buscaCat} onChange={e=>setBuscaCat(e.target.value)} className={inpSm}
                   placeholder="Pesquisar categorias..." style={{ flex:1, maxWidth:300 }}/>
                 <Btn size="sm" onClick={()=>abrirCat()}>+ Nova Categoria</Btn>
               </div>
-              <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><tr><TH>Nome</TH><TH center>Status</TH><TH center>Ações</TH></tr></thead>
-                <tbody>
-                  {catsFiltradas.length===0 && <tr><td colSpan={3}><div className="ds-empty"><div className="ds-empty-title">{buscaCat?'Nenhuma encontrada.':'Nenhuma categoria cadastrada.'}</div></div></td></tr>}
-                  {catsFiltradas.map((cat,i)=>(
-                    <tr key={cat.id} style={{ background:i%2===0?'var(--bg-card)':'var(--bg-header)' }}>
-                      <TD><span style={{ fontWeight:500 }}>{cat.nome}</span></TD>
-                      <TD center><Badge value={cat.ativo?'ativo':'inativo'} dot/></TD>
-                      <TD center>
-                        <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
-                          <button onClick={()=>abrirCat(cat)} className="tbl-btn edit" title="Editar"><IcoEdit/></button>
-                          <button onClick={()=>toggleCat(cat.id,cat.ativo)} className="tbl-btn"
-                            title={cat.ativo?'Desativar':'Ativar'}
-                            style={{ color:cat.ativo?'var(--c-success)':'var(--t-muted)', fontSize:14, padding:'3px 6px' }}>
-                            {cat.ativo?'●':'○'}
-                          </button>
-                          <button onClick={()=>removerCat(cat.id)} className="tbl-btn del" title="Excluir"><IcoTrash/></button>
-                        </div>
-                      </TD>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                columns={[
+                  { key:'nome', label:'Nome', render: cat => <span style={{ fontWeight:500 }}>{cat.nome}</span> },
+                  { key:'status', label:'Status', align:'center', render: cat => <Badge value={cat.ativo?'ativo':'inativo'} dot/> },
+                ]}
+                data={catsFiltradas}
+                emptyMessage={buscaCat?'Nenhuma encontrada.':'Nenhuma categoria cadastrada.'}
+                actions={cat => (
+                  <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
+                    <button onClick={()=>abrirCat(cat)} className="tbl-btn edit" title="Editar"><IcoEdit/></button>
+                    <button onClick={()=>toggleCat(cat.id,cat.ativo)} className="tbl-btn"
+                      title={cat.ativo?'Desativar':'Ativar'}
+                      style={{ color:cat.ativo?'var(--c-success)':'var(--t-muted)', fontSize:14, padding:'3px 6px' }}>
+                      {cat.ativo?'●':'○'}
+                    </button>
+                    <button onClick={()=>removerCat(cat.id)} className="tbl-btn del" title="Excluir"><IcoTrash/></button>
+                  </div>
+                )}
+              />
             </div>
           )}
 
           {/* ══ TIPOS DE ENDEREÇO ════════════════════════════════════════ */}
           {secao === 'enderecos' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:16, maxWidth:620 }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:16, maxWidth:'var(--content-max)' }}>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <input value={buscaEnd} onChange={e=>setBuscaEnd(e.target.value)} className={inpSm}
                   placeholder="Pesquisar..." style={{ flex:1, maxWidth:300 }}/>
                 <Btn size="sm" onClick={()=>abrirEnd()}>+ Novo Tipo</Btn>
               </div>
-              <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><tr><TH>Ordem</TH><TH>Nome</TH><TH center>Status</TH><TH center>Ações</TH></tr></thead>
-                <tbody>
-                  {endsFiltrados.length===0 && <tr><td colSpan={4}><div className="ds-empty"><div className="ds-empty-title">{buscaEnd?'Nenhum encontrado.':'Nenhum tipo cadastrado.'}</div></div></td></tr>}
-                  {endsFiltrados.map((t,i)=>(
-                    <tr key={t.id} style={{ background:i%2===0?'var(--bg-card)':'var(--bg-header)' }}>
-                      <TD>
-                        <div style={{ display:'flex', flexDirection:'column', gap:2, alignItems:'center', width:28 }}>
-                          <button onClick={()=>moverEnd(tiposEnd.indexOf(t),-1)} disabled={tiposEnd.indexOf(t)===0} className="tbl-btn" style={{ height:18, padding:'0 4px', opacity:tiposEnd.indexOf(t)===0?0.3:1 }}><IcoUp/></button>
-                          <button onClick={()=>moverEnd(tiposEnd.indexOf(t),1)} disabled={tiposEnd.indexOf(t)===tiposEnd.length-1} className="tbl-btn" style={{ height:18, padding:'0 4px', opacity:tiposEnd.indexOf(t)===tiposEnd.length-1?0.3:1 }}><IcoDown/></button>
-                        </div>
-                      </TD>
-                      <TD><span style={{ fontWeight:500 }}>{t.nome}</span></TD>
-                      <TD center><Badge value={t.ativo?'ativo':'inativo'} dot/></TD>
-                      <TD center>
-                        <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
-                          <button onClick={()=>abrirEnd(t)} className="tbl-btn edit" title="Editar"><IcoEdit/></button>
-                          <button onClick={()=>toggleEnd(t.id,t.ativo)} className="tbl-btn" title={t.ativo?'Desativar':'Ativar'} style={{ color:t.ativo?'var(--c-success)':'var(--t-muted)', fontSize:14, padding:'3px 6px' }}>{t.ativo?'●':'○'}</button>
-                          <button onClick={()=>removerEnd(t.id)} className="tbl-btn del" title="Excluir"><IcoTrash/></button>
-                        </div>
-                      </TD>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                columns={[
+                  { key:'ordem', label:'Ordem', width:'44px', render: t => (
+                      <div style={{ display:'flex', flexDirection:'column', gap:2, alignItems:'center', width:28 }}>
+                        <button onClick={()=>moverEnd(tiposEnd.indexOf(t),-1)} disabled={tiposEnd.indexOf(t)===0} className="tbl-btn" style={{ height:18, padding:'0 4px', opacity:tiposEnd.indexOf(t)===0?0.3:1 }}><IcoUp/></button>
+                        <button onClick={()=>moverEnd(tiposEnd.indexOf(t),1)} disabled={tiposEnd.indexOf(t)===tiposEnd.length-1} className="tbl-btn" style={{ height:18, padding:'0 4px', opacity:tiposEnd.indexOf(t)===tiposEnd.length-1?0.3:1 }}><IcoDown/></button>
+                      </div>
+                    )},
+                  { key:'nome', label:'Nome', render: t => <span style={{ fontWeight:500 }}>{t.nome}</span> },
+                  { key:'status', label:'Status', align:'center', render: t => <Badge value={t.ativo?'ativo':'inativo'} dot/> },
+                ]}
+                data={endsFiltrados}
+                emptyMessage={buscaEnd?'Nenhum encontrado.':'Nenhum tipo cadastrado.'}
+                actions={t => (
+                  <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
+                    <button onClick={()=>abrirEnd(t)} className="tbl-btn edit" title="Editar"><IcoEdit/></button>
+                    <button onClick={()=>toggleEnd(t.id,t.ativo)} className="tbl-btn" title={t.ativo?'Desativar':'Ativar'} style={{ color:t.ativo?'var(--c-success)':'var(--t-muted)', fontSize:14, padding:'3px 6px' }}>{t.ativo?'●':'○'}</button>
+                    <button onClick={()=>removerEnd(t.id)} className="tbl-btn del" title="Excluir"><IcoTrash/></button>
+                  </div>
+                )}
+              />
               <InfoBox type="warning">Clique em <strong>Salvar Alterações</strong> para confirmar a nova ordem.</InfoBox>
             </div>
           )}
 
           {/* ══ LOCAIS ═══════════════════════════════════════════════════ */}
           {secao === 'locais' && (
-            <div style={{ display:'flex', flexDirection:'column', gap:16, maxWidth:680 }}>
+            <div style={{ display:'flex', flexDirection:'column', gap:16, maxWidth:'var(--content-max)' }}>
               <div style={{ display:'flex', alignItems:'center', gap:10 }}>
                 <input value={buscaLoc} onChange={e=>setBuscaLoc(e.target.value)} className={inpSm}
                   placeholder="Pesquisar locais..." style={{ flex:1, maxWidth:300 }}/>
                 <Btn size="sm" onClick={()=>abrirLoc()}>+ Novo Local</Btn>
               </div>
-              <table style={{ width:'100%', borderCollapse:'collapse' }}>
-                <thead><tr><TH>Nome</TH><TH>Descrição</TH><TH center>Status</TH><TH center>Ações</TH></tr></thead>
-                <tbody>
-                  {locaisFiltrados.length===0 && <tr><td colSpan={4}><div className="ds-empty"><div className="ds-empty-title">{buscaLoc?'Nenhum encontrado.':'Nenhum local cadastrado.'}</div></div></td></tr>}
-                  {locaisFiltrados.map((l,i)=>(
-                    <tr key={l.id} style={{ background:i%2===0?'var(--bg-card)':'var(--bg-header)' }}>
-                      <TD><span style={{ fontWeight:500 }}>{l.nome}</span></TD>
-                      <TD muted>{l.descricao||'—'}</TD>
-                      <TD center><Badge value={l.ativo?'ativo':'inativo'} dot/></TD>
-                      <TD center>
-                        <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
-                          <button onClick={()=>abrirLoc(l)} className="tbl-btn edit" title="Editar"><IcoEdit/></button>
-                          <button onClick={()=>toggleLoc(l.id,l.ativo)} className="tbl-btn" title={l.ativo?'Desativar':'Ativar'} style={{ color:l.ativo?'var(--c-success)':'var(--t-muted)', fontSize:14, padding:'3px 6px' }}>{l.ativo?'●':'○'}</button>
-                          <button onClick={()=>removerLoc(l.id)} className="tbl-btn del" title="Excluir"><IcoTrash/></button>
-                        </div>
-                      </TD>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+              <DataTable
+                columns={[
+                  { key:'nome', label:'Nome', render: l => <span style={{ fontWeight:500 }}>{l.nome}</span> },
+                  { key:'descricao', label:'Descrição', render: l => <span style={{ color:'var(--t-muted)' }}>{l.descricao||'—'}</span> },
+                  { key:'status', label:'Status', align:'center', render: l => <Badge value={l.ativo?'ativo':'inativo'} dot/> },
+                ]}
+                data={locaisFiltrados}
+                emptyMessage={buscaLoc?'Nenhum encontrado.':'Nenhum local cadastrado.'}
+                actions={l => (
+                  <div style={{ display:'flex', gap:4, justifyContent:'center' }}>
+                    <button onClick={()=>abrirLoc(l)} className="tbl-btn edit" title="Editar"><IcoEdit/></button>
+                    <button onClick={()=>toggleLoc(l.id,l.ativo)} className="tbl-btn" title={l.ativo?'Desativar':'Ativar'} style={{ color:l.ativo?'var(--c-success)':'var(--t-muted)', fontSize:14, padding:'3px 6px' }}>{l.ativo?'●':'○'}</button>
+                    <button onClick={()=>removerLoc(l.id)} className="tbl-btn del" title="Excluir"><IcoTrash/></button>
+                  </div>
+                )}
+              />
             </div>
           )}
 
