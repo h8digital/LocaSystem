@@ -1,4 +1,4 @@
-// build: 2026-05-29 18:10:30
+// build: 2026-07-22
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
@@ -28,10 +28,11 @@ export default function QuickCreateProduto({ onClose, onCreated }: Props) {
   }
 
   return (
-    <div className="space-y-4">
-      {erro&&<div className="bg-red-50 border border-red-200 text-red-600 rounded-lg px-3 py-2 text-sm">{erro}</div>}
-      <div className="grid grid-cols-2 gap-3">
-        <FormField label="Nome do Produto" required className="col-span-2">
+    <div style={{ display:'flex', flexDirection:'column', gap:18 }}>
+      {erro && <div className="ds-alert-error">{erro}</div>}
+
+      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
+        <FormField label="Nome do Produto" required style={{ gridColumn:'1 / -1' }}>
           <input value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})} className={inputCls} autoFocus />
         </FormField>
         <FormField label="Categoria">
@@ -40,7 +41,9 @@ export default function QuickCreateProduto({ onClose, onCreated }: Props) {
             {cats.map(c=><option key={c.id} value={c.id}>{c.nome}</option>)}
           </select>
         </FormField>
-        <FormField label="Marca"><input value={form.marca} onChange={e=>setForm({...form,marca:e.target.value})} className={inputCls} /></FormField>
+        <FormField label="Marca">
+          <input value={form.marca} onChange={e=>setForm({...form,marca:e.target.value})} className={inputCls} />
+        </FormField>
         <FormField label="Controle de Estoque">
           <select value={form.controla_patrimonio} onChange={e=>setForm({...form,controla_patrimonio:Number(e.target.value)})} className={selectCls}>
             <option value={1}>Por Patrimônio</option>
@@ -51,11 +54,15 @@ export default function QuickCreateProduto({ onClose, onCreated }: Props) {
           <input type="number" step="0.01" min="0" value={form.preco_locacao_diario} onChange={e=>setForm({...form,preco_locacao_diario:Number(e.target.value)})} className={inputCls} />
         </FormField>
       </div>
-      <div className="flex gap-3 pt-2">
-        <Btn variant="secondary" className="flex-1" onClick={onClose}>Cancelar</Btn>
-        <Btn className="flex-1" loading={saving} onClick={salvar}>✓ Criar Produto</Btn>
+
+      <div style={{ display:'flex', gap:12 }}>
+        <Btn variant="secondary" style={{ flex:1 }} onClick={onClose}>Cancelar</Btn>
+        <Btn style={{ flex:1 }} loading={saving} onClick={salvar}>✓ Criar Produto</Btn>
       </div>
-      <p className="text-xs text-gray-400 text-center mt-1">Complete o cadastro depois em <strong>Equipamentos</strong>.</p>
+
+      <p style={{ fontSize:'var(--fs-xs)', color:'var(--t-muted)', textAlign:'center', margin:0 }}>
+        Complete o cadastro depois em <strong>Equipamentos</strong>.
+      </p>
     </div>
   )
 }
