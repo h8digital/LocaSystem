@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { calcularPrecoItem, calcularDias, type PrecosProduto } from '@/lib/calcularCobranca'
 import { supabase, fmt } from '@/lib/supabase'
-import { carregarFeriados, anteciparParaDiaUtil } from '@/lib/diasUteis'
+import { carregarFeriados, carregarAjusteDiaUtilAtivo, postergarParaDiaUtil } from '@/lib/diasUteis'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { FormField, inputCls, selectCls, textareaCls, Btn, LookupField } from '@/components/ui'
 import { QuickCreateCliente, QuickCreateProduto } from '@/components/quick-create'
@@ -99,6 +99,7 @@ export default function CriarContratoPage() {
   const [passo,     setPasso]     = useState(1)
   const [periodos,  setPeriodos]  = useState<any[]>([])
   const [feriados,  setFeriados]  = useState<Set<string>>(new Set())
+  const [ajusteDiaUtilAtivo, setAjusteDiaUtilAtivo] = useState(true)
   const [itens,     setItens]     = useState<any[]>([])
   const [saving,    setSaving]    = useState(false)
   const [modalAtivar, setModalAtivar] = useState<{id:number; numero:string}|null>(null)
@@ -150,6 +151,7 @@ export default function CriarContratoPage() {
 
   useEffect(()=>{ supabase.from('periodos_locacao').select('*').eq('ativo',1).order('dias').then(({data})=>setPeriodos(data??[])) },[])
   useEffect(()=>{ carregarFeriados().then(setFeriados) },[])
+  useEffect(()=>{ carregarAjusteDiaUtilAtivo().then(setAjusteDiaUtilAtivo) },[])
 
   // Carregar dados do contrato anterior (Novo Período)
   useEffect(() => {
@@ -239,9 +241,9 @@ export default function CriarContratoPage() {
     const tipo = tipoContratoDoPeriodo(p?.nome ?? '')
     if (p && form.data_inicio) {
       // Mesma regra para todos os períodos, incluindo mensal: devolução prevista = início + dias do período
-      // Se cair em fim de semana ou feriado, antecipa para o último dia útil anterior
-      let fim = new Date(form.data_inicio); fim.setDate(fim.getDate() + p.dias)
-      fim = anteciparParaDiaUtil(fim, feriados)
+      // Se cair em fim de semana ou feriado, adia para o próximo dia útil (quando o ajuste estiver ativado)
+      let fim = new Date(form.data_inicio+'T00:00:00'); fim.setDate(fim.getDate() + p.dias)
+      if (ajusteDiaUtilAtivo) fim = postergarParaDiaUtil(fim, feriados)
       setForm((f:any)=>({...f, periodo_id:pid, tipo_contrato:tipo, data_fim:fim.toISOString().split('T')[0]}))
     } else {
       setForm((f:any)=>({...f, periodo_id:pid, tipo_contrato:tipo}))

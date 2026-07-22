@@ -2,7 +2,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase, fmt } from '@/lib/supabase'
-import { carregarFeriados, anteciparParaDiaUtil } from '@/lib/diasUteis'
+import { carregarFeriados, carregarAjusteDiaUtilAtivo, postergarParaDiaUtil } from '@/lib/diasUteis'
 import { useRouter } from 'next/navigation'
 import { LookupField, FormField, inputCls, selectCls, textareaCls, Btn } from '@/components/ui'
 import QuickCreateCliente from '@/components/quick-create/QuickCreateCliente'
@@ -91,6 +91,7 @@ export default function CriarCotacaoPage(){
   const [erro,   setErro]   =useState('')
   const [periodos,setPeriodos]=useState<any[]>([])
   const [feriados,setFeriados]=useState<Set<string>>(new Set())
+  const [ajusteDiaUtilAtivo,setAjusteDiaUtilAtivo]=useState(true)
   const [user,   setUser]   =useState<any>(null)
   const [loadingUser,setLoadingUser]=useState(true)
 
@@ -133,6 +134,7 @@ export default function CriarCotacaoPage(){
     supabase.from('periodos_locacao').select('*').eq('ativo',1).order('dias').then(({data})=>setPeriodos(data??[]))
   },[])
   useEffect(()=>{ carregarFeriados().then(setFeriados) },[])
+  useEffect(()=>{ carregarAjusteDiaUtilAtivo().then(setAjusteDiaUtilAtivo) },[])
   useEffect(()=>{
     if(!clienteId){setEnderecos([]);return}
     supabase.from('cliente_enderecos').select('*').eq('cliente_id',clienteId).eq('ativo',1)
@@ -141,10 +143,10 @@ export default function CriarCotacaoPage(){
   useEffect(()=>{
     if(dataInicio&&periododias>0){
       let d=new Date(dataInicio+'T00:00:00');d.setDate(d.getDate()+periododias)
-      d=anteciparParaDiaUtil(d,feriados)
+      if(ajusteDiaUtilAtivo) d=postergarParaDiaUtil(d,feriados)
       setDataFim(d.toISOString().slice(0,10))
     }
-  },[dataInicio,periododias,feriados])
+  },[dataInicio,periododias,feriados,ajusteDiaUtilAtivo])
   useEffect(()=>{
     if(itens.length===0)return
     setItens(prev=>prev.map(it=>{

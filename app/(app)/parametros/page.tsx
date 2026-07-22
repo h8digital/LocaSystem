@@ -645,6 +645,18 @@ export default function ParametrosPage() {
                 </FormField>
               </Section>
 
+              <Section title="Data Prevista de Devolução em Fim de Semana/Feriado"
+                hint="Quando a data prevista de devolução calculada a partir do período de locação cair num sábado, domingo ou feriado.">
+                <FormField label="Ajustar automaticamente para dia útil?">
+                  <select value={params['ajustar_entrega_dia_util']??'sim'}
+                    onChange={async e=>{ await salvarParam('ajustar_entrega_dia_util', e.target.value); setOkERP(true) }}
+                    className={inpSm} style={{ maxWidth:380 }}>
+                    <option value="sim">Sim — adiar para o próximo dia útil</option>
+                    <option value="nao">Não — manter a data exata calculada</option>
+                  </select>
+                </FormField>
+              </Section>
+
               <Section title="Mensagem de Limpeza no Contrato"
                 hint="Exibida antes das assinaturas no contrato impresso. Deixe vazio para não exibir.">
                 <textarea value={params['mensagem_limpeza_contrato']??''}
