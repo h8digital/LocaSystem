@@ -550,6 +550,20 @@ select {
   flex-shrink: 0;
 }
 
+.ds-add-btn {
+  width: 100%;
+  border: 2px dashed var(--border);
+  background: none;
+  color: var(--t-muted);
+  padding: 12px;
+  border-radius: var(--r-md);
+  font-size: var(--fs-sm);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.ds-add-btn:hover { border-color: var(--c-primary); color: var(--c-primary) }
+
 /* ── Alertas ─────────────────────────────────────────────────── */
 .ds-alert-error {
   background: rgba(248,113,113,0.12);
