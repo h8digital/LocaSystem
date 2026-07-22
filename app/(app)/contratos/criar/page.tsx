@@ -605,6 +605,13 @@ export default function CriarContratoPage() {
             </FormField>
           </div>
 
+          {form.tipo_contrato==='fds' && form.data_inicio && new Date(form.data_inicio+'T00:00:00').getDay()!==5 && (
+            <div style={{ background:'var(--c-warning-light)', border:'1px solid var(--c-warning)', borderRadius:'var(--r-sm)',
+              padding:'8px 14px', fontSize:'var(--fs-md)', color:'var(--c-warning-text)', fontWeight:500 }}>
+              ⚠️ O período "Final de Semana" normalmente começa numa sexta-feira. A data de início selecionada não é sexta-feira.
+            </div>
+          )}
+
           {form.data_inicio && form.data_fim && (
             <div style={{ background:'var(--c-info-light)', border:'1px solid var(--c-info)', borderRadius:'var(--r-sm)',
               padding:'8px 14px', fontSize:'var(--fs-md)', color:'var(--c-info-text)', fontWeight:500 }}>

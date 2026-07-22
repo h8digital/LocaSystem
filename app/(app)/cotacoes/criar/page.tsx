@@ -126,6 +126,9 @@ export default function CriarCotacaoPage(){
   const subtotal  =itens.reduce((s,i)=>s+i.total_item,0)
   const totalFinal=subtotal-Number(desconto)+Number(acrescimo)
   const duracao   =dataInicio&&dataFim?Math.ceil((new Date(dataFim).getTime()-new Date(dataInicio+'T00:00:00').getTime())/86400000)+1:null
+  const periodoNomeLower=periodoNome.toLowerCase()
+  const avisoInicioNaoSexta=(periodoNomeLower.includes('final')||periodoNomeLower.includes('fds')||periodoNomeLower.includes('fim de semana'))
+    && !!dataInicio && new Date(dataInicio+'T00:00:00').getDay()!==5
 
   useEffect(()=>{
     fetch('/api/auth/me').then(r=>r.json()).then(d=>{if(d.user)setUser(d.user)}).finally(()=>setLoadingUser(false))
@@ -304,6 +307,11 @@ export default function CriarCotacaoPage(){
               <input type="date" className={inputCls} value={dataFim} onChange={e=>setDataFim(e.target.value)} min={dataInicio}/>
             </FormField>
           </div>
+          {avisoInicioNaoSexta && (
+            <div style={{background:'var(--c-warning-light)',border:'1px solid var(--c-warning)',borderRadius:'var(--r-sm)',padding:'8px 14px',fontSize:'var(--fs-md)',color:'var(--c-warning-text)',fontWeight:500}}>
+              ⚠️ O período "Final de Semana" normalmente começa numa sexta-feira. A data de início selecionada não é sexta-feira.
+            </div>
+          )}
           {duracao!==null&&(
             <div style={{background:'var(--c-info-light)',border:'1px solid var(--c-info)',borderRadius:'var(--r-sm)',padding:'8px 14px',fontSize:'var(--fs-md)',color:'var(--c-info-text)',fontWeight:500}}>
               Duração: <strong>{duracao} dia(s)</strong>
