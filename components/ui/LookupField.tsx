@@ -61,7 +61,8 @@ export default function LookupField({
     let target: HTMLElement | null = null
     while (el && el !== document.body) {
       const cs = getComputedStyle(el)
-      if (cs.backdropFilter !== 'none' || (cs as any).webkitBackdropFilter !== 'none') { target = el; break }
+      const bf = cs.backdropFilter || (cs as any).webkitBackdropFilter || 'none'
+      if (bf && bf !== 'none') { target = el; break }
       el = el.parentElement
     }
     if (!target) return
