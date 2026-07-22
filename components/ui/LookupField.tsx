@@ -52,6 +52,26 @@ export default function LookupField({
     return () => document.removeEventListener('keydown', h)
   }, [])
 
+  // Elevar temporariamente o ancestral com backdrop-filter (ex: .ds-card) enquanto o
+  // dropdown está aberto — sem isso, o z-index do dropdown fica preso no stacking
+  // context do card e um card irmão renderizado depois (ex: tabela de itens) cobre a lista.
+  useEffect(() => {
+    if (!open || !wrapRef.current) return
+    let el: HTMLElement | null = wrapRef.current.parentElement
+    let target: HTMLElement | null = null
+    while (el && el !== document.body) {
+      const cs = getComputedStyle(el)
+      if (cs.backdropFilter !== 'none' || (cs as any).webkitBackdropFilter !== 'none') { target = el; break }
+      el = el.parentElement
+    }
+    if (!target) return
+    const prevPosition = target.style.position
+    const prevZIndex   = target.style.zIndex
+    if (getComputedStyle(target).position === 'static') target.style.position = 'relative'
+    target.style.zIndex = '50'
+    return () => { target!.style.position = prevPosition; target!.style.zIndex = prevZIndex }
+  }, [open])
+
   // Calcular se dropdown abre para cima ou baixo
   function calcAbove() {
     if (!wrapRef.current) return
