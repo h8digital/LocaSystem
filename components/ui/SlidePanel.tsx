@@ -1,6 +1,7 @@
-// build: 2026-06-02 — Reescrito como Modal centralizado (mesma interface de props)
+// build: 2026-07-22 — Renderizado via portal em document.body
 'use client'
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 
 const widths: Record<string, number> = { sm: 440, md: 560, lg: 740, xl: 960 }
 
@@ -16,6 +17,10 @@ interface SlidePanelProps {
 
 export default function SlidePanel({ open, onClose, title, subtitle, width = 'md', children, footer }: SlidePanelProps) {
   const panelRef = useRef<HTMLDivElement>(null)
+  const [mounted, setMounted] = useState(false)
+
+  // Só monta o portal no cliente (document não existe no SSR)
+  useEffect(() => { setMounted(true) }, [])
 
   // Bloquear scroll do body
   useEffect(() => {
@@ -31,9 +36,13 @@ export default function SlidePanel({ open, onClose, title, subtitle, width = 'md
     return () => document.removeEventListener('keydown', h)
   }, [open, onClose])
 
-  if (!open) return null
+  if (!open || !mounted) return null
 
-  return (
+  // Renderizado via portal em document.body: escapa de qualquer ancestral com
+  // backdrop-filter/transform (que vira containing block para position:fixed
+  // e prendia o modal dentro dos limites de cards com esse efeito, ex: o
+  // LookupField dentro de um card "glass" ou a Sidebar).
+  return createPortal(
     <div
       style={{
         position: 'fixed', inset: 0, zIndex: 1000,
@@ -100,6 +109,7 @@ export default function SlidePanel({ open, onClose, title, subtitle, width = 'md
           to   { opacity: 1; }
         }
       `}</style>
-    </div>
+    </div>,
+    document.body
   )
 }
