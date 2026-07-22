@@ -205,6 +205,12 @@ export default function ParametrosPage() {
       'empresa_cep','empresa_logradouro','empresa_numero','empresa_complemento',
       'empresa_bairro','empresa_cidade','empresa_estado','empresa_endereco',
       'empresa_logo_url',
+      // Financeiro
+      'multa_pagamento_percentual','juros_pagamento_mensal',
+      'dias_aviso_vencimento','spc_intervalo_dias',
+      'prefixo_contrato','prefixo_fatura','moeda_simbolo',
+      // Contratos
+      'multa_entrega_ativo','mensagem_limpeza_contrato','url_contrato_padrao',
     ]
     for (const chave of chavesERP) {
       if (params[chave] !== undefined)
