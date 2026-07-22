@@ -4,18 +4,18 @@ import { useState } from 'react'
 import { Btn, Badge, FormField, inputCls, selectCls, textareaCls, Tabs } from '@/components/ui'
 
 const COLORS = [
-  {name:'Primary',      bg:'#17A2B8',text:'#fff',token:'--c-primary'},
-  {name:'Primary Light',bg:'#D1ECF1',text:'#0C5460',token:'--c-primary-light'},
-  {name:'Success',      bg:'#28A745',text:'#fff',token:'--c-success'},
-  {name:'Danger',       bg:'#DC3545',text:'#fff',token:'--c-danger'},
-  {name:'Warning',      bg:'#FFC107',text:'#212529',token:'--c-warning'},
-  {name:'Sidebar',      bg:'#1E2A38',text:'#fff',token:'--c-sidebar'},
-  {name:'BG Page',      bg:'#F4F6F8',text:'#212529',token:'--bg'},
-  {name:'BG Card',      bg:'#FFFFFF',text:'#212529',token:'--bg-card',border:true},
-  {name:'BG Header',    bg:'#F8F9FA',text:'#495057',token:'--bg-header',border:true},
-  {name:'Row Hover',    bg:'#E8F4F8',text:'#212529',token:'--bg-row-hover',border:true},
-  {name:'T Primary',    bg:'#212529',text:'#fff',token:'--t-primary'},
-  {name:'T Muted',      bg:'#6C757D',text:'#fff',token:'--t-muted'},
+  {name:'Primary',      bg:'#818cf8',text:'#fff',token:'--c-primary'},
+  {name:'Primary Light',bg:'rgba(129,140,248,0.15)',text:'#c7d2fe',token:'--c-primary-light'},
+  {name:'Success',      bg:'#34d399',text:'#052e21',token:'--c-success'},
+  {name:'Danger',       bg:'#f87171',text:'#3d0a0a',token:'--c-danger'},
+  {name:'Warning',      bg:'#fbbf24',text:'#3d2c05',token:'--c-warning'},
+  {name:'Info',         bg:'#38bdf8',text:'#04222f',token:'--c-info'},
+  {name:'BG Page',      bg:'#0f172a',text:'#fff',token:'--bg'},
+  {name:'BG Card',      bg:'rgba(255,255,255,0.05)',text:'#fff',token:'--bg-card',border:true},
+  {name:'BG Header',    bg:'rgba(255,255,255,0.03)',text:'#fff',token:'--bg-header',border:true},
+  {name:'Row Hover',    bg:'rgba(129,140,248,0.08)',text:'#fff',token:'--bg-row-hover',border:true},
+  {name:'T Primary',    bg:'rgba(255,255,255,0.92)',text:'#111',token:'--t-primary'},
+  {name:'T Muted',      bg:'rgba(255,255,255,0.38)',text:'#111',token:'--t-muted'},
 ]
 
 const BADGES = [
@@ -33,13 +33,14 @@ export default function DesignSystemPage() {
     <div>
       <div className="ds-page-header">
         <div>
-          <div className="ds-page-title">🎨 Design System — LocaSystem v1.0</div>
+          <div className="ds-page-title">🎨 Design System — LocaSystem v1.1</div>
           <div className="ds-page-subtitle">Referência visual e componentes — acesse em /design-system</div>
         </div>
       </div>
 
       <Tabs active={tab} onChange={setTab} tabs={[
         {key:'cores',label:'Cores',icon:'🎨'},
+        {key:'layout',label:'Layout',icon:'📐'},
         {key:'tipografia',label:'Tipografia',icon:'🔤'},
         {key:'botoes',label:'Botões',icon:'🖱️'},
         {key:'inputs',label:'Inputs',icon:'✏️'},
@@ -65,6 +66,35 @@ export default function DesignSystemPage() {
                   </div>
                 </div>
               ))}
+            </div>
+          </div>
+        )}
+
+        {tab==='layout' && (
+          <div style={{ display:'flex', flexDirection:'column', gap:24 }}>
+            <div>
+              <div style={{fontSize:'var(--fs-sm)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em',color:'var(--t-muted)',marginBottom:8}}>Largura de conteúdo</div>
+              <p style={{fontSize:'var(--fs-md)',color:'var(--t-secondary)',marginBottom:12,lineHeight:1.6,maxWidth:700}}>
+                Toda tela de formulário/wizard (Contratos, Cotações, Parâmetros) usa a classe <code style={{fontFamily:'var(--font-mono)',color:'var(--c-primary-text)'}}>.ds-page-content</code>,
+                que fixa a largura em <code style={{fontFamily:'var(--font-mono)',color:'var(--c-primary-text)'}}>--content-max</code> (1100px) e centraliza. Nenhuma tela deve definir seu próprio <code style={{fontFamily:'var(--font-mono)'}}>maxWidth</code> em px.
+              </p>
+              <div className="ds-page-content" style={{ border:'1px dashed var(--border)', borderRadius:'var(--r-md)', padding:16, background:'var(--bg-header)' }}>
+                <div style={{fontSize:'var(--fs-sm)',color:'var(--t-muted)',textAlign:'center'}}>.ds-page-content (max-width: var(--content-max), margin: 0 auto)</div>
+              </div>
+            </div>
+
+            <div>
+              <div style={{fontSize:'var(--fs-sm)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.08em',color:'var(--t-muted)',marginBottom:8}}>Grids de formulário</div>
+              <p style={{fontSize:'var(--fs-md)',color:'var(--t-secondary)',marginBottom:12,lineHeight:1.6,maxWidth:700}}>
+                <code style={{fontFamily:'var(--font-mono)',color:'var(--c-primary-text)'}}>.form-grid-2/3/4</code> — número fixo de colunas, para pares/trios de campo que devem manter a mesma proporção sempre (ex: painéis estreitos dentro de um modal).<br/>
+                <code style={{fontFamily:'var(--font-mono)',color:'var(--c-primary-text)'}}>.form-grid-auto</code> — adaptativo: cria quantas colunas de ~240px couberem no espaço disponível, em vez de esticar 2 colunas fixas e sobrar espaço vazio. Use este em telas largas (wizards, Parâmetros). Campos que precisam da largura toda usam <code style={{fontFamily:'var(--font-mono)'}}>{"gridColumn:'1 / -1'"}</code>; campos curtos (UF, CEP) mantêm <code style={{fontFamily:'var(--font-mono)'}}>maxWidth</code> pontual.
+              </p>
+              <div className="form-grid-auto" style={{ marginBottom: 8 }}>
+                {['Campo A','Campo B','Campo C','Campo D','Campo E'].map(f=>(
+                  <div key={f} style={{ background:'var(--bg-header)', border:'1px dashed var(--border)', borderRadius:'var(--r-sm)', padding:'10px 12px', textAlign:'center', fontSize:'var(--fs-sm)', color:'var(--t-muted)' }}>{f}</div>
+                ))}
+              </div>
+              <div style={{fontSize:'var(--fs-xs)',color:'var(--t-muted)'}}>.form-grid-auto — redimensione a janela para ver as colunas se reorganizarem</div>
             </div>
           </div>
         )}

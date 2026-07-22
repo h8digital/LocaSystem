@@ -77,6 +77,9 @@
   --r-lg:  12px;
   --r-xl:  16px;
 
+  /* Layout — largura padrão de conteúdo (wizards, formulários, seções de Parâmetros) */
+  --content-max: 1100px;
+
   /* Tipografia */
   --font-sans:  'Inter', system-ui, sans-serif;
   --font-mono:  'JetBrains Mono', monospace;
@@ -252,6 +255,15 @@ a:hover { color: var(--c-primary-text) }
   border: 1px solid var(--border);
   border-radius: var(--r-lg);
   padding: 14px 16px;
+}
+
+/* ── Layout de página ───────────────────────────────────────────
+   Padrão único de largura para wizards e telas de formulário —
+   substitui os maxWidth arbitrários (620–820px) que cada tela definia
+   por conta própria. */
+.ds-page-content {
+  max-width: var(--content-max);
+  margin: 0 auto;
 }
 
 /* ── Seção dentro do card ────────────────────────────────────── */
@@ -550,7 +562,7 @@ select {
   flex-shrink: 0;
 }
 
-.ds-add-btn {
+.ds-add-dashed {
   width: 100%;
   border: 2px dashed var(--border);
   background: none;
@@ -562,7 +574,7 @@ select {
   cursor: pointer;
   transition: all 0.15s;
 }
-.ds-add-btn:hover { border-color: var(--c-primary); color: var(--c-primary) }
+.ds-add-dashed:hover { border-color: var(--c-primary); color: var(--c-primary) }
 
 /* ── Alertas ─────────────────────────────────────────────────── */
 .ds-alert-error {
@@ -637,6 +649,13 @@ select {
 .form-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px }
 .form-grid-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 14px }
 .form-grid-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 14px }
+
+/* Grid adaptativo: para telas largas (wizards, Parâmetros) — em vez de um
+   número fixo de colunas, cria quantas colunas de ~240px couberem no
+   espaço disponível. Campos que precisam da largura toda usam
+   gridColumn:'1 / -1'; campos curtos (UF, CEP) continuam com maxWidth
+   pontual, como já é feito hoje. */
+.form-grid-auto { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 14px }
 
 /* ── Utilitários ─────────────────────────────────────────────── */
 .text-mono { font-family: var(--font-mono); font-size: var(--fs-sm) }

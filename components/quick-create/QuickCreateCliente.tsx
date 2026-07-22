@@ -249,7 +249,7 @@ export default function QuickCreateCliente({ onClose, onCreated }: Props) {
             </div>
           ))}
           <button onClick={()=>setEnderecos(prev=>[...prev,emptyEndereco()])}
-            className="ds-add-btn">
+            className="ds-add-dashed">
             + Adicionar Endereço
           </button>
         </div>
@@ -292,7 +292,7 @@ export default function QuickCreateCliente({ onClose, onCreated }: Props) {
             </div>
           ))}
           <button onClick={()=>setContatos(prev=>[...prev,emptyContato()])}
-            className="ds-add-btn">
+            className="ds-add-dashed">
             + Adicionar Contato
           </button>
         </div>
