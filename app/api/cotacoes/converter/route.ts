@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { geocodeEndereco } from '@/lib/geocode'
 
 
 export const runtime = 'nodejs'
@@ -41,6 +42,15 @@ export async function POST(req: NextRequest) {
       : 1
     const numeroContrato = `LOC${ano}${String(seq).padStart(6, '0')}`
 
+    // Geocodificar o local de uso (Mapbox) — nunca bloqueia a conversão
+    const geo = await geocodeEndereco(supabase, {
+      logradouro: cot.local_uso_endereco,
+      numero:     cot.local_uso_numero,
+      bairro:     cot.local_uso_bairro,
+      cidade:     cot.local_uso_cidade,
+      estado:     cot.local_uso_estado,
+    })
+
     // Criar contrato
     const contratoPayload = {
       numero:       numeroContrato,
@@ -65,6 +75,8 @@ export async function POST(req: NextRequest) {
       local_uso_cidade:      cot.local_uso_cidade,
       local_uso_estado:      cot.local_uso_estado,
       local_uso_referencia:  cot.local_uso_referencia,
+      local_uso_lat:         geo?.lat ?? null,
+      local_uso_lng:         geo?.lng ?? null,
     }
 
     const { data: contrato, error: contratoErr } = await supabase

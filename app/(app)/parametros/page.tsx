@@ -561,6 +561,16 @@ export default function ParametrosPage() {
                   </FormField>
                 </div>
               </Section>
+
+              <Section title="Mapa de Contratos (Mapbox)"
+                hint="Usado para geocodificar o local de uso dos contratos e exibir o mapa no Dashboard. Crie uma conta gratuita em mapbox.com e copie o 'Default public token'.">
+                <FormField label="Access Token do Mapbox" hint="Formato: pk.xxxxxxxxxxxx...">
+                  <input type="password" className={inpSm}
+                    defaultValue={params['mapbox_token'] ?? ''}
+                    onBlur={async e => { await salvarParam('mapbox_token', e.target.value); setOkERP(true) }}
+                    placeholder="pk.eyJ1Ijoi..." />
+                </FormField>
+              </Section>
             </div>
           )}
 

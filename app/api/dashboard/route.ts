@@ -25,6 +25,8 @@ export async function GET(req: NextRequest) {
     { data: vencendo },
     { data: inadimplentes },
     { data: vencidos },
+    { data: contratosMapa },
+    { data: paramMapbox },
   ] = await Promise.all([
     // Todos contratos — para KPIs globais
     sb.from('contratos').select('status, total, created_at'),
@@ -87,6 +89,16 @@ export async function GET(req: NextRequest) {
       .eq('status', 'ativo')
       .lt('data_fim', hoje)
       .order('data_fim'),
+
+    // Contratos ativos geocodificados — para o mapa do dashboard
+    sb.from('contratos')
+      .select('id, numero, total, local_uso_lat, local_uso_lng, local_uso_cidade, local_uso_bairro, clientes(nome)')
+      .eq('status', 'ativo')
+      .not('local_uso_lat', 'is', null)
+      .not('local_uso_lng', 'is', null),
+
+    // Token do Mapbox (mapa do dashboard)
+    sb.from('parametros').select('valor').eq('chave', 'mapbox_token').maybeSingle(),
   ])
 
   // ── KPIs globais ──────────────────────────────────────────────────────────
@@ -184,5 +196,11 @@ export async function GET(req: NextRequest) {
     contratos_vencendo:(vencendo ?? []).map((c: any) => ({ numero: c.numero, data_fim: c.data_fim, total: c.total, cliente: c.clientes?.nome })),
     contratos_vencidos: vencidosList,
     inadimplentes:     (inadimplentes ?? []).map((f: any) => ({ numero: f.numero, valor: f.valor, data_vencimento: f.data_vencimento, contrato: f.contratos?.numero, cliente: f.contratos?.clientes?.nome })),
+    contratos_mapa:    (contratosMapa ?? []).map((c: any) => ({
+      id: c.id, numero: c.numero, total: Number(c.total ?? 0),
+      lat: Number(c.local_uso_lat), lng: Number(c.local_uso_lng),
+      cidade: c.local_uso_cidade, bairro: c.local_uso_bairro, cliente: c.clientes?.nome,
+    })),
+    mapbox_token: paramMapbox?.valor || null,
   })
 }

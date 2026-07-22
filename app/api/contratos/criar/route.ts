@@ -2,6 +2,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
+import { geocodeEndereco } from '@/lib/geocode'
 export const runtime = 'nodejs'
 
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
@@ -24,6 +25,15 @@ export async function POST(req: NextRequest) {
       .rpc('gerar_numero_contrato', { prefixo })
     if (numError) return NextResponse.json({ ok:false, error:'Erro ao gerar número: ' + numError.message })
     const numero = numData as string
+
+    // ── Geocodificar o local de uso (Mapbox) — nunca bloqueia a criação do contrato
+    const geo = await geocodeEndereco(sb, {
+      logradouro: contrato.local_uso_endereco,
+      numero:     contrato.local_uso_numero,
+      bairro:     contrato.local_uso_bairro,
+      cidade:     contrato.local_uso_cidade,
+      estado:     contrato.local_uso_estado,
+    })
 
     // ── Criar contrato
     const { data: c, error } = await sb.from('contratos').insert({
@@ -53,6 +63,8 @@ export async function POST(req: NextRequest) {
       local_uso_cidade:     contrato.local_uso_cidade     || null,
       local_uso_estado:     contrato.local_uso_estado     || null,
       local_uso_referencia: contrato.local_uso_referencia || null,
+      local_uso_lat:        geo?.lat ?? null,
+      local_uso_lng:        geo?.lng ?? null,
       status: 'rascunho',
     }).select('id').single()
 

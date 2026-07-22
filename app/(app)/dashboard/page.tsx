@@ -2,6 +2,7 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
+import MapaContratos from '@/components/dashboard/MapaContratos'
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 const R$ = (v: number) => 'R$ ' + Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
@@ -200,6 +201,8 @@ export default function DashboardPage() {
   const vencendo = data?.contratos_vencendo ?? []
   const vencidos = data?.contratos_vencidos ?? []
   const inadimpl = data?.inadimplentes   ?? []
+  const contratosMapa = data?.contratos_mapa ?? []
+  const mapboxToken   = data?.mapbox_token ?? null
 
   const maxCliente = Math.max(...clientes.map((c:any)=>c.valor),1)
   const maxProduto = Math.max(...produtos.map((p:any)=>p.locacoes),1)
@@ -288,6 +291,20 @@ export default function DashboardPage() {
               {vencidos.length>0&&<div style={{fontSize:12,color:'var(--t-muted)',marginTop:2}}>Multa estimada: {R$(kpis.multa_estimada??0)} · Clique para ver todos</div>}
             </div>
           </div>
+        </div>
+
+        {/* ── Mapa de contratos ativos ── */}
+        <div style={{background:'var(--bg-card)',border:'1px solid var(--border)',borderRadius:'var(--r-lg)',padding:'18px 20px'}}>
+          <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16}}>
+            <div>
+              <div style={{fontSize:11,fontWeight:700,textTransform:'uppercase',letterSpacing:'0.07em',color:'var(--t-muted)'}}>Locais de uso</div>
+              <div style={{fontSize:14,fontWeight:700,color:'var(--t-primary)',marginTop:2}}>Contratos Ativos no Mapa</div>
+            </div>
+            {contratosMapa.length>0 && (
+              <div style={{fontSize:12,color:'var(--t-muted)'}}>{contratosMapa.length} contrato(s) localizado(s)</div>
+            )}
+          </div>
+          <MapaContratos contratos={contratosMapa} mapboxToken={mapboxToken} />
         </div>
 
         {/* ── Gráfico principal ── */}
