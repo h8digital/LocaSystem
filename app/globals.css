@@ -131,24 +131,42 @@ a:hover { color: var(--c-primary-text) }
 ::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.22) }
 
 /* ── Sidebar ─────────────────────────────────────────────────── */
-.ds-sidebar {
+/* Espaçador: participa do layout flex e reserva o espaço horizontal.
+   A sidebar em si é posicionada fixa e sobrepõe o conteúdo quando
+   expande no hover, sem empurrar o restante da página. */
+.ds-sidebar-spacer {
   width: 220px;
   min-width: 220px;
+  flex-shrink: 0;
+  transition: width 0.2s ease, min-width 0.2s ease;
+}
+.ds-sidebar-spacer.collapsed {
+  width: 64px;
+  min-width: 64px;
+}
+
+.ds-sidebar {
+  width: 220px;
   background: rgba(15,23,42,0.8);
   backdrop-filter: var(--glass-blur);
   border-right: 1px solid var(--glass-border);
   display: flex;
   flex-direction: column;
   height: 100vh;
-  position: sticky;
+  position: fixed;
   top: 0;
+  left: 0;
   overflow-y: auto;
-  flex-shrink: 0;
-  transition: width 0.2s ease, min-width 0.2s ease;
+  overflow-x: hidden;
+  z-index: 40;
+  transition: width 0.2s ease;
 }
 .ds-sidebar.collapsed {
   width: 64px;
-  min-width: 64px;
+}
+.ds-sidebar.collapsed.peek {
+  width: 220px;
+  box-shadow: 8px 0 32px rgba(0,0,0,0.5);
 }
 
 .ds-sidebar-toggle {

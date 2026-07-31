@@ -22,6 +22,7 @@ const COLLAPSE_KEY = 'locasystem_sidebar_collapsed'
 export default function Sidebar() {
   const pathname = usePathname()
   const [collapsed, setCollapsed] = useState(false)
+  const [peeking, setPeeking] = useState(false)
   const [changelogOpen, setChangelogOpen] = useState(false)
 
   useEffect(() => {
@@ -36,10 +37,18 @@ export default function Sidebar() {
   }
 
   const ultimaAtualizacao = CHANGELOG[0]?.data
+  // Enquanto colapsada, passar o mouse por cima expande a sidebar como
+  // overlay (sem empurrar o conteúdo) — a rotulagem some de novo ao sair.
+  const expanded = !collapsed || peeking
 
   return (
     <>
-    <aside className={`ds-sidebar${collapsed ? ' collapsed' : ''}`}>
+    <div className={`ds-sidebar-spacer${collapsed ? ' collapsed' : ''}`} />
+    <aside
+      className={`ds-sidebar${collapsed ? ' collapsed' : ''}${collapsed && peeking ? ' peek' : ''}`}
+      onMouseEnter={() => collapsed && setPeeking(true)}
+      onMouseLeave={() => setPeeking(false)}
+    >
       {/* Botão de colapsar */}
       <button
         onClick={toggleCollapsed}
@@ -57,9 +66,9 @@ export default function Sidebar() {
       {/* Brand */}
       <div style={{
         height: 56,
-        padding: collapsed ? '0' : '0 18px',
+        padding: expanded ? '0 18px' : '0',
         borderBottom: '1px solid rgba(255,255,255,0.07)',
-        display: 'flex', alignItems: 'center', justifyContent: collapsed ? 'center' : 'flex-start',
+        display: 'flex', alignItems: 'center', justifyContent: expanded ? 'flex-start' : 'center',
         gap: 10, flexShrink: 0,
       }}>
         <div style={{
@@ -69,7 +78,7 @@ export default function Sidebar() {
           fontSize: 15, fontWeight: 700, color: '#fff',
           boxShadow: '0 0 12px rgba(99,102,241,0.5)', flexShrink: 0,
         }}>L</div>
-        {!collapsed && (
+        {expanded && (
           <div style={{ minWidth: 0 }}>
             <div style={{ color: '#fff', fontWeight: 600, fontSize: 14, letterSpacing: '-0.01em', lineHeight: 1.2 }}>
               Loca<span style={{ color: '#818cf8' }}>System</span>
@@ -85,13 +94,13 @@ export default function Sidebar() {
       <nav style={{ flex: 1, overflowY: 'auto', overflowX: 'hidden', padding: '8px 0' }}>
         {NAV.map(s => (
           <div key={s.section}>
-            {!collapsed && <div className="ds-nav-section">{s.section}</div>}
+            {expanded && <div className="ds-nav-section">{s.section}</div>}
             {s.items.map(item => (
               <Link key={item.href} href={item.href}
-                title={collapsed ? item.label : undefined}
+                title={expanded ? undefined : item.label}
                 className={`ds-nav-item${isActive(item.href, pathname) ? ' active' : ''}`}>
                 <span className="ds-nav-icon">{item.icon}</span>
-                {!collapsed && <span>{item.label}</span>}
+                {expanded && <span>{item.label}</span>}
               </Link>
             ))}
           </div>
@@ -102,10 +111,10 @@ export default function Sidebar() {
       <button
         onClick={() => setChangelogOpen(true)}
         className="ds-sidebar-version"
-        title={collapsed ? `v${APP_VERSION} — Novidades e correções` : undefined}
+        title={expanded ? undefined : `v${APP_VERSION} — Novidades e correções`}
       >
         <span style={{ fontSize: 14, flexShrink: 0 }}>🏷️</span>
-        {!collapsed && (
+        {expanded && (
           <div style={{ minWidth: 0, textAlign: 'left' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'rgba(255,255,255,0.75)', whiteSpace: 'nowrap' }}>
               v{APP_VERSION} <span style={{ fontWeight: 400, color: 'var(--t-muted)' }}>· {fmt.date(ultimaAtualizacao)}</span>

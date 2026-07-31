@@ -9,9 +9,16 @@ export interface ChangelogVersao {
   itens:  { tipo: ChangelogTipo; texto: string }[]
 }
 
-export const APP_VERSION = '1.6.0'
+export const APP_VERSION = '1.7.0'
 
 export const CHANGELOG: ChangelogVersao[] = [
+  { versao: '1.7.0', data: '2026-07-31', itens: [
+    { tipo: 'feat', texto: 'Notificações do sistema agora aparecem em um card no canto superior direito (estilo macOS), no lugar dos alertas do navegador' },
+    { tipo: 'fix',  texto: 'CNPJ da empresa não ficava salvo em Parâmetros e por isso sumia da promissória e do comprovante de locação' },
+    { tipo: 'feat', texto: 'Mapa de contratos ativos no Dashboard (Mapbox)' },
+    { tipo: 'fix',  texto: 'Clique no pino do mapa do Dashboard não navegava para o contrato' },
+    { tipo: 'feat', texto: 'Command Palette (Ctrl/Cmd+K) com atalhos de teclado para navegação rápida' },
+  ]},
   { versao: '1.6.0', data: '2026-07-22', itens: [
     { tipo: 'fix',  texto: 'Busca de equipamentos/clientes não fica mais escondida atrás de tabelas em Contratos e Cotações' },
     { tipo: 'fix',  texto: 'Devolução prevista em fim de semana ou feriado agora é adiada para o próximo dia útil (antes era antecipada)' },
