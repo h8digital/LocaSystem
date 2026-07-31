@@ -158,7 +158,9 @@ a:hover { color: var(--c-primary-text) }
   left: 0;
   overflow-y: auto;
   overflow-x: hidden;
-  z-index: 40;
+  /* Acima do Topbar (sticky, z-index:100) para que o hover-expand
+     sobreponha o cabeçalho da página em vez de ficar atrás dele. */
+  z-index: 200;
   transition: width 0.2s ease;
 }
 .ds-sidebar.collapsed {
