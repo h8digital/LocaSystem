@@ -4,7 +4,7 @@ import { useEffect, useState, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { supabase, fmt } from '@/lib/supabase'
-import { Btn, FormField, inputCls, selectCls, textareaCls, SlidePanel } from '@/components/ui'
+import { Btn, FormField, inputCls, selectCls, textareaCls, SlidePanel, useToast } from '@/components/ui'
 import LookupField from '@/components/ui/LookupField'
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
@@ -63,6 +63,7 @@ function CriarCatPanel({ onClose, onCreated }:{ onClose:()=>void; onCreated:(r:a
 
 // ─── Componente principal ─────────────────────────────────────────────────────
 export default function EquipamentosPage() {
+  const toast  = useToast()
   const router = useRouter()
 
   // ── Dados ──────────────────────────────────────────────────────────────────
@@ -83,7 +84,6 @@ export default function EquipamentosPage() {
   const [form,       setForm]       = useState<any>(emptyForm())
   const [editId,     setEditId]     = useState<number|null>(null)
   const [saving,     setSaving]     = useState(false)
-  const [erro,       setErro]       = useState('')
   const [catNome,    setCatNome]    = useState('')
   const [aba,        setAba]        = useState<'info'|'precos'|'fotos'|'inventario'>('info')
   // ── Inventário no painel ──────────────────────────────────────────────────
@@ -93,7 +93,6 @@ export default function EquipamentosPage() {
   const [novoPat,       setNovoPat]       = useState(false)       // formulário de novo
   const [patForm,       setPatForm]       = useState<any>({})
   const [patSaving,     setPatSaving]     = useState(false)
-  const [patErro,       setPatErro]       = useState('')
 
   // ── Painel de preços rápido (hover) ───────────────────────────────────────
   const [precoPainel, setPrecoPainel] = useState<any>(null)
@@ -259,7 +258,7 @@ export default function EquipamentosPage() {
 
   // ── Abrir edição ───────────────────────────────────────────────────────────
   async function abrir(p?: any) {
-    setErro(''); setAba('info')
+    setAba('info')
     if (p) {
       setForm({ ...emptyForm(), ...p })
       setEditId(p.id)
@@ -278,14 +277,14 @@ export default function EquipamentosPage() {
       setForm(emptyForm()); setEditId(null); setCatNome(''); setFotos([])
       setPatsPanel([])
     }
-    setEditPat(null); setNovoPat(false); setPatForm({}); setPatErro('')
+    setEditPat(null); setNovoPat(false); setPatForm({})
     setPanel(true)
   }
 
   // ── Salvar ─────────────────────────────────────────────────────────────────
   async function salvar() {
-    if (!form.nome?.trim()) { setErro('Nome é obrigatório.'); setAba('info'); return }
-    setSaving(true); setErro('')
+    if (!form.nome?.trim()) { toast.error('Nome é obrigatório.'); setAba('info'); return }
+    setSaving(true)
     const payload = {
       nome:                  form.nome.trim(),
       codigo:                form.codigo || null,
@@ -315,10 +314,10 @@ export default function EquipamentosPage() {
     }
     if (editId) {
       const { error } = await supabase.from('produtos').update(payload).eq('id', editId)
-      if (error) { setErro(error.message); setSaving(false); return }
+      if (error) { toast.error(error.message); setSaving(false); return }
     } else {
       const { error } = await supabase.from('produtos').insert(payload)
-      if (error) { setErro(error.message); setSaving(false); return }
+      if (error) { toast.error(error.message); setSaving(false); return }
     }
     setSaving(false); setPanel(false); load()
   }
@@ -337,8 +336,8 @@ export default function EquipamentosPage() {
   }
 
   async function salvarPat() {
-    if (!patForm.numero_patrimonio?.trim()) { setPatErro('Nº Patrimônio é obrigatório.'); return }
-    setPatSaving(true); setPatErro('')
+    if (!patForm.numero_patrimonio?.trim()) { toast.error('Nº Patrimônio é obrigatório.'); return }
+    setPatSaving(true)
     const numPat = patForm.numero_patrimonio.trim()
 
     // Verificar duplicidade (ignora soft-deleted e o próprio registro em edição)
@@ -349,7 +348,7 @@ export default function EquipamentosPage() {
     if (editPat) dupQ = dupQ.neq('id', editPat.id)
     const { data: dup } = await dupQ.limit(1)
     if (dup && dup.length > 0) {
-      setPatErro(`Nº Patrimônio "${numPat}" já está cadastrado para o produto "${(dup[0].produtos as any)?.nome ?? 'outro produto'}".`)
+      toast.error(`Nº Patrimônio "${numPat}" já está cadastrado para o produto "${(dup[0].produtos as any)?.nome ?? 'outro produto'}".`)
       setPatSaving(false); return
     }
 
@@ -363,11 +362,11 @@ export default function EquipamentosPage() {
     }
     if (editPat) {
       const { error } = await supabase.from('patrimonios').update(payload).eq('id', editPat.id)
-      if (error) { setPatErro(error.message); setPatSaving(false); return }
+      if (error) { toast.error(error.message); setPatSaving(false); return }
     } else {
-      if (!editId) { setPatErro('Erro: produto não identificado. Feche e abra novamente.'); setPatSaving(false); return }
+      if (!editId) { toast.error('Produto não identificado. Feche e abra novamente.'); setPatSaving(false); return }
       const { error } = await supabase.from('patrimonios').insert({ ...payload, produto_id: editId })
-      if (error) { setPatErro(error.message); setPatSaving(false); return }
+      if (error) { toast.error(error.message); setPatSaving(false); return }
     }
     setPatSaving(false); setEditPat(null); setNovoPat(false); setPatForm({})
     carregarPatsPanel(editId!)
@@ -392,7 +391,7 @@ export default function EquipamentosPage() {
       && Number(ci.qtd_devolvida ?? 0) < Number(ci.quantidade ?? 1)
     )
     if (contratosAtivos.length > 0) {
-      alert('Patrimônio ' + pat.numero_patrimonio + ' possui contrato ativo (' + (contratosAtivos[0].contratos as any)?.numero + ') — não pode ser excluído.')
+      toast.error('Patrimônio ' + pat.numero_patrimonio + ' possui contrato ativo (' + (contratosAtivos[0].contratos as any)?.numero + ') — não pode ser excluído.')
       return
     }
 
@@ -407,10 +406,11 @@ export default function EquipamentosPage() {
       if ((movimentacoes?.length ?? 0) > 0) deps.push('movimentações de estoque')
       if ((devItens?.length ?? 0) > 0) deps.push('registros de devolução')
       if ((manutencoes?.length ?? 0) > 0) deps.push('ordens de manutenção')
-      alert(
-        'O patrimônio ' + pat.numero_patrimonio + ' possui histórico e não pode ser excluído fisicamente:\n\n' +
-        deps.map(d => '• ' + d).join('\n') +
-        '\n\nEle foi marcado como INATIVO para preservar o histórico.'
+      toast.warning(
+        'O patrimônio ' + pat.numero_patrimonio + ' possui histórico e não pode ser excluído fisicamente (' +
+        deps.join(', ') +
+        '). Ele foi marcado como INATIVO para preservar o histórico.',
+        { duration: 8000 },
       )
       await supabase.from('patrimonios').update({ deleted_at: new Date().toISOString(), status: 'inativo' }).eq('id', pat.id)
       carregarPatsPanel(editId!)
@@ -443,13 +443,13 @@ export default function EquipamentosPage() {
       && Number(ci.qtd_devolvida ?? 0) < Number(ci.quantidade ?? 1)
     )
     if (contratosAtivos.length > 0) {
-      alert('O produto "' + nome + '" possui ' + contratosAtivos.length + ' contrato(s) ativo(s) e não pode ser inativado.\n\nEncerre os contratos antes de inativar o produto.')
+      toast.error('O produto "' + nome + '" possui ' + contratosAtivos.length + ' contrato(s) ativo(s) e não pode ser inativado. Encerre os contratos antes de inativar o produto.')
       return
     }
 
     const patsLocados = (patrimonios ?? []).filter((p:any) => p.status === 'locado')
     if (patsLocados.length > 0) {
-      alert('O produto "' + nome + '" possui ' + patsLocados.length + ' patrimônio(s) atualmente locado(s).\n\nRegistre a devolução antes de inativar.')
+      toast.error('O produto "' + nome + '" possui ' + patsLocados.length + ' patrimônio(s) atualmente locado(s). Registre a devolução antes de inativar.')
       return
     }
 
@@ -477,13 +477,13 @@ export default function EquipamentosPage() {
   // ── Upload de foto ─────────────────────────────────────────────────────────
   async function uploadFoto(file: File) {
     if (!editId) return
-    if (file.size > 5 * 1024 * 1024) { alert('Arquivo muito grande. Limite: 5MB.'); return }
+    if (file.size > 5 * 1024 * 1024) { toast.error('Arquivo muito grande. Limite: 5MB.'); return }
     setUploadando(true)
     const ext  = file.name.split('.').pop() ?? 'jpg'
     const path = `${editId}/${Date.now()}.${ext}`
     const { error: upErr } = await supabase.storage
       .from('produto-fotos').upload(path, file, { upsert: false })
-    if (upErr) { alert('Erro no upload: ' + upErr.message); setUploadando(false); return }
+    if (upErr) { toast.error(upErr.message, { title: 'Erro no upload' }); setUploadando(false); return }
     const { data: { publicUrl } } = supabase.storage.from('produto-fotos').getPublicUrl(path)
     const isPrimeira = fotos.length === 0
     const { error: dbErr } = await supabase.from('produto_fotos').insert({
@@ -493,7 +493,7 @@ export default function EquipamentosPage() {
       principal:    isPrimeira,
       ordem:        fotos.length,
     })
-    if (dbErr) { alert('Erro ao salvar: ' + dbErr.message) }
+    if (dbErr) { toast.error(dbErr.message) }
     else {
       const { data: fs } = await supabase.from('produto_fotos').select('*')
         .eq('produto_id', editId).order('created_at')
@@ -973,8 +973,6 @@ export default function EquipamentosPage() {
           ))}
         </div>
 
-        {erro && <div className="ds-alert-error" style={{ marginBottom:14 }}>{erro}</div>}
-
         {/* ── ABA: INFORMAÇÕES ─────────────────────────────────────────── */}
         {aba === 'info' && (
           <div style={{ display:'flex', flexDirection:'column', gap:20 }}>
@@ -1297,7 +1295,7 @@ export default function EquipamentosPage() {
                   </div>
                 ))}
               </div>
-              <Btn onClick={() => { setNovoPat(true); setEditPat(null); setPatForm({ status:'disponivel' }); setPatErro('') }}>
+              <Btn onClick={() => { setNovoPat(true); setEditPat(null); setPatForm({ status:'disponivel' }) }}>
                 + Novo Patrimônio
               </Btn>
             </div>
@@ -1309,7 +1307,6 @@ export default function EquipamentosPage() {
                 <div style={{ fontWeight:700, fontSize:'var(--fs-base)', marginBottom:14, color:'var(--c-primary)' }}>
                   {editPat ? `Editar patrimônio ${editPat.numero_patrimonio}` : 'Novo Patrimônio'}
                 </div>
-                {patErro && <div className="ds-alert-error" style={{ marginBottom:12 }}>{patErro}</div>}
                 <div className="form-grid-3">
                   <FormField label="Nº Patrimônio" required>
                     <input value={patForm.numero_patrimonio??''} autoFocus
@@ -1352,7 +1349,7 @@ export default function EquipamentosPage() {
                 </div>
                 <div style={{ display:'flex', gap:10, marginTop:14 }}>
                   <Btn variant="secondary" style={{ flex:1 }}
-                    onClick={() => { setNovoPat(false); setEditPat(null); setPatForm({}); setPatErro('') }}>
+                    onClick={() => { setNovoPat(false); setEditPat(null); setPatForm({}) }}>
                     Cancelar
                   </Btn>
                   <Btn style={{ flex:2 }} loading={patSaving} onClick={salvarPat}>
@@ -1434,7 +1431,6 @@ export default function EquipamentosPage() {
                               onClick={() => {
                                 setEditPat(pat)
                                 setNovoPat(false)
-                                setPatErro('')
                                 setPatForm({
                                   numero_patrimonio: pat.numero_patrimonio,
                                   numero_serie:      pat.numero_serie ?? '',

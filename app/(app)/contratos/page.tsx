@@ -4,10 +4,11 @@ import { useEffect, useState } from 'react'
 import { supabase, fmt } from '@/lib/supabase'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { PageHeader, DataTable, Filters, Badge, Btn, ActionButtons } from '@/components/ui'
+import { PageHeader, DataTable, Filters, Badge, Btn, ActionButtons, useToast } from '@/components/ui'
 import type { AcaoSecundaria } from '@/components/ui/ActionButtons'
 
 export default function ContratosPage() {
+  const toast = useToast()
   const [contratos, setContratos] = useState<any[]>([])
   const [loading,   setLoading]   = useState(true)
   const [filters,   setFilters]   = useState<Record<string,string>>({ busca:'', status:'ativo', data_inicio_de:'', data_inicio_ate:'', data_fim_de:'', data_fim_ate:'' })
@@ -89,8 +90,8 @@ export default function ContratosPage() {
       if (!confirm(`Ativar o contrato ${row.numero}?\n\nIsso registrará a remessa e mudará o status para ATIVO.`)) return
       const res = await fetch('/api/contratos/ativar', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ contrato_id: row.id }) })
       const data = await res.json()
-      if (!data.ok) { alert(`Erro: ${data.error}`); return }
-      alert(data.msg); load()
+      if (!data.ok) { toast.error(data.error); return }
+      toast.success(data.msg); load()
     }
 
     async function cancelar() {
@@ -120,10 +121,10 @@ export default function ContratosPage() {
         //    contrato_itens, faturas, fatura_recebimentos, devolucoes,
         //    doc_gerados, email_log, manutencoes, contrato_timeline, contrato_aprovacoes
         const { error } = await supabase.from('contratos').delete().eq('id', row.id)
-        if (error) { alert(`Erro ao excluir: ${error.message}`); return }
+        if (error) { toast.error(error.message, { title: 'Erro ao excluir' }); return }
         load()
       } catch(e: any) {
-        alert(`Erro inesperado: ${e.message}`)
+        toast.error(e.message, { title: 'Erro inesperado' })
       }
     }
 

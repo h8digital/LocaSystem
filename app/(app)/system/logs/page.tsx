@@ -2,7 +2,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { fmt } from '@/lib/supabase'
-import { PageHeader, Btn, inputCls, selectCls } from '@/components/ui'
+import { PageHeader, Btn, inputCls, selectCls, useToast } from '@/components/ui'
 
 const NIVEL_STYLE: Record<string, { bg: string; color: string; label: string }> = {
   error: { bg: 'rgba(248,113,113,0.15)', color: '#f87171', label: 'ERRO' },
@@ -12,6 +12,7 @@ const NIVEL_STYLE: Record<string, { bg: string; color: string; label: string }> 
 }
 
 export default function SystemLogsPage() {
+  const toast = useToast()
   const [logs,    setLogs]    = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [fNivel,  setFNivel]  = useState('error')
@@ -37,7 +38,7 @@ export default function SystemLogsPage() {
     setLimpando(true)
     const res  = await fetch('/api/system/logs', { method: 'DELETE' })
     const data = await res.json()
-    alert(`${data.removidos ?? 0} log(s) removido(s).`)
+    toast.success(`${data.removidos ?? 0} log(s) removido(s).`)
     setLimpando(false); load()
   }
 

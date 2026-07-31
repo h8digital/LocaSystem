@@ -2,7 +2,7 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { FormField, inputCls, textareaCls, selectCls, Btn, Tabs } from '@/components/ui'
+import { FormField, inputCls, textareaCls, selectCls, Btn, Tabs, useToast } from '@/components/ui'
 
 // ── Máscaras ─────────────────────────────────────────────────
 function maskPhone(v: string) { v=v.replace(/\D/g,'').slice(0,11); return v.length<=10?v.replace(/(\d{2})(\d{4})(\d{0,4})/,'($1) $2-$3').replace(/-$/,''):v.replace(/(\d{2})(\d{5})(\d{0,4})/,'($1) $2-$3').replace(/-$/,'') }
@@ -21,9 +21,9 @@ interface Props {
 }
 
 export default function QuickCreateCliente({ onClose, onCreated }: Props) {
+  const toast = useToast()
   const [tab, setTab]           = useState('dados')
   const [saving, setSaving]     = useState(false)
-  const [erro, setErro]         = useState('')
   const [loadingCNPJ, setLoadingCNPJ] = useState(false)
   const [loadingCEP, setLoadingCEP]   = useState<string|null>(null)
   const [tiposEnd, setTiposEnd] = useState<string[]>(['Comercial','Residencial','Entrega','Cobrança','Obra','Outro'])
@@ -46,7 +46,7 @@ export default function QuickCreateCliente({ onClose, onCreated }: Props) {
   // ── Busca CNPJ ─────────────────────────────────────────────
   async function buscarCNPJ(cnpj: string) {
     const d = cnpj.replace(/\D/g,''); if(d.length!==14)return
-    setLoadingCNPJ(true); setErro('')
+    setLoadingCNPJ(true)
     try {
       const r = await fetch(`https://publica.cnpj.ws/cnpj/${d}`)
       if(!r.ok) throw new Error()
@@ -61,7 +61,7 @@ export default function QuickCreateCliente({ onClose, onCreated }: Props) {
         bairro:toTitle(est?.bairro??''), cidade:toTitle(est?.cidade?.nome??''), estado:est?.estado?.sigla??'',
       }))
       setEnderecos([{tipo:'Comercial',cep:maskCEP(cepL),logradouro:toTitle(`${est?.tipo_logradouro??''} ${est?.logradouro??''}`.trim()),numero:est?.numero??'',complemento:toTitle(est?.complemento??''),bairro:toTitle(est?.bairro??''),cidade:toTitle(est?.cidade?.nome??''),estado:est?.estado?.sigla??'',ibge:est?.cidade?.ibge_id??'',principal:true,observacoes:''}])
-    } catch { setErro('CNPJ não encontrado.') }
+    } catch { toast.error('CNPJ não encontrado.') }
     setLoadingCNPJ(false)
   }
 
@@ -75,14 +75,14 @@ export default function QuickCreateCliente({ onClose, onCreated }: Props) {
       const logr=toTitle(data.logradouro??''), bai=toTitle(data.bairro??''), cid=toTitle(data.localidade??''), uf=data.uf??''
       if(target==='main') setForm((f:any)=>({...f,endereco:logr,bairro:bai,cidade:cid,estado:uf}))
       else setEnderecos(prev=>{ const a=[...prev]; a[target as number]={...a[target as number],logradouro:logr,bairro:bai,cidade:cid,estado:uf,ibge:data.ibge??''}; return a })
-    } catch { setErro('CEP não encontrado.') }
+    } catch { toast.error('CEP não encontrado.') }
     setLoadingCEP(null)
   }
 
   // ── Salvar ──────────────────────────────────────────────────
   async function salvar() {
-    if(!form.nome?.trim()){ setErro('Nome é obrigatório!'); setTab('dados'); return }
-    setSaving(true); setErro('')
+    if(!form.nome?.trim()){ toast.error('Nome é obrigatório!'); setTab('dados'); return }
+    setSaving(true)
     try {
       // Salvar cliente
       const payload = {
@@ -113,7 +113,7 @@ export default function QuickCreateCliente({ onClose, onCreated }: Props) {
       setSaving(false)
       onCreated(data)
     } catch(e:any) {
-      setErro('Erro: ' + e.message)
+      toast.error(e.message)
       setSaving(false)
     }
   }
@@ -130,8 +130,6 @@ export default function QuickCreateCliente({ onClose, onCreated }: Props) {
   return (
     <div style={{ display:'flex', flexDirection:'column', height:'100%' }}>
       <Tabs tabs={panelTabs} active={tab} onChange={setTab} />
-
-      {erro && <div className="ds-alert-error" style={{ marginBottom:16 }}>{erro}</div>}
 
       {/* ── DADOS ────────────────────────────────────────── */}
       {tab==='dados' && (

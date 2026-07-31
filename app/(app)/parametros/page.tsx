@@ -2,7 +2,7 @@
 'use client'
 import React, { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
-import { Btn, PageHeader, FormField, inputCls, textareaCls, Badge, SlidePanel, DataTable } from '@/components/ui'
+import { Btn, PageHeader, FormField, inputCls, textareaCls, Badge, SlidePanel, DataTable, useToast } from '@/components/ui'
 
 const inpSm = inputCls
 
@@ -129,6 +129,7 @@ const CAMPOS_EMPRESA = [
 ]
 
 export default function ParametrosPage() {
+  const toast = useToast()
   const [params,      setParams]      = useState<Record<string,string>>({})
   const [periodos,    setPeriodos]    = useState<any[]>([])
   const [categorias,  setCategorias]  = useState<any[]>([])
@@ -136,11 +137,8 @@ export default function ParametrosPage() {
   const [locais,      setLocais]      = useState<any[]>([])
   const [saving,      setSaving]      = useState(false)
   const [savingSite,  setSavingSite]  = useState(false)
-  const [okSite,      setOkSite]      = useState(false)
-  const [okERP,       setOkERP]       = useState(false)
   const [uploadingLogo, setUploadingLogo] = useState(false)
   const [uploadingHero, setUploadingHero] = useState(false)
-  const [erroLogo,    setErroLogo]    = useState('')
 
   // Navegação — seção principal e sub-aba do Site
   const [secao, setSecao]   = useState('empresa')
@@ -162,7 +160,6 @@ export default function ParametrosPage() {
   const [formEnd,  setFormEnd]  = useState({ nome:'' })
   const [formLoc,  setFormLoc]  = useState({ nome:'', descricao:'' })
   const [salvando,    setSalvando]    = useState(false)
-  const [erroPainel,  setErroPainel]  = useState('')
 
   useEffect(() => { loadAll() }, [])
 
@@ -175,9 +172,12 @@ export default function ParametrosPage() {
       supabase.from('locais_armazenagem').select('*').order('nome'),
     ])
     const map: Record<string,string> = {}
-    p?.forEach((x:any) => { map[x.chave] = x.valor ?? '' })
     const { data: siteConf } = await supabase.from('site_config').select('chave,valor')
     ;(siteConf ?? []).forEach((r:any) => { map[r.chave] = r.valor ?? '' })
+    // parametros (dados do ERP) tem prioridade: sobrescreve qualquer chave
+    // equivalente órfã em site_config (ex.: empresa_cnpj), evitando que o
+    // conteúdo do site apague dados do ERP usados nos relatórios.
+    p?.forEach((x:any) => { map[x.chave] = x.valor ?? '' })
     setParams(map); setPeriodos(per??[]); setCategorias(cat??[]); setTiposEnd(te??[]); setLocais(lo??[])
   }
 
@@ -211,8 +211,8 @@ export default function ParametrosPage() {
     for (const [i,t] of tiposEnd.entries())
       if (t.id) await supabase.from('tipos_endereco_cliente')
         .update({ nome:t.nome, ativo:t.ativo?1:0, ordem:i+1 }).eq('id',t.id)
-    setSaving(false); setOkERP(true)
-    setTimeout(() => setOkERP(false), 3000)
+    setSaving(false)
+    toast.success('Configurações salvas.')
   }
 
   // ── Salvar parâmetro individual (Asaas) ──────────────────────────────────
@@ -223,7 +223,7 @@ export default function ParametrosPage() {
 
   // ── Salvar Site ───────────────────────────────────────────────────────────
   async function salvarSite() {
-    setSavingSite(true); setOkSite(false)
+    setSavingSite(true)
     const chaves = [
       'hero_titulo','hero_subtitulo','hero_cta_texto','hero_cta2_texto',
       'stat_equipamentos','stat_categorias','stat_prazo',
@@ -242,20 +242,20 @@ export default function ParametrosPage() {
     await supabase.from('site_config')
       .upsert({ chave:'horario_funcionamento', valor: partes.join(' | ') }, { onConflict:'chave' })
 
-    setSavingSite(false); setOkSite(true)
-    setTimeout(() => setOkSite(false), 3000)
+    setSavingSite(false)
+    toast.success('Site atualizado.')
   }
 
   // ── Uploads ───────────────────────────────────────────────────────────────
   async function uploadContrato(file: File) {
-    if (!file.name.toLowerCase().endsWith('.pdf')) { alert('Selecione um arquivo PDF.'); return }
-    if (file.size > 15*1024*1024) { alert('Arquivo excede 15MB.'); return }
+    if (!file.name.toLowerCase().endsWith('.pdf')) { toast.error('Selecione um arquivo PDF.'); return }
+    if (file.size > 15*1024*1024) { toast.error('Arquivo excede 15MB.'); return }
     const fd = new FormData(); fd.append('file', file)
     const res = await fetch('/api/contrato-pdf', { method:'POST', body:fd })
     const data = await res.json()
-    if (!data.ok) { alert('Erro: ' + data.error); return }
+    if (!data.ok) { toast.error(data.error); return }
     setP('url_contrato_padrao', data.url)
-    alert('✅ Contrato atualizado no site!')
+    toast.success('Contrato atualizado no site!')
   }
 
   async function uploadHero(file: File) {
@@ -263,7 +263,7 @@ export default function ParametrosPage() {
     const ext  = file.name.split('.').pop()
     const path = `site/hero-bg.${ext}`
     const { error } = await supabase.storage.from('produto-fotos').upload(path, file, { upsert:true })
-    if (error) { alert('Erro: ' + error.message); setUploadingHero(false); return }
+    if (error) { toast.error(error.message); setUploadingHero(false); return }
     const { data: urlData } = supabase.storage.from('produto-fotos').getPublicUrl(path)
     await supabase.from('site_config').update({ valor: urlData.publicUrl }).eq('chave', 'hero_bg_url')
     setP('hero_bg_url', urlData.publicUrl)
@@ -283,9 +283,9 @@ export default function ParametrosPage() {
   }
 
   // ── Categorias ────────────────────────────────────────────────────────────
-  function abrirCat(cat?: any) { setEditandoCat(cat??null); setFormCat({ nome:cat?.nome??'' }); setErroPainel(''); setPainelCat(true) }
+  function abrirCat(cat?: any) { setEditandoCat(cat??null); setFormCat({ nome:cat?.nome??'' }); setPainelCat(true) }
   async function salvarCat() {
-    if (!formCat.nome.trim()) { setErroPainel('Nome é obrigatório.'); return }
+    if (!formCat.nome.trim()) { toast.error('Nome é obrigatório.'); return }
     setSalvando(true)
     if (editandoCat) {
       await supabase.from('categorias').update({ nome:formCat.nome.trim() }).eq('id', editandoCat.id)
@@ -307,9 +307,9 @@ export default function ParametrosPage() {
   }
 
   // ── Tipos de Endereço ─────────────────────────────────────────────────────
-  function abrirEnd(end?: any) { setEditandoEnd(end??null); setFormEnd({ nome:end?.nome??'' }); setErroPainel(''); setPainelEnd(true) }
+  function abrirEnd(end?: any) { setEditandoEnd(end??null); setFormEnd({ nome:end?.nome??'' }); setPainelEnd(true) }
   async function salvarEnd() {
-    if (!formEnd.nome.trim()) { setErroPainel('Nome é obrigatório.'); return }
+    if (!formEnd.nome.trim()) { toast.error('Nome é obrigatório.'); return }
     setSalvando(true)
     if (editandoEnd) {
       await supabase.from('tipos_endereco_cliente').update({ nome:formEnd.nome.trim() }).eq('id', editandoEnd.id)
@@ -337,9 +337,9 @@ export default function ParametrosPage() {
   }
 
   // ── Locais ────────────────────────────────────────────────────────────────
-  function abrirLoc(loc?: any) { setEditandoLoc(loc??null); setFormLoc({ nome:loc?.nome??'', descricao:loc?.descricao??'' }); setErroPainel(''); setPainelLoc(true) }
+  function abrirLoc(loc?: any) { setEditandoLoc(loc??null); setFormLoc({ nome:loc?.nome??'', descricao:loc?.descricao??'' }); setPainelLoc(true) }
   async function salvarLoc() {
-    if (!formLoc.nome.trim()) { setErroPainel('Nome é obrigatório.'); return }
+    if (!formLoc.nome.trim()) { toast.error('Nome é obrigatório.'); return }
     setSalvando(true)
     if (editandoLoc) {
       await supabase.from('locais_armazenagem').update({ nome:formLoc.nome.trim(), descricao:formLoc.descricao||null }).eq('id', editandoLoc.id)
@@ -371,10 +371,10 @@ export default function ParametrosPage() {
 
   async function executarLimpeza() {
     const modos = modosLimpeza
-    if (!modos.length) { alert('Selecione pelo menos um tipo de dado para limpar.'); return }
+    if (!modos.length) { toast.error('Selecione pelo menos um tipo de dado para limpar.'); return }
     const texto = modos.includes('tudo') ? 'TODOS OS DADOS' : modos.join(', ').toUpperCase()
     const conf1 = window.prompt(`⚠️ ATENÇÃO: Esta ação é IRREVERSÍVEL.\n\nDigite LIMPAR para confirmar a exclusão de: ${texto}`)
-    if (conf1 !== 'LIMPAR') { alert('Operação cancelada.'); return }
+    if (conf1 !== 'LIMPAR') { toast.info('Operação cancelada.'); return }
     const conf2 = window.confirm(`🚨 ÚLTIMA CONFIRMAÇÃO\n\nTodos os ${texto} serão deletados permanentemente do banco de dados.\n\nTem ABSOLUTA certeza?`)
     if (!conf2) return
     setLimpando(true); setResultLimpeza(null)
@@ -399,8 +399,6 @@ export default function ParametrosPage() {
         subtitle="Configurações globais do LocaSystem"
         actions={
           <div style={{ display:'flex', gap:10, alignItems:'center' }}>
-            {okERP  && <span style={{ fontSize:'var(--fs-sm)', color:'#34d399' }}>✅ Salvo</span>}
-            {okSite && <span style={{ fontSize:'var(--fs-sm)', color:'#34d399' }}>✅ Site atualizado</span>}
             {isSite
               ? <Btn loading={savingSite} onClick={salvarSite}>Salvar Site</Btn>
               : isERP
@@ -460,13 +458,13 @@ export default function ParametrosPage() {
                       <input type="file" accept="image/jpeg,image/png,image/webp,image/svg+xml" style={{ display:'none' }} disabled={uploadingLogo}
                         onChange={async e => {
                           const file = e.target.files?.[0]; if (!file) return
-                          if (file.size > 2*1024*1024) { setErroLogo('Arquivo excede 2MB'); return }
-                          setUploadingLogo(true); setErroLogo('')
+                          if (file.size > 2*1024*1024) { toast.error('Arquivo excede 2MB'); return }
+                          setUploadingLogo(true)
                           const fd = new FormData(); fd.append('file', file)
                           const res  = await fetch('/api/empresa-logo', { method:'POST', body:fd })
                           const data = await res.json()
                           if (data.ok) setParams(p => ({ ...p, empresa_logo_url: data.url }))
-                          else setErroLogo(data.error)
+                          else toast.error(data.error)
                           setUploadingLogo(false); e.target.value = ''
                         }} />
                       {uploadingLogo
@@ -477,7 +475,6 @@ export default function ParametrosPage() {
                             <span style={{ fontSize:'var(--fs-sm)' }}>PNG, JPG, SVG · até 2MB</span>
                           </span></>}
                     </label>
-                    {erroLogo && <div style={{ color:'var(--c-danger)', fontSize:'var(--fs-sm)', marginTop:4 }}>{erroLogo}</div>}
                     {params['empresa_logo_url'] && (
                       <button onClick={async()=>{ if(!confirm('Remover o logotipo?')) return; await fetch('/api/empresa-logo',{method:'DELETE'}); setParams(p=>({...p,empresa_logo_url:''})) }}
                         style={{ marginTop:8, background:'none', border:'none', color:'var(--c-danger)', fontSize:'var(--fs-sm)', cursor:'pointer', fontWeight:600 }}>
@@ -567,7 +564,7 @@ export default function ParametrosPage() {
                 <FormField label="Access Token do Mapbox" hint="Formato: pk.xxxxxxxxxxxx...">
                   <input type="password" className={inpSm}
                     defaultValue={params['mapbox_token'] ?? ''}
-                    onBlur={async e => { await salvarParam('mapbox_token', e.target.value); setOkERP(true) }}
+                    onBlur={async e => { await salvarParam('mapbox_token', e.target.value); toast.success('Salvo.') }}
                     placeholder="pk.eyJ1Ijoi..." />
                 </FormField>
               </Section>
@@ -653,7 +650,7 @@ export default function ParametrosPage() {
                 hint="Quando a data prevista de devolução calculada a partir do período de locação cair num sábado, domingo ou feriado.">
                 <FormField label="Ajustar automaticamente para dia útil?">
                   <select value={params['ajustar_entrega_dia_util']??'sim'}
-                    onChange={async e=>{ await salvarParam('ajustar_entrega_dia_util', e.target.value); setOkERP(true) }}
+                    onChange={async e=>{ await salvarParam('ajustar_entrega_dia_util', e.target.value); toast.success('Salvo.') }}
                     className={inpSm} style={{ maxWidth:380 }}>
                     <option value="sim">Sim — adiar para o próximo dia útil</option>
                     <option value="nao">Não — manter a data exata calculada</option>
@@ -715,13 +712,13 @@ export default function ParametrosPage() {
                     <FormField label="Chave de API (API Key)" hint="Obtida em Asaas → Configurações → Integrações">
                       <input type="password" className={inputCls}
                         defaultValue={params['asaas_api_key'] ?? ''}
-                        onBlur={async e => { await salvarParam('asaas_api_key', e.target.value); setOkERP(true) }}
+                        onBlur={async e => { await salvarParam('asaas_api_key', e.target.value); toast.success('Salvo.') }}
                         placeholder="$aact_..." />
                     </FormField>
                     <FormField label="Ambiente">
                       <select className={inputCls}
                         value={params['asaas_ambiente'] ?? 'sandbox'}
-                        onChange={async e => { await salvarParam('asaas_ambiente', e.target.value); setOkERP(true) }}>
+                        onChange={async e => { await salvarParam('asaas_ambiente', e.target.value); toast.success('Salvo.') }}>
                         <option value="sandbox">Sandbox (testes)</option>
                         <option value="production">Produção</option>
                       </select>
@@ -729,22 +726,22 @@ export default function ParametrosPage() {
                     <FormField label="Multa por atraso (%)" hint="Ex: 2 = 2%">
                       <input type="number" min="0" max="10" step="0.1" className={inputCls}
                         defaultValue={params['asaas_multa_pct'] ?? '2'}
-                        onBlur={async e => { await salvarParam('asaas_multa_pct', e.target.value); setOkERP(true) }} />
+                        onBlur={async e => { await salvarParam('asaas_multa_pct', e.target.value); toast.success('Salvo.') }} />
                     </FormField>
                     <FormField label="Juros ao mês (%)" hint="Ex: 1 = 1% ao mês">
                       <input type="number" min="0" max="5" step="0.1" className={inputCls}
                         defaultValue={params['asaas_juros_pct'] ?? '1'}
-                        onBlur={async e => { await salvarParam('asaas_juros_pct', e.target.value); setOkERP(true) }} />
+                        onBlur={async e => { await salvarParam('asaas_juros_pct', e.target.value); toast.success('Salvo.') }} />
                     </FormField>
                     <FormField label="Dias de aviso antes do vencimento">
                       <input type="number" min="0" max="30" className={inputCls}
                         defaultValue={params['asaas_dias_aviso'] ?? '3'}
-                        onBlur={async e => { await salvarParam('asaas_dias_aviso', e.target.value); setOkERP(true) }} />
+                        onBlur={async e => { await salvarParam('asaas_dias_aviso', e.target.value); toast.success('Salvo.') }} />
                     </FormField>
                     <FormField label="Descrição padrão da cobrança">
                       <input className={inputCls}
                         defaultValue={params['asaas_descricao_padrao'] ?? 'Locação de equipamentos'}
-                        onBlur={async e => { await salvarParam('asaas_descricao_padrao', e.target.value); setOkERP(true) }} />
+                        onBlur={async e => { await salvarParam('asaas_descricao_padrao', e.target.value); toast.success('Salvo.') }} />
                     </FormField>
                   </div>
                 </div>
@@ -1243,7 +1240,6 @@ export default function ParametrosPage() {
       {/* ── Painéis ───────────────────────────────────────────────────── */}
       <SlidePanel open={painelCat} onClose={()=>setPainelCat(false)} title={editandoCat?'Editar Categoria':'Nova Categoria'} subtitle="Categorias de equipamentos" width="sm"
         footer={<div className="panel-footer-2btn"><Btn variant="secondary" style={{ flex:1 }} onClick={()=>setPainelCat(false)}>Cancelar</Btn><Btn style={{ flex:2 }} loading={salvando} onClick={salvarCat}>{editandoCat?'Salvar':'Criar'}</Btn></div>}>
-        {erroPainel&&<div className="ds-alert-error" style={{ marginBottom:14 }}>{erroPainel}</div>}
         <FormField label="Nome da Categoria" required>
           <input value={formCat.nome} onChange={e=>setFormCat({nome:e.target.value})} className={inpSm} autoFocus placeholder="Ex: Andaimes, Ferramentas..." onKeyDown={e=>e.key==='Enter'&&salvarCat()}/>
         </FormField>
@@ -1251,7 +1247,6 @@ export default function ParametrosPage() {
 
       <SlidePanel open={painelEnd} onClose={()=>setPainelEnd(false)} title={editandoEnd?'Editar Tipo de Endereço':'Novo Tipo de Endereço'} subtitle="Tipos no cadastro de clientes" width="sm"
         footer={<div className="panel-footer-2btn"><Btn variant="secondary" style={{ flex:1 }} onClick={()=>setPainelEnd(false)}>Cancelar</Btn><Btn style={{ flex:2 }} loading={salvando} onClick={salvarEnd}>{editandoEnd?'Salvar':'Criar'}</Btn></div>}>
-        {erroPainel&&<div className="ds-alert-error" style={{ marginBottom:14 }}>{erroPainel}</div>}
         <FormField label="Nome do Tipo" required>
           <input value={formEnd.nome} onChange={e=>setFormEnd({nome:e.target.value})} className={inpSm} autoFocus placeholder="Ex: Residencial, Comercial, Obra..." onKeyDown={e=>e.key==='Enter'&&salvarEnd()}/>
         </FormField>
@@ -1259,7 +1254,6 @@ export default function ParametrosPage() {
 
       <SlidePanel open={painelLoc} onClose={()=>setPainelLoc(false)} title={editandoLoc?'Editar Local de Armazenagem':'Novo Local de Armazenagem'} subtitle="Locais de estoque e patrimônio" width="sm"
         footer={<div className="panel-footer-2btn"><Btn variant="secondary" style={{ flex:1 }} onClick={()=>setPainelLoc(false)}>Cancelar</Btn><Btn style={{ flex:2 }} loading={salvando} onClick={salvarLoc}>{editandoLoc?'Salvar':'Criar'}</Btn></div>}>
-        {erroPainel&&<div className="ds-alert-error" style={{ marginBottom:14 }}>{erroPainel}</div>}
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
           <FormField label="Nome do Local" required>
             <input value={formLoc.nome} onChange={e=>setFormLoc(f=>({...f,nome:e.target.value}))} className={inpSm} autoFocus placeholder="Ex: Galpão A, Prateleira 01..."/>

@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react'
 import { supabase, fmt } from '@/lib/supabase'
 import { carregarFeriados, carregarAjusteDiaUtilAtivo, postergarParaDiaUtil } from '@/lib/diasUteis'
 import { useRouter } from 'next/navigation'
-import { LookupField, FormField, inputCls, selectCls, textareaCls, Btn } from '@/components/ui'
+import { LookupField, FormField, inputCls, selectCls, textareaCls, Btn, useToast } from '@/components/ui'
 import QuickCreateCliente from '@/components/quick-create/QuickCreateCliente'
 
 // ─── Parser de condição de pagamento ─────────────────────────────────────────
@@ -85,10 +85,10 @@ function Stepper({passo}:{passo:number}){
 
 // ─── Página ───────────────────────────────────────────────────────────────────
 export default function CriarCotacaoPage(){
+  const toast=useToast()
   const router=useRouter()
   const [passo,  setPasso]  =useState(1)
   const [saving, setSaving] =useState(false)
-  const [erro,   setErro]   =useState('')
   const [periodos,setPeriodos]=useState<any[]>([])
   const [feriados,setFeriados]=useState<Set<string>>(new Set())
   const [ajusteDiaUtilAtivo,setAjusteDiaUtilAtivo]=useState(true)
@@ -207,14 +207,14 @@ export default function CriarCotacaoPage(){
     }
     return''
   }
-  function avancar(){const msg=validar();if(msg){setErro(msg);return}setErro('');setPasso(p=>p+1);window.scrollTo(0,0)}
-  function voltar(){setErro('');setPasso(p=>p-1);window.scrollTo(0,0)}
+  function avancar(){const msg=validar();if(msg){toast.error(msg);return}setPasso(p=>p+1);window.scrollTo(0,0)}
+  function voltar(){setPasso(p=>p-1);window.scrollTo(0,0)}
 
   async function salvar(statusSalvar:'rascunho'|'aguardando'){
-    if(!clienteId){setErro('Selecione o cliente.');setPasso(1);return}
-    if(itens.length===0){setErro('Adicione pelo menos um equipamento.');setPasso(2);return}
-    if(!user){setErro('Não foi possível identificar o usuário. Recarregue a página.');return}
-    setSaving(true);setErro('')
+    if(!clienteId){toast.error('Selecione o cliente.');setPasso(1);return}
+    if(itens.length===0){toast.error('Adicione pelo menos um equipamento.');setPasso(2);return}
+    if(!user){toast.error('Não foi possível identificar o usuário. Recarregue a página.');return}
+    setSaving(true)
     try{
       const token=statusSalvar==='aguardando'
         ?Array.from(crypto.getRandomValues(new Uint8Array(32))).map(b=>b.toString(16).padStart(2,'0')).join('')
@@ -242,10 +242,10 @@ export default function CriarCotacaoPage(){
       if(statusSalvar==='aguardando'&&cot.token_aprovacao){
         const link=`${window.location.origin}/cotacao/${cot.token_aprovacao}`
         await navigator.clipboard.writeText(link).catch(()=>{})
-        alert(`Cotação ${cot.numero} enviada!\n\nLink copiado:\n${link}`)
+        toast.success(`Cotação ${cot.numero} enviada! Link copiado:\n${link}`)
       }
       router.push('/cotacoes')
-    }catch(e:any){setErro(e.message);setSaving(false)}
+    }catch(e:any){toast.error(e.message);setSaving(false)}
   }
 
   return(
@@ -266,8 +266,6 @@ export default function CriarCotacaoPage(){
       <Stepper passo={passo}/>
 
       {loadingUser&&<div style={{display:'flex',alignItems:'center',gap:8,padding:'8px 12px',background:'var(--bg-header)',border:'1px solid var(--border)',borderRadius:'var(--r-sm)',fontSize:'var(--fs-md)',color:'var(--t-muted)',marginBottom:12}}><div style={{width:6,height:6,borderRadius:"50%",background:"var(--c-primary)",animation:"dot-pulse 1.2s ease-in-out infinite",display:"inline-block",verticalAlign:"middle",flexShrink:0}}/>Carregando sessão...</div>}
-      {erro&&<div className="ds-alert-error" style={{marginBottom:16}}>{erro}</div>}
-
       {/* ══ PASSO 1 — CLIENTE E PERÍODO ══════════════════════════════════ */}
       {passo===1&&(
         <div className="ds-card" style={{padding:20,display:'flex',flexDirection:'column',gap:16}}>

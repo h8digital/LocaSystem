@@ -2,7 +2,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { supabase, fmt } from '@/lib/supabase'
-import { Btn, inputCls } from '@/components/ui'
+import { Btn, inputCls, useToast } from '@/components/ui'
 
 // ── Tipos ─────────────────────────────────────────────────────────────────────
 type Produto = {
@@ -118,6 +118,7 @@ function CardProduto({ prod, qtd, onAdd, onRemove }: {
 
 // ── Página principal ──────────────────────────────────────────────────────────
 export default function CotacaoRapidaPage() {
+  const toast = useToast()
   const [step, setStep]         = useState<1 | 2 | 3>(1)
   const [produtos, setProdutos]  = useState<Produto[]>([])
   const [cats, setCats]          = useState<string[]>([])
@@ -127,7 +128,6 @@ export default function CotacaoRapidaPage() {
   const [carrinho, setCarrinho]  = useState<ItemCarrinho[]>([])
   const [salvando, setSalvando]  = useState(false)
   const [resultado, setResultado]= useState<{ token: string; token_aprovacao: string; numero: string; cotacao_id: number } | null>(null)
-  const [erro, setErro]          = useState('')
 
   const [cliente, setCliente] = useState({ nome: '', email: '', telefone: '', cidade: '' })
   const C = (k: keyof typeof cliente) => ({
@@ -182,8 +182,8 @@ export default function CotacaoRapidaPage() {
 
   // ── Gerar PDF ──────────────────────────────────────────────────────────────
   async function gerarCotacao() {
-    if (!cliente.nome.trim()) { setErro('Informe o nome.'); return }
-    setSalvando(true); setErro('')
+    if (!cliente.nome.trim()) { toast.error('Informe o nome.'); return }
+    setSalvando(true)
     const res = await fetch('/api/cotacoes/rapida', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -192,7 +192,7 @@ export default function CotacaoRapidaPage() {
       }),
     })
     const data = await res.json()
-    if (!data.ok) { setErro(data.error ?? 'Erro ao gerar cotação.'); setSalvando(false); return }
+    if (!data.ok) { toast.error(data.error ?? 'Erro ao gerar cotação.'); setSalvando(false); return }
     setResultado(data)
     setStep(3)
     setSalvando(false)
@@ -358,8 +358,6 @@ export default function CotacaoRapidaPage() {
               Informe os dados para quem a cotação será emitida. Não é necessário cadastro completo.
             </div>
 
-            {erro && <div className="ds-alert-error" style={{ marginBottom: 14 }}>{erro}</div>}
-
             <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
               <div>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '.05em', marginBottom: 5 }}>
@@ -491,7 +489,7 @@ export default function CotacaoRapidaPage() {
           {/* Botão copiar link público */}
           <button onClick={() => {
               navigator.clipboard.writeText(`${window.location.origin}/cotacao/${resultado.token_aprovacao}`)
-              alert('✅ Link copiado! O cliente pode visualizar, aprovar ou recusar a proposta online.')
+              toast.success('Link copiado! O cliente pode visualizar, aprovar ou recusar a proposta online.')
             }}
             style={{ padding: '7px 16px', borderRadius: 'var(--r-md)',
               border: '1px solid rgba(129,140,248,0.35)', background: 'rgba(129,140,248,0.12)',
@@ -527,7 +525,7 @@ export default function CotacaoRapidaPage() {
 
           <button onClick={() => {
             setStep(1); setCarrinho([]); setCliente({ nome:'', email:'', telefone:'', cidade:'' })
-            setResultado(null); setErro('')
+            setResultado(null)
           }}
             style={{ background: 'rgba(255,255,255,0.07)', border: '1px solid rgba(255,255,255,0.12)',
               borderRadius: 'var(--r-md)', padding: '8px 16px', color: 'rgba(255,255,255,0.55)',

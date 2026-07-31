@@ -2,35 +2,33 @@
 'use client'
 import { useState, useEffect } from 'react'
 import { supabase } from '@/lib/supabase'
-import { FormField, inputCls, selectCls, Btn } from '@/components/ui'
+import { FormField, inputCls, selectCls, Btn, useToast } from '@/components/ui'
 
 interface Props { onClose: () => void; onCreated: (row: any) => void }
 
 export default function QuickCreateProduto({ onClose, onCreated }: Props) {
+  const toast = useToast()
   const [form, setForm]   = useState({ nome:'', categoria_id:'', marca:'', controla_patrimonio:1, unidade:'un', preco_locacao_diario:0, custo_reposicao:0 })
   const [cats, setCats]   = useState<any[]>([])
   const [saving, setSaving] = useState(false)
-  const [erro, setErro]   = useState('')
 
   useEffect(()=>{supabase.from('categorias').select('id,nome').eq('ativo',1).order('nome').then(({data})=>setCats(data??[]))},[])
 
   async function salvar() {
-    if(!form.nome.trim()){setErro('Nome é obrigatório!');return}
-    setSaving(true); setErro('')
+    if(!form.nome.trim()){toast.error('Nome é obrigatório!');return}
+    setSaving(true)
     const {data,error} = await supabase.from('produtos').insert({
       nome:form.nome, categoria_id:form.categoria_id||null, marca:form.marca||null,
       controla_patrimonio:Number(form.controla_patrimonio), unidade:form.unidade,
       preco_locacao_diario:Number(form.preco_locacao_diario)||0,
       custo_reposicao:Number(form.custo_reposicao)||0, ativo:1
     }).select('*').single()
-    if(error){setErro(error.message);setSaving(false);return}
+    if(error){toast.error(error.message);setSaving(false);return}
     onCreated(data)
   }
 
   return (
     <div style={{ display:'flex', flexDirection:'column', gap:18 }}>
-      {erro && <div className="ds-alert-error">{erro}</div>}
-
       <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:14 }}>
         <FormField label="Nome do Produto" required style={{ gridColumn:'1 / -1' }}>
           <input value={form.nome} onChange={e=>setForm({...form,nome:e.target.value})} className={inputCls} autoFocus />

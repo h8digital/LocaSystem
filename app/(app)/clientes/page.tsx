@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { supabase, fmt } from '@/lib/supabase'
 import { validarDoc, formatarDoc, formatarPhone, formatarCEP } from '@/lib/validators'
-import { SlidePanel, PageHeader, Badge, ActionButtons, Btn, Tabs, FormField, inputCls, selectCls, textareaCls } from '@/components/ui'
+import { SlidePanel, PageHeader, Badge, ActionButtons, Btn, Tabs, FormField, inputCls, selectCls, textareaCls, useToast } from '@/components/ui'
 
 
 function toTitle(s:string){if(!s)return'';const m=new Set(['de','da','do','das','dos','e','a','o','em','com','por','para']);return s.toLowerCase().split(' ').map((w,i)=>(!m.has(w)||i===0)?w.charAt(0).toUpperCase()+w.slice(1):w).join(' ')}
@@ -13,13 +13,13 @@ const emptyEnd =()=>({tipo:'Residencial',cep:'',logradouro:'',numero:'',compleme
 const emptyCt  =()=>({nome:'',cargo:'',telefone:'',celular:'',email:'',autorizado_retirada:false,principal:false,observacoes:''})
 
 export default function ClientesPage() {
+  const toast = useToast()
   const [lista,setLista]         = useState<any[]>([])
   const [loading,setLoading]     = useState(true)
   const [panel,setPanel]         = useState(false)
   const [editId,setEditId]       = useState<number|null>(null)
   const [tab,setTab]             = useState('dados')
   const [saving,setSaving]       = useState(false)
-  const [erro,setErro]           = useState('')
   const [loadingCNPJ,setLoadingCNPJ]=useState(false)
   const [loadingCEP,setLoadingCEP]  =useState<string|null>(null)
   const [form,setForm]           = useState<any>(emptyForm())
@@ -28,7 +28,6 @@ export default function ClientesPage() {
   const [docs,        setDocs]        = useState<any[]>([])
   const [loadingDocs, setLoadingDocs] = useState(false)
   const [uploadando,  setUploadando]  = useState(false)
-  const [errDoc,      setErrDoc]      = useState('')
   const [editDoc,     setEditDoc]     = useState<any>(null)
   const [formDoc,     setFormDoc]     = useState({ tipo_documento:'', descricao:'' })
   const [fileInput,   setFileInput]   = useState<File|null>(null)
@@ -94,11 +93,11 @@ export default function ClientesPage() {
     supabase.from('tipos_endereco_cliente').select('nome').eq('ativo',1).order('ordem').then(({data})=>setTiposEnd(data?.map((t:any)=>t.nome)??['Residencial','Comercial','Sede','Obra','Outros']))
   },[])
 
-  async function buscarCNPJ(cnpj:string){const d=cnpj.replace(/\D/g,'');if(d.length!==14)return;setLoadingCNPJ(true);try{const r=await fetch(`https://publica.cnpj.ws/cnpj/${d}`);if(!r.ok)throw new Error();const data=await r.json();const est=data.estabelecimento;const cepL=(est?.cep??'').replace(/\D/g,'');setForm((f:any)=>({...f,nome:toTitle(data.razao_social??''),email:(est?.email??'').toLowerCase(),telefone:est?.ddd1&&est?.telefone1?formatarPhone(`${est.ddd1}${est.telefone1}`):f.telefone,cep:formatarCEP(cepL),endereco:toTitle(`${est?.tipo_logradouro??''} ${est?.logradouro??''}`.trim()),numero:est?.numero??'',complemento:toTitle(est?.complemento??''),bairro:toTitle(est?.bairro??''),cidade:toTitle(est?.cidade?.nome??''),estado:est?.estado?.sigla??''}));setEnderecos([{tipo:'Comercial',cep:formatarCEP(cepL),logradouro:toTitle(`${est?.tipo_logradouro??''} ${est?.logradouro??''}`.trim()),numero:est?.numero??'',complemento:toTitle(est?.complemento??''),bairro:toTitle(est?.bairro??''),cidade:toTitle(est?.cidade?.nome??''),estado:est?.estado?.sigla??'',ibge:est?.cidade?.ibge_id??'',principal:true,observacoes:''}])}catch{setErro('CNPJ não encontrado.')}setLoadingCNPJ(false)}
-  async function buscarCEP(cep:string,target:'main'|number){const d=cep.replace(/\D/g,'');if(d.length!==8)return;setLoadingCEP(String(target));try{const r=await fetch(`https://viacep.com.br/ws/${d}/json/`);const data=await r.json();if(data.erro)throw new Error();const logr=toTitle(data.logradouro??''),bai=toTitle(data.bairro??''),cid=toTitle(data.localidade??''),uf=data.uf??'';if(target==='main')setForm((f:any)=>({...f,endereco:logr,bairro:bai,cidade:cid,estado:uf}));else setEnderecos(prev=>{const a=[...prev];a[target as number]={...a[target as number],logradouro:logr,bairro:bai,cidade:cid,estado:uf,ibge:data.ibge??''};return a})}catch{setErro('CEP não encontrado.')}setLoadingCEP(null)}
+  async function buscarCNPJ(cnpj:string){const d=cnpj.replace(/\D/g,'');if(d.length!==14)return;setLoadingCNPJ(true);try{const r=await fetch(`https://publica.cnpj.ws/cnpj/${d}`);if(!r.ok)throw new Error();const data=await r.json();const est=data.estabelecimento;const cepL=(est?.cep??'').replace(/\D/g,'');setForm((f:any)=>({...f,nome:toTitle(data.razao_social??''),email:(est?.email??'').toLowerCase(),telefone:est?.ddd1&&est?.telefone1?formatarPhone(`${est.ddd1}${est.telefone1}`):f.telefone,cep:formatarCEP(cepL),endereco:toTitle(`${est?.tipo_logradouro??''} ${est?.logradouro??''}`.trim()),numero:est?.numero??'',complemento:toTitle(est?.complemento??''),bairro:toTitle(est?.bairro??''),cidade:toTitle(est?.cidade?.nome??''),estado:est?.estado?.sigla??''}));setEnderecos([{tipo:'Comercial',cep:formatarCEP(cepL),logradouro:toTitle(`${est?.tipo_logradouro??''} ${est?.logradouro??''}`.trim()),numero:est?.numero??'',complemento:toTitle(est?.complemento??''),bairro:toTitle(est?.bairro??''),cidade:toTitle(est?.cidade?.nome??''),estado:est?.estado?.sigla??'',ibge:est?.cidade?.ibge_id??'',principal:true,observacoes:''}])}catch{toast.error('CNPJ não encontrado.')}setLoadingCNPJ(false)}
+  async function buscarCEP(cep:string,target:'main'|number){const d=cep.replace(/\D/g,'');if(d.length!==8)return;setLoadingCEP(String(target));try{const r=await fetch(`https://viacep.com.br/ws/${d}/json/`);const data=await r.json();if(data.erro)throw new Error();const logr=toTitle(data.logradouro??''),bai=toTitle(data.bairro??''),cid=toTitle(data.localidade??''),uf=data.uf??'';if(target==='main')setForm((f:any)=>({...f,endereco:logr,bairro:bai,cidade:cid,estado:uf}));else setEnderecos(prev=>{const a=[...prev];a[target as number]={...a[target as number],logradouro:logr,bairro:bai,cidade:cid,estado:uf,ibge:data.ibge??''};return a})}catch{toast.error('CEP não encontrado.')}setLoadingCEP(null)}
 
   async function abrir(c?:any){
-    setErro('');setTab('dados')
+    setTab('dados')
     if(c){setForm({tipo:c.tipo??'PF',nome:c.nome??'',cpf_cnpj:c.cpf_cnpj??'',rg_ie:c.rg_ie??'',email:c.email??'',telefone:c.telefone??'',celular:c.celular??'',limite_credito:c.limite_credito??0,observacoes:c.observacoes??'',endereco:c.endereco??'',numero:c.numero??'',complemento:c.complemento??'',bairro:c.bairro??'',cidade:c.cidade??'',estado:c.estado??'',cep:c.cep??'',papeis:c.papeis??['cliente']});setEditId(c.id);const[{data:ends},{data:cts},{data:spcs}]=await Promise.all([supabase.from('cliente_enderecos').select('*').eq('cliente_id',c.id).eq('ativo',1).order('principal',{ascending:false}),supabase.from('cliente_contatos').select('*').eq('cliente_id',c.id).eq('ativo',1).order('principal',{ascending:false}),supabase.from('cliente_spc').select('*').eq('cliente_id',c.id).order('data_consulta',{ascending:false})]);setEnderecos(ends?.length
           ? (ends.some((e:any)=>e.principal) ? ends : ends.map((e:any,i:number)=>({...e,principal:i===0})))
           : [{...emptyEnd(),principal:true}]);setContatos(cts?.length?cts:[emptyCt()]);setSpcData(spcs??[])
@@ -107,32 +106,32 @@ export default function ClientesPage() {
         .select('*, usuarios(nome)').eq('cliente_id',c.id).order('created_at',{ascending:false})
       setDocs(docsData??[])
     }
-    else{setForm(emptyForm());setEditId(null);setEnderecos([{...emptyEnd(),principal:true}]);setContatos([emptyCt()]);setSpcData([]);setDocs([]);setFormDoc({tipo_documento:'',descricao:''});setFileInput(null);setErrDoc('')}
+    else{setForm(emptyForm());setEditId(null);setEnderecos([{...emptyEnd(),principal:true}]);setContatos([emptyCt()]);setSpcData([]);setDocs([]);setFormDoc({tipo_documento:'',descricao:''});setFileInput(null)}
     setPanel(true)
   }
 
   async function salvar(){
-    if(!form.nome?.trim()){setErro('Nome é obrigatório!');return}
+    if(!form.nome?.trim()){toast.error('Nome é obrigatório!');return}
     // CPF obrigatório para PF, CNPJ obrigatório para PJ
     if(!form.cpf_cnpj?.trim()){
-      setErro(form.tipo==='PJ'?'CNPJ é obrigatório para Pessoa Jurídica!':'CPF é obrigatório para Pessoa Física!')
+      toast.error(form.tipo==='PJ'?'CNPJ é obrigatório para Pessoa Jurídica!':'CPF é obrigatório para Pessoa Física!')
       return
     }
     const docSemMask=form.cpf_cnpj.replace(/\D/g,'')
     if(!validarDoc(form.cpf_cnpj,form.tipo)){
-      setErro(form.tipo==='PJ'?'CNPJ inválido! Verifique o número informado.':'CPF inválido! Verifique o número informado.')
+      toast.error(form.tipo==='PJ'?'CNPJ inválido! Verifique o número informado.':'CPF inválido! Verifique o número informado.')
       return
     }
     // Validar: ao menos 1 endereço principal obrigatório
     const endValidos = enderecos.filter(e => e.logradouro?.trim() || e.cep?.trim())
     if (endValidos.length === 0) {
-      setErro('Informe ao menos um endereço para o cliente.'); setTab('enderecos'); return
+      toast.error('Informe ao menos um endereço para o cliente.'); setTab('enderecos'); return
     }
     const temPrincipal = endValidos.some(e => e.principal)
     if (!temPrincipal) {
-      setErro('Marque um dos endereços como Principal.'); setTab('enderecos'); return
+      toast.error('Marque um dos endereços como Principal.'); setTab('enderecos'); return
     }
-    setSaving(true);setErro('')
+    setSaving(true)
     try{
       const payload={tipo:form.tipo,nome:form.nome.trim(),cpf_cnpj:form.cpf_cnpj||null,rg_ie:form.rg_ie||null,email:form.email||null,telefone:form.telefone||null,celular:form.celular||null,limite_credito:Number(form.limite_credito)||0,observacoes:form.observacoes||null,ativo:1,updated_at:new Date().toISOString(),papeis:(form.papeis??[]).length>0?form.papeis:['cliente']}
       let id=editId
@@ -143,7 +142,7 @@ export default function ClientesPage() {
       if(editId)await supabase.from('cliente_contatos').update({ativo:0}).eq('cliente_id',editId)
       for(const ct of contatos){if(!ct.nome?.trim())continue;const{id:_,created_at,updated_at,...d}=ct;if(_&&editId)await supabase.from('cliente_contatos').update({...d,ativo:1}).eq('id',_);else await supabase.from('cliente_contatos').insert({...d,cliente_id:id})}
       setSaving(false);setPanel(false);load()
-    }catch(e:any){setErro('Erro: '+e.message);setSaving(false)}
+    }catch(e:any){toast.error(e.message);setSaving(false)}
   }
 
   async function registrarSPC(){
@@ -170,12 +169,12 @@ export default function ClientesPage() {
 
   // ── Upload de novo documento ───────────────────────────────────────────────
   async function uploadDoc() {
-    if (!formDoc.tipo_documento) { setErrDoc('Selecione o tipo do documento.'); return }
-    if (!fileInput)              { setErrDoc('Selecione um arquivo.'); return }
+    if (!formDoc.tipo_documento) { toast.error('Selecione o tipo do documento.'); return }
+    if (!fileInput)              { toast.error('Selecione um arquivo.'); return }
     if (fileInput.size > 10 * 1024 * 1024) {
-      setErrDoc(`Arquivo muito grande (${(fileInput.size/1024/1024).toFixed(1)}MB). Limite: 10MB.`); return
+      toast.error(`Arquivo muito grande (${(fileInput.size/1024/1024).toFixed(1)}MB). Limite: 10MB.`); return
     }
-    setUploadando(true); setErrDoc('')
+    setUploadando(true)
     try {
       const fd = new FormData()
       fd.append('cliente_id',     String(editId))
@@ -184,31 +183,31 @@ export default function ClientesPage() {
       fd.append('arquivo',        fileInput)
       const res  = await fetch('/api/clientes/documentos', { method:'POST', body: fd })
       const data = await res.json()
-      if (!data.ok) { setErrDoc(data.error); setUploadando(false); return }
+      if (!data.ok) { toast.error(data.error); setUploadando(false); return }
       setDocs(prev => [data.data, ...prev])
       setFormDoc({ tipo_documento:'', descricao:'' })
       setFileInput(null)
       // Limpar input file
       const inp = document.getElementById('file-doc-input') as HTMLInputElement
       if (inp) inp.value = ''
-    } catch(e:any) { setErrDoc(e.message) }
+    } catch(e:any) { toast.error(e.message) }
     setUploadando(false)
   }
 
   // ── Salvar edição (tipo e descrição) ──────────────────────────────────────
   async function salvarEdicaoDoc() {
-    if (!editDoc || !formDoc.tipo_documento) { setErrDoc('Tipo obrigatório.'); return }
-    setUploadando(true); setErrDoc('')
+    if (!editDoc || !formDoc.tipo_documento) { toast.error('Tipo obrigatório.'); return }
+    setUploadando(true)
     try {
       const res  = await fetch('/api/clientes/documentos', {
         method:'PATCH', headers:{'Content-Type':'application/json'},
         body: JSON.stringify({ id: editDoc.id, tipo_documento: formDoc.tipo_documento, descricao: formDoc.descricao }),
       })
       const data = await res.json()
-      if (!data.ok) { setErrDoc(data.error); setUploadando(false); return }
+      if (!data.ok) { toast.error(data.error); setUploadando(false); return }
       setDocs(prev => prev.map(d => d.id === editDoc.id ? data.data : d))
       setEditDoc(null); setFormDoc({ tipo_documento:'', descricao:'' })
-    } catch(e:any) { setErrDoc(e.message) }
+    } catch(e:any) { toast.error(e.message) }
     setUploadando(false)
   }
 
@@ -228,7 +227,7 @@ export default function ClientesPage() {
     const res  = await fetch(`/api/clientes/documentos?id=${doc.id}`, { method:'DELETE' })
     const data = await res.json()
     if (data.ok) setDocs(prev => prev.filter(d => d.id !== doc.id))
-    else alert('Erro ao excluir: ' + data.error)
+    else toast.error(data.error)
   }
 
 
@@ -419,7 +418,6 @@ return (
       <SlidePanel open={panel} onClose={()=>setPanel(false)} title={editId?'Editar Cliente':'Novo Cliente'} subtitle={editId?form.nome:'Preencha os dados do cliente'} width="lg"
         footer={<div style={{display:'flex',gap:10}}><Btn variant="secondary" style={{flex:1}} onClick={()=>setPanel(false)}>Cancelar</Btn><Btn style={{flex:1}} loading={saving} onClick={salvar}>{editId?'Atualizar':'Salvar'} Cliente</Btn></div>}>
         <Tabs tabs={[{key:'dados',label:'Dados',icon:'👤'},{key:'enderecos',label:'Endereços',icon:'📍'},{key:'contatos',label:'Contatos',icon:'📞'},{key:'spc',label:'SPC',icon:'🔍'},{key:'documentos',label:'Documentos',icon:'📎'}]} active={tab} onChange={setTab} />
-        {erro&&<div className="ds-alert-error" style={{marginTop:12}}>{erro}</div>}
         <div style={{marginTop:16}}>
           {tab==='dados'&&(
             <div style={{display:"flex",flexDirection:"column",gap:16}}>
@@ -519,7 +517,7 @@ return (
                             // Não permite desmarcar o único principal
                             const outros = enderecos.filter((_,j)=>j!==i&&(_.logradouro?.trim()||_.cep?.trim()))
                             if (outros.length === 0 || !outros.some(x=>x.principal)) {
-                              alert('O endereço principal não pode ser desmarcado. Marque outro endereço como principal primeiro.'); return
+                              toast.error('O endereço principal não pode ser desmarcado. Marque outro endereço como principal primeiro.'); return
                             }
                           }
                           const a=enderecos.map((x,j)=>({...x,principal:j===i?novoValor:novoValor?false:x.principal}));setEnderecos(a)
@@ -621,7 +619,6 @@ return (
                 <div className="ds-section-title">
                   {editDoc ? '✏️ Editar Documento' : '📎 Enviar Novo Documento'}
                 </div>
-                {errDoc && <div className="ds-alert-error" style={{marginBottom:12}}>{errDoc}</div>}
                 <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:12,marginBottom:12}}>
                   <FormField label="Tipo de Documento *">
                     <select value={formDoc.tipo_documento}
@@ -659,7 +656,7 @@ return (
                     {editDoc ? '💾 Salvar Alteração' : '📤 Enviar Documento'}
                   </Btn>
                   {editDoc && (
-                    <Btn variant="secondary" onClick={()=>{setEditDoc(null);setFormDoc({tipo_documento:'',descricao:''});setErrDoc('')}}>
+                    <Btn variant="secondary" onClick={()=>{setEditDoc(null);setFormDoc({tipo_documento:'',descricao:''})}}>
                       Cancelar
                     </Btn>
                   )}
@@ -754,7 +751,7 @@ return (
                                       color:'var(--c-danger)',fontSize:13,cursor:'pointer',lineHeight:1}}>❌</button>
                                 )}
                                 {/* Editar */}
-                                <button onClick={()=>{setEditDoc(doc);setFormDoc({tipo_documento:doc.tipo_documento,descricao:doc.descricao??''});setErrDoc('')}}
+                                <button onClick={()=>{setEditDoc(doc);setFormDoc({tipo_documento:doc.tipo_documento,descricao:doc.descricao??''})}}
                                   title="Editar tipo/descrição" style={{padding:'4px 8px',borderRadius:'var(--r-sm)',
                                     border:'1px solid var(--border)',background:'var(--bg-card)',
                                     color:'var(--c-primary)',fontSize:13,cursor:'pointer',lineHeight:1}}>✏️</button>

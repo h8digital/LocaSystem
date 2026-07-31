@@ -2,7 +2,7 @@
 'use client'
 import { useEffect, useState, useCallback } from 'react'
 import { supabase, fmt } from '@/lib/supabase'
-import { SlidePanel, PageHeader, Badge, ActionButtons, Btn, FormField, inputCls, selectCls, textareaCls, LookupField } from '@/components/ui'
+import { SlidePanel, PageHeader, Badge, ActionButtons, Btn, FormField, inputCls, selectCls, textareaCls, LookupField, useToast } from '@/components/ui'
 import type { AcaoSecundaria } from '@/components/ui/ActionButtons'
 import { QuickCreateProduto } from '@/components/quick-create'
 
@@ -35,13 +35,13 @@ function Kpi({ label, value, accent, sub }: { label:string; value:string|number;
 }
 
 export default function ManutencoesPage() {
+  const toast = useToast()
   const [lista,   setLista]   = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [kpis,    setKpis]    = useState({ abertas:0, em_andamento:0, concluidas:0, canceladas:0, custo_total:0, vencidas:0 })
   const [panel,   setPanel]   = useState(false)
   const [saving,  setSaving]  = useState(false)
   const [pats,    setPats]    = useState<any[]>([])
-  const [erro,    setErro]    = useState('')
 
   // Filtros
   const [fBusca,       setFBusca]       = useState('')
@@ -131,7 +131,7 @@ export default function ManutencoesPage() {
   }
 
   function abrirNovaOS() {
-    setEditId(null); setErro('')
+    setEditId(null)
     setProdutoId(null); setProdutoNome(''); setProduto(null)
     setPatrimonioId(null); setPatrimonioNome(''); setPats([])
     setForm({
@@ -143,7 +143,7 @@ export default function ManutencoesPage() {
   }
 
   function abrirEditar(row: any) {
-    setEditId(row.id); setErro('')
+    setEditId(row.id)
     setProdutoId(row.produto_id ?? null)
     setProdutoNome((row.produtos as any)?.nome ?? '')
     setProduto(row.produtos ?? null)
@@ -164,9 +164,9 @@ export default function ManutencoesPage() {
   }
 
   async function salvar() {
-    if (!produtoId) { setErro('Selecione um equipamento.'); return }
-    if (!form.descricao?.trim()) { setErro('Descrição do problema é obrigatória.'); return }
-    setSaving(true); setErro('')
+    if (!produtoId) { toast.error('Selecione um equipamento.'); return }
+    if (!form.descricao?.trim()) { toast.error('Descrição do problema é obrigatória.'); return }
+    setSaving(true)
     const payload = {
       produto_id: produtoId, patrimonio_id: patrimonioId || null,
       ...form,
@@ -467,7 +467,6 @@ export default function ManutencoesPage() {
           </div>
         }>
 
-        {erro && <div className="ds-alert-error" style={{ marginBottom:14 }}>{erro}</div>}
 
         <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
 

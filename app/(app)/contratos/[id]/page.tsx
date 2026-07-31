@@ -4,7 +4,7 @@ import { useEffect, useState, Suspense } from 'react'
 import { calcularPrecoItem, calcularDias, type PrecosProduto } from '@/lib/calcularCobranca'
 import { supabase, fmt } from '@/lib/supabase'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
-import { Badge, Btn, Tabs, SlidePanel, FormField, inputCls, selectCls, textareaCls, LookupField, ActionButtons } from '@/components/ui'
+import { Badge, Btn, Tabs, SlidePanel, FormField, inputCls, selectCls, textareaCls, LookupField, ActionButtons, useToast } from '@/components/ui'
 import type { AcaoSecundaria } from '@/components/ui/ActionButtons'
 
 const Th = ({ children, right }: { children?: React.ReactNode; right?: boolean }) => (
@@ -27,6 +27,7 @@ const Campo = ({ label, value }: { label: string; value: React.ReactNode }) => (
 )
 
 export default function VerContratoPage() {
+  const toast  = useToast()
   const { id } = useParams()
   const router = useRouter()
 
@@ -43,7 +44,6 @@ export default function VerContratoPage() {
   const [timeline,      setTimeline]      = useState<any[]>([])
   const [novaAnotacao,  setNovaAnotacao]  = useState('')
   const [salvandoAnot,  setSalvandoAnot]  = useState(false)
-  const [erroAnot,      setErroAnot]      = useState('')
   const [aba,        setAba]        = useState('dados')
   const searchParams = useSearchParams()
   useEffect(() => {
@@ -54,7 +54,6 @@ export default function VerContratoPage() {
   const [painelPgto,    setPainelPgto]    = useState(false)
   const [faturaAlvo,    setFaturaAlvo]    = useState<any>(null)
   const [salvandoPgto,  setSalvandoPgto]  = useState(false)
-  const [erroPgto,      setErroPgto]      = useState('')
   const [multaJurosInfo, setMultaJurosInfo] = useState<{multa:number,juros:number,dias:number}|null>(null)
   const [formPgto, setFormPgto] = useState<any>({
     valor_pago: 0, data_pagamento: new Date().toISOString().split('T')[0],
@@ -66,7 +65,6 @@ export default function VerContratoPage() {
     forma_pagamento: 'pix', descricao: '', observacoes: ''
   })
   const [salvandoFatura, setSalvandoFatura] = useState(false)
-  const [erroFatura,     setErroFatura]     = useState('')
 
   // ── Edição de itens ─────────────────────────────────────
   const [painelItem,    setPainelItem]    = useState(false)
@@ -80,7 +78,6 @@ export default function VerContratoPage() {
   const [periodos,     setPeriodos]     = useState<any[]>([])
   const [painelEditar, setPainelEditar] = useState(false)
   const [salvandoEdicao, setSalvandoEdicao] = useState(false)
-  const [erroEdicao, setErroEdicao] = useState('')
   const [formEdicao, setFormEdicao] = useState<any>({})
   // ── Novo Período ────────────────────────────────────────────
   const [modalNovoPeriodo,  setModalNovoPeriodo]  = useState(false)
@@ -245,7 +242,6 @@ export default function VerContratoPage() {
   const [itemDevoluver, setItemDevoluver] = useState<any>(null)
   const [formDevItem, setFormDevItem]   = useState<any>({ qtd:1, condicao:'bom', custo_avaria:0, obs:'' })
   const [salvandoDevItem, setSalvandoDevItem] = useState(false)
-  const [erroDevItem, setErroDevItem]   = useState('')
 
   async function load() {
     const [{ data:c },{ data:i },{ data:f }, s,{ data:t },{ data:per },{ data:d }] = await Promise.all([
@@ -301,13 +297,12 @@ export default function VerContratoPage() {
       observacoes:        contrato.observacoes       ?? '',
       observacoes_internas: contrato.observacoes_internas ?? '',
     })
-    setErroEdicao('')
     setPainelEditar(true)
   }
 
   async function salvarEdicao() {
-    if (!formEdicao.data_inicio || !formEdicao.data_fim) { setErroEdicao('Datas de início e fim são obrigatórias.'); return }
-    setSalvandoEdicao(true); setErroEdicao('')
+    if (!formEdicao.data_inicio || !formEdicao.data_fim) { toast.error('Datas de início e fim são obrigatórias.'); return }
+    setSalvandoEdicao(true)
 
     // Recalcular preços dos itens se período mudou
     const periodoMudou = formEdicao.periodo_id && formEdicao.periodo_id !== contrato?.periodo_id
@@ -375,7 +370,7 @@ export default function VerContratoPage() {
       observacoes:          formEdicao.observacoes       || null,
       observacoes_internas: formEdicao.observacoes_internas || null,
     }).eq('id', id)
-    if (error) { setErroEdicao('Erro ao salvar: ' + error.message); setSalvandoEdicao(false); return }
+    if (error) { toast.error(error.message, { title: 'Erro ao salvar' }); setSalvandoEdicao(false); return }
     setSalvandoEdicao(false); setPainelEditar(false)
     // Registrar na timeline
     const descTimeline = periodoMudou
@@ -394,7 +389,7 @@ export default function VerContratoPage() {
     await supabase.from('faturas').delete().eq('contrato_id', id)
     await supabase.from('devolucoes').delete().eq('contrato_id', id)
     const { error } = await supabase.from('contratos').delete().eq('id', id)
-    if (error) { alert('Erro ao excluir: ' + error.message); return }
+    if (error) { toast.error(error.message, { title: 'Erro ao excluir' }); return }
     router.push('/contratos')
   }
 
@@ -405,8 +400,8 @@ export default function VerContratoPage() {
     if (!confirm(`Ativar o contrato ${contrato.numero}?\n\nIsso registrará a remessa dos equipamentos e mudará o status para ATIVO.`)) return
     const res = await fetch('/api/contratos/ativar', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ contrato_id: Number(id) }) })
     const data = await res.json()
-    if (!data.ok) { alert(`Erro: ${data.error}`); return }
-    alert(data.msg)
+    if (!data.ok) { toast.error(data.error); return }
+    toast.success(data.msg)
     window.location.reload()
   }
 
@@ -425,22 +420,22 @@ export default function VerContratoPage() {
     })
     const data = await res.json()
     if (data.precisa_devolucao) {
-      alert('⚠️ ' + data.error + '\n\nAcesse a aba Itens e registre a devolução primeiro.')
+      toast.warning(data.error + ' Acesse a aba Itens e registre a devolução primeiro.')
       setAba('itens')
       return
     }
     if (data.fatura_gerada || data.precisa_pagamento) {
-      alert('📄 ' + data.error + '\n\nAcesse a aba Financeiro para registrar o pagamento.')
+      toast.info(data.error + ' Acesse a aba Financeiro para registrar o pagamento.')
       setAba('financeiro')
       window.location.reload()
       return
     }
     if (!data.ok) {
-      alert('Erro: ' + data.error)
+      toast.error(data.error)
       return
     }
     // ── Encerramento bem-sucedido — imprimir fatura obrigatoriamente ──────────
-    alert('✅ ' + data.msg + '\n\n🖨️ A fatura será aberta para impressão agora.')
+    toast.success(data.msg + ' A fatura será aberta para impressão agora.')
     if (data.fatura_id) {
       // Gerar e abrir o PDF da fatura — obrigatório ao encerrar
       try {
@@ -463,7 +458,6 @@ export default function VerContratoPage() {
   // ── Funções de pagamento ─────────────────────────────────
   async function abrirPagamento(fatura: any) {
     setFaturaAlvo(fatura)
-    setErroPgto('')
     setMultaJurosInfo(null)
 
     // Calcular juros e multa se fatura estiver vencida
@@ -506,9 +500,9 @@ export default function VerContratoPage() {
   }
 
   async function confirmarPagamento() {
-    if (!formPgto.valor_pago || Number(formPgto.valor_pago) <= 0) { setErroPgto('Informe o valor pago.'); return }
-    if (!formPgto.data_pagamento) { setErroPgto('Informe a data do pagamento.'); return }
-    setSalvandoPgto(true); setErroPgto('')
+    if (!formPgto.valor_pago || Number(formPgto.valor_pago) <= 0) { toast.error('Informe o valor pago.'); return }
+    if (!formPgto.data_pagamento) { toast.error('Informe a data do pagamento.'); return }
+    setSalvandoPgto(true)
     const valorPago    = Number(formPgto.valor_pago)
     const jaRecebido   = Number(faturaAlvo?.valor_recebido ?? 0)
     const novoRecebido = jaRecebido + valorPago
@@ -539,8 +533,8 @@ export default function VerContratoPage() {
   }
 
   async function salvarAnotacao() {
-    if (!novaAnotacao.trim()) { setErroAnot('Digite o texto da anotação.'); return }
-    setSalvandoAnot(true); setErroAnot('')
+    if (!novaAnotacao.trim()) { toast.error('Digite o texto da anotação.'); return }
+    setSalvandoAnot(true)
     const cookieUser = document.cookie.split(';').map(s=>s.trim())
       .find(s=>s.startsWith('locasystem_user='))
     const usuario = cookieUser ? JSON.parse(decodeURIComponent(cookieUser.split('=')[1])) : null
@@ -551,7 +545,7 @@ export default function VerContratoPage() {
       descricao:   novaAnotacao.trim(),
       detalhes:    {},
     })
-    if (error) { setErroAnot(error.message); setSalvandoAnot(false); return }
+    if (error) { toast.error(error.message); setSalvandoAnot(false); return }
     setNovaAnotacao('')
     // Recarregar timeline
     const { data: tl } = await supabase
@@ -585,9 +579,9 @@ export default function VerContratoPage() {
   }
 
   async function criarFaturaAvulsa() {
-    if (!formNovaFatura.valor || Number(formNovaFatura.valor) <= 0) { setErroFatura('Informe o valor da fatura.'); return }
-    if (!formNovaFatura.data_vencimento) { setErroFatura('Informe a data de vencimento.'); return }
-    setSalvandoFatura(true); setErroFatura('')
+    if (!formNovaFatura.valor || Number(formNovaFatura.valor) <= 0) { toast.error('Informe o valor da fatura.'); return }
+    if (!formNovaFatura.data_vencimento) { toast.error('Informe a data de vencimento.'); return }
+    setSalvandoFatura(true)
     // Gerar número sequencial
     const { data: ultima } = await supabase.from('faturas').select('numero').order('id', {ascending:false}).limit(1).single()
     const seq = ultima?.numero ? (parseInt(ultima.numero.replace(/\D/g,'').slice(-6)) + 1) : 1
@@ -725,12 +719,12 @@ export default function VerContratoPage() {
   }
 
   async function gerarDocumento() {
-    if(!templateSel){alert('Selecione um template.');return}
+    if(!templateSel){toast.error('Selecione um template.');return}
     setGerando(true)
     const res=await fetch('/api/documentos/gerar',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({template_id:Number(templateSel),contrato_id:Number(id)})})
     const result=await res.json()
     if(result.ok) setDocLink(`${window.location.origin}/doc/${result.token}`)
-    else alert('Erro: '+result.error)
+    else toast.error(result.error)
     setGerando(false)
   }
 
@@ -764,7 +758,6 @@ export default function VerContratoPage() {
     const pendente = Number(item.quantidade) - Number(item.qtd_devolvida ?? 0)
     setItemDevoluver(item)
     setFormDevItem({ qtd: pendente, condicao: 'bom', custo_avaria: 0, obs: '' })
-    setErroDevItem('')
     setModalDevItem(true)
   }
 
@@ -773,11 +766,10 @@ export default function VerContratoPage() {
     const qtd = Number(formDevItem.qtd)
     const pendente = Number(itemDevoluver.quantidade) - Number(itemDevoluver.qtd_devolvida ?? 0)
     if (qtd <= 0 || qtd > pendente) {
-      setErroDevItem(`Quantidade inválida. Máximo pendente: ${pendente}`)
+      toast.error(`Quantidade inválida. Máximo pendente: ${pendente}`)
       return
     }
     setSalvandoDevItem(true)
-    setErroDevItem('')
     try {
       const res = await fetch('/api/devolucoes/registrar', {
         method: 'POST',
@@ -796,11 +788,11 @@ export default function VerContratoPage() {
         }),
       })
       const data = await res.json()
-      if (!data.ok) { setErroDevItem(data.error ?? 'Erro ao registrar devolução'); return }
+      if (!data.ok) { toast.error(data.error ?? 'Erro ao registrar devolução'); return }
       setModalDevItem(false)
       await load()  // recarrega contrato, itens e devoluções
     } catch (e: any) {
-      setErroDevItem(e.message)
+      toast.error(e.message)
     } finally {
       setSalvandoDevItem(false)
     }
@@ -1158,7 +1150,6 @@ export default function VerContratoPage() {
                   <div className="ds-section-title" style={{marginBottom:0}}>Faturas e Pagamentos</div>
                   <Btn size="sm" variant="secondary" onClick={()=>{
                     setFormNovaFatura({tipo:'antecipacao',valor:0,data_vencimento:new Date().toISOString().split('T')[0],forma_pagamento:contrato.forma_pagamento??'pix',descricao:'',observacoes:''})
-                    setErroFatura('')
                     setPainelFatura(true)
                   }}>+ Nova Fatura / Antecipação</Btn>
                 </div>
@@ -1314,7 +1305,7 @@ export default function VerContratoPage() {
                               const res = await fetch(`/api/documentos/recibo-devolucao?devolucao_id=${dev.id}`)
                               const data = await res.json()
                               if (data.ok && data.token) window.open(`${window.location.origin}/doc/${data.token}`,'_blank')
-                              else alert('Erro ao gerar recibo: '+(data.error??'Tente novamente'))
+                              else toast.error(data.error ?? 'Tente novamente', { title: 'Erro ao gerar recibo' })
                             } finally {
                               btn.innerHTML = '<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14,2 14,8 20,8"/></svg>'
                               btn.style.opacity = '1'
@@ -1390,10 +1381,9 @@ export default function VerContratoPage() {
               {/* ── Formulário nova anotação ── */}
               <div className="ds-card" style={{padding:'16px 20px'}}>
                 <div className="ds-section-title">Nova Anotação de Acompanhamento</div>
-                {erroAnot && <div className="ds-alert-error" style={{marginBottom:10}}>{erroAnot}</div>}
                 <textarea
                   value={novaAnotacao}
-                  onChange={e=>{setNovaAnotacao(e.target.value);setErroAnot('')}}
+                  onChange={e=>setNovaAnotacao(e.target.value)}
                   rows={3}
                   placeholder="Digite o acompanhamento, observação ou ocorrência..."
                   className={textareaCls}
@@ -1554,7 +1544,7 @@ export default function VerContratoPage() {
                     <div style={{marginTop:10}}>
                       <div style={{fontSize:11,color:'var(--t-muted)',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.06em'}}>Pix Copia e Cola</div>
                       <div style={{background:'rgba(255,255,255,0.04)',borderRadius:8,padding:'8px 12px',fontSize:11,fontFamily:'monospace',wordBreak:'break-all',color:'var(--t-secondary)',cursor:'pointer'}}
-                        onClick={()=>{navigator.clipboard.writeText(asaasResult.pix_copia_cola??'');alert('Copiado!')}}>
+                        onClick={()=>{navigator.clipboard.writeText(asaasResult.pix_copia_cola??'');toast.success('Copiado!', { duration: 2000 })}}>
                         {asaasResult.pix_copia_cola?.slice(0,60)}...
                         <div style={{color:'var(--c-primary)',marginTop:4,fontSize:11}}>📋 Clique para copiar</div>
                       </div>
@@ -1566,7 +1556,7 @@ export default function VerContratoPage() {
                     <div style={{fontWeight:700,color:'#34d399',marginBottom:8,fontSize:14}}>✅ Boleto gerado</div>
                     <div style={{fontSize:11,color:'var(--t-muted)',marginBottom:4,textTransform:'uppercase',letterSpacing:'0.06em'}}>Linha Digitável</div>
                     <div style={{background:'rgba(255,255,255,0.04)',borderRadius:8,padding:'8px 12px',fontSize:12,fontFamily:'monospace',wordBreak:'break-all',cursor:'pointer'}}
-                      onClick={()=>{navigator.clipboard.writeText(asaasResult.boleto_linha_digitavel??'');alert('Copiado!')}}>
+                      onClick={()=>{navigator.clipboard.writeText(asaasResult.boleto_linha_digitavel??'');toast.success('Copiado!', { duration: 2000 })}}>
                       {asaasResult.boleto_linha_digitavel}
                       <div style={{color:'var(--c-primary)',marginTop:4,fontSize:11}}>📋 Clique para copiar</div>
                     </div>
@@ -1767,7 +1757,6 @@ export default function VerContratoPage() {
             </div>
 
             <div style={{padding:'18px 20px', display:'flex', flexDirection:'column', gap:14}}>
-              {erroDevItem && <div className="ds-alert-error">{erroDevItem}</div>}
 
               {/* Info do item */}
               <div style={{
@@ -1874,7 +1863,6 @@ export default function VerContratoPage() {
             </div>
 
             <div style={{ padding:'20px', display:'flex', flexDirection:'column', gap:16 }}>
-              {erroEdicao && <div className="ds-alert-error">{erroEdicao}</div>}
 
               {/* Período e datas */}
               <div className="ds-card" style={{ padding:'14px 16px' }}>
@@ -2027,7 +2015,6 @@ export default function VerContratoPage() {
                 style={{ background:'none', border:'none', cursor:'pointer', fontSize:20, color:'var(--t-muted)' }}>×</button>
             </div>
             <div style={{ padding:'20px', display:'flex', flexDirection:'column', gap:14 }}>
-              {erroFatura && <div className="ds-alert-error">{erroFatura}</div>}
 
               <FormField label="Tipo">
                 <select value={formNovaFatura.tipo}
@@ -2159,7 +2146,6 @@ export default function VerContratoPage() {
                 </div>
               )}
 
-              {erroPgto && <div className="ds-alert-error" style={{ marginBottom:12 }}>{erroPgto}</div>}
 
               {/* Formulário */}
               <div style={{ display:'flex', flexDirection:'column', gap:12 }}>

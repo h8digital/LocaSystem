@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase, fmt } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
-import { Badge, Btn, FormField, inputCls, selectCls, textareaCls } from '@/components/ui'
+import { Badge, Btn, FormField, inputCls, selectCls, textareaCls, useToast } from '@/components/ui'
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
 type Fatura = {
@@ -50,12 +50,12 @@ const card  = { background:'var(--bg-card)', border:'1px solid var(--border)', b
 const header = { padding:'12px 16px', borderBottom:'1px solid var(--border)', fontWeight:700 as const, background:'var(--bg-header)' }
 
 export default function EncerrarContratoPage() {
+  const toast   = useToast()
   const { id }  = useParams()
   const router  = useRouter()
 
   const [loading, setLoading] = useState(true)
   const [saving,  setSaving]  = useState(false)
-  const [erro,    setErro]    = useState('')
   const [passo,   setPasso]   = useState(1)
 
   const [contrato,   setContrato]   = useState<any>(null)
@@ -155,14 +155,14 @@ export default function EncerrarContratoPage() {
 
   function avancar() {
     const msg = validar()
-    if (msg) { setErro(msg); return }
-    setErro(''); setPasso(p => p + 1); window.scrollTo(0, 0)
+    if (msg) { toast.error(msg); return }
+    setPasso(p => p + 1); window.scrollTo(0, 0)
   }
-  function voltar() { setErro(''); setPasso(p => p - 1); window.scrollTo(0, 0) }
+  function voltar() { setPasso(p => p - 1); window.scrollTo(0, 0) }
 
   // ── Confirmar ─────────────────────────────────────────────────────────────
   async function confirmar() {
-    setSaving(true); setErro('')
+    setSaving(true)
     try {
       // Registrar pagamentos pendentes marcados
       for (const pag of pagamentos.filter(p => p.pagar)) {
@@ -205,7 +205,7 @@ export default function EncerrarContratoPage() {
           }),
         })
         const result = await res.json()
-        if (!result.ok) { setErro(result.error); setSaving(false); return }
+        if (!result.ok) { toast.error(result.error); setSaving(false); return }
         // Se tudo foi devolvido, o encerrar também ocorre na API de devolução
         router.push(`/contratos/${id}?aba=devolucoes`)
       } else {
@@ -217,16 +217,16 @@ export default function EncerrarContratoPage() {
         })
         const result = await res.json()
         if (result.precisa_devolucao) {
-          setErro(result.error); setSaving(false); return
+          toast.error(result.error); setSaving(false); return
         }
         if (result.fatura_gerada || result.precisa_pagamento) {
-          setErro(result.error + ' Volte à tela do contrato e acesse a aba Financeiro.')
+          toast.info(result.error + ' Volte à tela do contrato e acesse a aba Financeiro.')
           setSaving(false); return
         }
-        if (!result.ok) { setErro(result.error); setSaving(false); return }
+        if (!result.ok) { toast.error(result.error); setSaving(false); return }
         router.push(`/contratos/${id}?aba=financeiro`)
       }
-    } catch (e: any) { setErro('Erro inesperado: ' + e.message); setSaving(false) }
+    } catch (e: any) { toast.error(e.message, { title: 'Erro inesperado' }); setSaving(false) }
   }
 
   // ── Helpers de update ─────────────────────────────────────────────────────
@@ -297,7 +297,6 @@ export default function EncerrarContratoPage() {
         })}
       </div>
 
-      {erro && <div className="ds-alert-error" style={{ marginBottom:20 }}>{erro}</div>}
 
       {/* ══════════════════════════════════════════════════════════════════
           PASSO 1 — FINANCEIRO

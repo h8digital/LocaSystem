@@ -2,15 +2,15 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase, fmt } from '@/lib/supabase'
-import { SlidePanel, PageHeader, DataTable, Filters, Badge, Btn, FormField, inputCls, selectCls, textareaCls, LookupField } from '@/components/ui'
+import { SlidePanel, PageHeader, DataTable, Filters, Badge, Btn, FormField, inputCls, selectCls, textareaCls, LookupField, useToast } from '@/components/ui'
 
 export default function DevolucoesPage() {
+  const toast = useToast()
   const [lista, setLista]     = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [filters, setFilters] = useState<Record<string,string>>({ busca:'', status:'' })
   const [panel, setPanel]     = useState(false)
   const [saving, setSaving]   = useState(false)
-  const [erro,   setErro]     = useState('')
   const [itensContrato, setItensContrato] = useState<any[]>([])
   const [itensDev,      setItensDev]      = useState<any[]>([])
 
@@ -56,9 +56,9 @@ export default function DevolucoesPage() {
   }
 
   async function salvar() {
-    if (!contratoId)           { setErro('Selecione o contrato.'); return }
-    if (itensDev.length === 0) { setErro('Nenhum item para devolver.'); return }
-    setSaving(true); setErro('')
+    if (!contratoId)           { toast.error('Selecione o contrato.'); return }
+    if (itensDev.length === 0) { toast.error('Nenhum item para devolver.'); return }
+    setSaving(true)
     try {
       const res = await fetch('/api/devolucoes/registrar', {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -71,12 +71,11 @@ export default function DevolucoesPage() {
       setItensContrato([]); setItensDev([])
       setForm({ dias_atraso:0, multa_atraso:0, valor_avarias:0, caucao_devolvido:0, observacoes:'' })
       load()
-    } catch (e: any) { setErro('Erro: ' + e.message) }
+    } catch (e: any) { toast.error(e.message) }
     setSaving(false)
   }
 
   function abrirPanel() {
-    setErro('')
     setContratoId(null); setContratoNum(''); setContrato(null)
     setItensContrato([]); setItensDev([])
     setForm({ dias_atraso:0, multa_atraso:0, valor_avarias:0, caucao_devolvido:0, observacoes:'' })
@@ -151,7 +150,6 @@ export default function DevolucoesPage() {
           </div>
         }
       >
-        {erro && <div className="ds-alert-error" style={{ marginBottom:14 }}>{erro}</div>}
         <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
           <LookupField
             label="Contrato Ativo" required placeholder="Pesquisar por número do contrato..."

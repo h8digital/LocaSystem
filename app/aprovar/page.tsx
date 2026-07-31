@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 import { Suspense } from 'react'
+import { useToast } from '@/components/ui'
 
 function fmt_money(v: number) {
   return 'R$ ' + Number(v).toFixed(2).replace('.', ',').replace(/\B(?=(\d{3})+(?!\d))/g, '.')
@@ -13,6 +14,7 @@ function fmt_date(d: string) {
 }
 
 function AprovarForm() {
+  const toast     = useToast()
   const params    = useSearchParams()
   const token     = params.get('token') ?? ''
   const [apr, setApr]       = useState<any>(null)
@@ -79,11 +81,11 @@ function AprovarForm() {
   async function enviar() {
     if (!acao) return
     if (acao === 'aprovar' && !temAssinatura) {
-      alert('Por favor, assine no campo de assinatura antes de aprovar.')
+      toast.error('Por favor, assine no campo de assinatura antes de aprovar.')
       return
     }
     if (acao === 'reprovar' && !motivo.trim()) {
-      alert('Informe o motivo da reprovação.')
+      toast.error('Informe o motivo da reprovação.')
       return
     }
     setEnv(true)
@@ -100,7 +102,7 @@ function AprovarForm() {
     })
     const d = await r.json()
     if (d.ok) setRes(acao === 'aprovar' ? 'aprovado' : 'reprovado')
-    else { alert('Erro: ' + d.error); setEnv(false) }
+    else { toast.error(d.error); setEnv(false) }
   }
 
   const contrato = apr?.contratos

@@ -5,7 +5,7 @@ import { calcularPrecoItem, calcularDias, type PrecosProduto } from '@/lib/calcu
 import { supabase, fmt } from '@/lib/supabase'
 import { carregarFeriados, carregarAjusteDiaUtilAtivo, postergarParaDiaUtil } from '@/lib/diasUteis'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { FormField, inputCls, selectCls, textareaCls, Btn, LookupField } from '@/components/ui'
+import { FormField, inputCls, selectCls, textareaCls, Btn, LookupField, useToast } from '@/components/ui'
 import { QuickCreateCliente, QuickCreateProduto } from '@/components/quick-create'
 
 // ─── Stepper ─────────────────────────────────────────────────────────────────
@@ -92,6 +92,7 @@ const Th = ({ children, right }: { children?:React.ReactNode; right?:boolean }) 
 )
 
 export default function CriarContratoPage() {
+  const toast        = useToast()
   const router       = useRouter()
   const searchParams = useSearchParams()
   const novoPeriodoDe = searchParams.get('novo_periodo_de') // ID do contrato anterior
@@ -104,7 +105,7 @@ export default function CriarContratoPage() {
   const [saving,    setSaving]    = useState(false)
   const [modalAtivar, setModalAtivar] = useState<{id:number; numero:string}|null>(null)
   const [ativando,    setAtivando]    = useState(false)
-  const [erro,      setErro]      = useState('')
+  const [avisoRenovacao, setAvisoRenovacao] = useState('')
   const [carregandoAnterior, setCarregandoAnterior] = useState(false)
 
   // Passo 1 — cliente e período
@@ -206,7 +207,7 @@ export default function CriarContratoPage() {
       setItens(novosItens)
 
       // Banner informativo
-      setErro(`✅ Contrato ${ct.numero} encerrado. Selecione o novo período e os preços serão calculados automaticamente.`)
+      setAvisoRenovacao(`Contrato ${ct.numero} encerrado. Selecione o novo período e os preços serão calculados automaticamente.`)
       setCarregandoAnterior(false)
     }
     carregarAnterior()
@@ -282,7 +283,7 @@ export default function CriarContratoPage() {
 
   async function salvarNovoEndereco() {
     if (!novoEnd.logradouro || !novoEnd.numero || !novoEnd.cidade) {
-      alert('Preencha pelo menos logradouro, número e cidade.')
+      toast.error('Preencha pelo menos logradouro, número e cidade.')
       return
     }
     if (!clienteId) return
@@ -302,7 +303,7 @@ export default function CriarContratoPage() {
       flag_obra_entrega: novoEnd.flag_obra_entrega || false,
       ativo:             1,
     }).select().single()
-    if (error) { alert('Erro ao salvar endereço: ' + error.message); setSalvandoEnd(false); return }
+    if (error) { toast.error(error.message, { title: 'Erro ao salvar endereço' }); setSalvandoEnd(false); return }
 
     // Atualizar lista e selecionar automaticamente o novo
     setEnderecosCliente((prev:any) => [data, ...prev])
@@ -403,9 +404,8 @@ export default function CriarContratoPage() {
   }
 
   function adicionarItem() {
-    if(!itemProdutoId||!itemProduto){setErro('Selecione um produto.');return}
-    if(itemProduto.controla_patrimonio && !itemPatrimonioId){setErro('Selecione o patrimônio do produto.');return}
-    setErro('')
+    if(!itemProdutoId||!itemProduto){toast.error('Selecione um produto.');return}
+    if(itemProduto.controla_patrimonio && !itemPatrimonioId){toast.error('Selecione o patrimônio do produto.');return}
     setItens(prev=>[...prev,{
       produto_id:itemProdutoId, produto_nome:itemProduto.nome,
       patrimonio_id:itemPatrimonioId, patrimonio_num:itemPatrimonioNome||null,
@@ -444,14 +444,14 @@ export default function CriarContratoPage() {
 
   function avancar() {
     const msg=validar()
-    if(msg){setErro(msg);return}
-    setErro(''); setPasso(p=>p+1); window.scrollTo(0,0)
+    if(msg){toast.error(msg);return}
+    setPasso(p=>p+1); window.scrollTo(0,0)
   }
-  function voltar() { setErro(''); setPasso(p=>p-1); window.scrollTo(0,0) }
+  function voltar() { setPasso(p=>p-1); window.scrollTo(0,0) }
 
   async function salvar() {
-    if(itens.length===0){setErro('Adicione pelo menos 1 item.');return}
-    setSaving(true); setErro('')
+    if(itens.length===0){toast.error('Adicione pelo menos 1 item.');return}
+    setSaving(true)
     const localUso = enderecoUsoData ? {
       local_uso_cep:         enderecoUsoData.cep??null,
       local_uso_endereco:    enderecoUsoData.logradouro??null,
@@ -470,7 +470,7 @@ export default function CriarContratoPage() {
       // Mostrar modal perguntando se quer ativar o contrato
       setModalAtivar({ id: result.id, numero: result.numero })
     } else {
-      setErro('Erro: '+result.error)
+      toast.error(result.error)
     }
     setSaving(false)
   }
@@ -484,7 +484,7 @@ export default function CriarContratoPage() {
         body: JSON.stringify({ contrato_id: contratoId }),
       })
       const d = await res.json()
-      if (!d.ok) { alert('Erro ao ativar: ' + d.error); setAtivando(false); return }
+      if (!d.ok) { toast.error(d.error, { title: 'Erro ao ativar' }); setAtivando(false); return }
 
       // 2. Gerar e imprimir a Ordem de Locação (template_id=1)
       try {
@@ -500,7 +500,7 @@ export default function CriarContratoPage() {
 
       router.push(`/contratos/${contratoId}`)
     } catch(e: any) {
-      alert('Erro: ' + e.message)
+      toast.error(e.message)
     }
     setAtivando(false)
   }
@@ -554,9 +554,7 @@ export default function CriarContratoPage() {
         </div>
       )}
 
-      {erro && !novoPeriodoDe && <div className="ds-alert-error" style={{ marginBottom:16 }}>{erro}</div>}
-      {erro && novoPeriodoDe && erro.startsWith('✅') && <div className="ds-alert-success" style={{ marginBottom:16 }}>{erro.replace('✅ ','')}</div>}
-      {erro && novoPeriodoDe && !erro.startsWith('✅') && <div className="ds-alert-error" style={{ marginBottom:16 }}>{erro}</div>}
+      {avisoRenovacao && <div className="ds-alert-success" style={{ marginBottom:16 }}>{avisoRenovacao}</div>}
 
       {/* ══════════════════════════════════════════════════════════
           PASSO 1 — CLIENTE E PERÍODO

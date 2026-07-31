@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import { supabase, fmt } from '@/lib/supabase'
-import { PageHeader, Badge, Btn, SlidePanel, FormField, inputCls, selectCls, textareaCls } from '@/components/ui'
+import { PageHeader, Badge, Btn, SlidePanel, FormField, inputCls, selectCls, textareaCls, useToast } from '@/components/ui'
 
 const FORMAS = ['pix','dinheiro','cartao_credito','cartao_debito','boleto','transferencia','cheque']
 const fmtForma = (v: string) => v?.replace(/_/g,' ').replace(/\b\w/g,(c:string)=>c.toUpperCase()) ?? '—'
@@ -137,6 +137,7 @@ function FatMenu({ onEditar, onRecibo, onFatura, onExcluir }: {
 
 
 export default function FinanceiroPage() {
+  const toast = useToast()
   const [faturas,  setFaturas]  = useState<any[]>([])
   const [loading,  setLoading]  = useState(true)
   const [kpis,     setKpis]     = useState({ total:0, recebido:0, pendente:0, vencidas:0, nVencidas:0 })
@@ -156,7 +157,6 @@ export default function FinanceiroPage() {
   const [faturaEdit,   setFaturaEdit]   = useState<any>(null)
   const [formEdit,     setFormEdit]     = useState<any>({})
   const [salvandoEdit, setSalvandoEdit] = useState(false)
-  const [erroEdit,     setErroEdit]     = useState('')
 
   // Painel de recebimento
   const [painel,       setPainel]       = useState(false)
@@ -164,7 +164,6 @@ export default function FinanceiroPage() {
   const [recebimentos, setRecebimentos] = useState<any[]>([])
   const [loadingRec,   setLoadingRec]   = useState(false)
   const [salvando,     setSalvando]     = useState(false)
-  const [erro,         setErro]         = useState('')
   const [formRec, setFormRec] = useState({
     valor: '', data_recebimento: new Date().toISOString().split('T')[0],
     forma_pagamento: 'pix', observacoes: '',
@@ -233,7 +232,7 @@ export default function FinanceiroPage() {
       forma_pagamento:  fatura.forma_pagamento ?? 'pix',
       observacoes:      '',
     })
-    setErro(''); setPainel(true)
+    setPainel(true)
     setLoadingRec(true)
     const { data } = await supabase.from('fatura_recebimentos')
       .select('*, usuarios(nome)').eq('fatura_id', fatura.id)
@@ -243,11 +242,11 @@ export default function FinanceiroPage() {
 
   async function confirmarRecebimento() {
     const valor = Number(formRec.valor)
-    if (!valor || valor <= 0) { setErro('Informe um valor válido.'); return }
-    if (!formRec.data_recebimento) { setErro('Informe a data.'); return }
+    if (!valor || valor <= 0) { toast.error('Informe um valor válido.'); return }
+    if (!formRec.data_recebimento) { toast.error('Informe a data.'); return }
     const saldoAtual = Number(faturaAlvo.saldo_restante ?? faturaAlvo.valor)
-    if (valor > saldoAtual + 0.01) { setErro(`Valor excede saldo de ${fmt.money(saldoAtual)}.`); return }
-    setSalvando(true); setErro('')
+    if (valor > saldoAtual + 0.01) { toast.error(`Valor excede saldo de ${fmt.money(saldoAtual)}.`); return }
+    setSalvando(true)
     await supabase.from('fatura_recebimentos').insert({
       fatura_id: faturaAlvo.id, valor,
       data_recebimento: formRec.data_recebimento,
@@ -301,11 +300,11 @@ export default function FinanceiroPage() {
     setFaturaEdit(fat)
     setFormEdit({ descricao: fat.descricao ?? '', data_vencimento: fat.data_vencimento ?? '',
       forma_pagamento: fat.forma_pagamento ?? '', observacoes: fat.observacoes ?? '' })
-    setErroEdit(''); setPainelEdit(true)
+    setPainelEdit(true)
   }
 
   async function salvarEdicao() {
-    setSalvandoEdit(true); setErroEdit('')
+    setSalvandoEdit(true)
     try {
       const { error } = await supabase.from('faturas').update({
         descricao: formEdit.descricao, data_vencimento: formEdit.data_vencimento,
@@ -313,7 +312,7 @@ export default function FinanceiroPage() {
       }).eq('id', faturaEdit.id)
       if (error) throw error
       setPainelEdit(false); load()
-    } catch(e:any) { setErroEdit(e.message) }
+    } catch(e:any) { toast.error(e.message) }
     finally { setSalvandoEdit(false) }
   }
 
@@ -321,7 +320,7 @@ export default function FinanceiroPage() {
     if (!confirm(`Excluir a fatura ${fat.numero}? Esta ação é irreversível.`)) return
     const { data: recs } = await supabase.from('fatura_recebimentos').select('id').eq('fatura_id', fat.id)
     if (recs && recs.length > 0) {
-      alert(`Esta fatura possui ${recs.length} recebimento(s) e não pode ser excluída. Estorne antes.`); return
+      toast.error(`Esta fatura possui ${recs.length} recebimento(s) e não pode ser excluída. Estorne antes.`); return
     }
     await supabase.from('faturas').delete().eq('id', fat.id); load()
   }
@@ -333,7 +332,7 @@ export default function FinanceiroPage() {
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ fatura_id: fat.id, tipo:'recibo' }) })
     const r = await res.json()
-    if (!r.ok) { alert('Erro: ' + r.error); return }
+    if (!r.ok) { toast.error(r.error); return }
     const w = window.open('', '_blank')
     if (w) { w.document.write(r.html); w.document.close(); setTimeout(()=>w.print(), 800) }
     // Garantir restauração do overflow após abrir nova janela
@@ -347,7 +346,7 @@ export default function FinanceiroPage() {
       headers:{'Content-Type':'application/json'},
       body: JSON.stringify({ fatura_id: fat.id, tipo:'fatura' }) })
     const r = await res.json()
-    if (!r.ok) { alert('Erro: ' + r.error); return }
+    if (!r.ok) { toast.error(r.error); return }
     const w = window.open('', '_blank')
     if (w) { w.document.write(r.html); w.document.close(); setTimeout(()=>w.print(), 800) }
     // Garantir restauração do overflow após abrir nova janela
@@ -625,7 +624,6 @@ export default function FinanceiroPage() {
           {faturaAlvo?.status !== 'pago' && (
             <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
               <div style={{ fontSize:'var(--fs-xs)', fontWeight:600, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', letterSpacing:'.06em' }}>Novo Recebimento</div>
-              {erro && <div className="ds-alert-error">{erro}</div>}
               <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12 }}>
                 <FormField label="Valor (R$)">
                   <input type="number" step="0.01" min="0.01" max={saldo}
@@ -727,7 +725,6 @@ export default function FinanceiroPage() {
         }>
         {faturaEdit && (
           <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
-            {erroEdit && <div className="ds-alert-error">{erroEdit}</div>}
             <FormField label="Descrição">
               <input className={inputCls} value={formEdit.descricao}
                 onChange={e=>setFormEdit({...formEdit,descricao:e.target.value})} placeholder="Descrição da fatura" />

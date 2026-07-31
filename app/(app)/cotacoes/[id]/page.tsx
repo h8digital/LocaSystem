@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase, fmt } from '@/lib/supabase'
 import { useRouter, useParams } from 'next/navigation'
-import { Btn, FormField, inputCls, selectCls, textareaCls } from '@/components/ui'
+import { Btn, FormField, inputCls, selectCls, textareaCls, useToast } from '@/components/ui'
 import { linkCotacao } from '@/lib/site'
 
 // ── Status ────────────────────────────────────────────────────────────────────
@@ -43,6 +43,7 @@ function Row({ label, value, color }: { label: string; value: string; color?: st
 const FORMAS_PGTO = ['boleto','pix','cartao_credito','cartao_debito','dinheiro','transferencia','cheque']
 
 export default function CotacaoDetalhePage() {
+  const toast  = useToast()
   const router = useRouter()
   const params = useParams() as { id: string }
 
@@ -142,7 +143,7 @@ export default function CotacaoDetalhePage() {
   async function enviarParaCliente() {
     // Verificações
     if (!cot.periodo_nome && !form.periodo_nome && !form.periodo_id) {
-      alert('Defina o período de locação antes de enviar.')
+      toast.error('Defina o período de locação antes de enviar.')
       return
     }
 
@@ -172,7 +173,7 @@ export default function CotacaoDetalhePage() {
 
   // ── Copiar link ───────────────────────────────────────────────────────────
   async function copiarLink() {
-    if (!cot.token_aprovacao) { alert('Envie para o cliente primeiro para gerar o link.'); return }
+    if (!cot.token_aprovacao) { toast.error('Envie para o cliente primeiro para gerar o link.'); return }
     const link = linkCotacao(cot.token_aprovacao)
     await navigator.clipboard.writeText(link)
     setCopiado(true)
@@ -205,7 +206,7 @@ export default function CotacaoDetalhePage() {
       body: JSON.stringify({ cotacao_id: cot.id }),
     })
     const d = await r.json()
-    if (d.error) return alert('Erro: ' + d.error)
+    if (d.error) return toast.error(d.error)
     if (confirm(`✅ Contrato ${d.numero} criado! Deseja abri-lo?`))
       router.push(`/contratos/${d.contrato_id}`)
     else load()
@@ -246,11 +247,11 @@ export default function CotacaoDetalhePage() {
   async function excluir() {
     // Verificar dependências antes de excluir
     if (cot.contrato_id) {
-      alert(`❌ Esta cotação não pode ser excluída pois originou o contrato ${cot.contrato_id}.\n\nExclua ou desvincule o contrato primeiro.`)
+      toast.error(`Esta cotação não pode ser excluída pois originou o contrato ${cot.contrato_id}. Exclua ou desvincule o contrato primeiro.`)
       return
     }
     if (cot.status === 'convertida') {
-      alert('❌ Cotações convertidas em contrato não podem ser excluídas.')
+      toast.error('Cotações convertidas em contrato não podem ser excluídas.')
       return
     }
     if (!confirm(`Excluir a cotação ${cot.numero}?\n\nEsta ação não pode ser desfeita.`)) return
@@ -262,7 +263,7 @@ export default function CotacaoDetalhePage() {
     const { error } = await supabase.from('cotacoes').delete().eq('id', cot.id)
 
     if (error) {
-      alert('Erro ao excluir: ' + error.message)
+      toast.error(error.message, { title: 'Erro ao excluir' })
       return
     }
     router.push('/cotacoes')

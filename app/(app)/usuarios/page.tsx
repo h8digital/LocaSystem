@@ -2,7 +2,7 @@
 'use client'
 import { useEffect, useState } from 'react'
 import { supabase, fmt } from '@/lib/supabase'
-import { SlidePanel, PageHeader, DataTable, Filters, Badge, ActionButtons, Btn, FormField, inputCls } from '@/components/ui'
+import { SlidePanel, PageHeader, DataTable, Filters, Badge, ActionButtons, Btn, FormField, inputCls, useToast } from '@/components/ui'
 import type { AcaoSecundaria } from '@/components/ui/ActionButtons'
 import { formatarPhone } from '@/lib/validators'
 
@@ -84,13 +84,13 @@ function PerfilSelector({ selected, onChange }: { selected: string[]; onChange: 
 
 // ─── Página principal ────────────────────────────────────────────────────────
 export default function UsuariosPage() {
+  const toast = useToast()
   const [lista,    setLista]   = useState<any[]>([])
   const [loading,  setLoading] = useState(true)
   const [filters,  setFilters] = useState<Record<string,string>>({ busca:'', perfil:'' })
   const [panel,    setPanel]   = useState(false)
   const [editId,   setEditId]  = useState<number|null>(null)
   const [saving,   setSaving]  = useState(false)
-  const [erro,     setErro]    = useState('')
 
   const [form, setForm] = useState<any>({
     nome:'', email:'', perfis:['operador'], comissao_percentual:0,
@@ -112,7 +112,6 @@ export default function UsuariosPage() {
   useEffect(() => { load() }, [filters])
 
   function abrir(u?: any) {
-    setErro('')
     if (u) {
       setForm({ ...u, perfis: parsePerfis(u.perfil), senha: '' })
     } else {
@@ -123,12 +122,12 @@ export default function UsuariosPage() {
   }
 
   async function salvar() {
-    if (!form.nome)            { setErro('Nome é obrigatório.'); return }
-    if (!form.email)           { setErro('E-mail é obrigatório.'); return }
-    if (form.perfis.length===0){ setErro('Selecione pelo menos um perfil.'); return }
-    if (!editId && !form.senha){ setErro('Senha obrigatória para novo usuário.'); return }
-    if (form.senha && form.senha.length < 6) { setErro('A senha deve ter no mínimo 6 caracteres.'); return }
-    setSaving(true); setErro('')
+    if (!form.nome)            { toast.error('Nome é obrigatório.'); return }
+    if (!form.email)           { toast.error('E-mail é obrigatório.'); return }
+    if (form.perfis.length===0){ toast.error('Selecione pelo menos um perfil.'); return }
+    if (!editId && !form.senha){ toast.error('Senha obrigatória para novo usuário.'); return }
+    if (form.senha && form.senha.length < 6) { toast.error('A senha deve ter no mínimo 6 caracteres.'); return }
+    setSaving(true)
 
     const payload: any = {
       nome:               form.nome,
@@ -156,7 +155,7 @@ export default function UsuariosPage() {
     const { error } = editId
       ? await supabase.from('usuarios').update(payload).eq('id', editId)
       : await supabase.from('usuarios').insert(payload)
-    if (error) { setErro('Erro: ' + error.message); setSaving(false); return }
+    if (error) { toast.error(error.message); setSaving(false); return }
     setSaving(false); setPanel(false); load()
   }
 
@@ -245,7 +244,6 @@ export default function UsuariosPage() {
           </div>
         }
       >
-        {erro && <div className="ds-alert-error" style={{ marginBottom:14 }}>{erro}</div>}
         <div style={{display:"flex",flexDirection:"column",gap:16}}>
 
           <FormField label="Nome Completo" required>

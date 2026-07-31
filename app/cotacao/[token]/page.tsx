@@ -3,8 +3,10 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { fmt } from '@/lib/supabase'
+import { useToast } from '@/components/ui'
 
 export default function CotacaoPublicaPage() {
+  const toast       = useToast()
   const params      = useParams() as { token: string }
   const [cot, setCot]     = useState<any>(null)
   const [loading, setLoading] = useState(true)
@@ -33,7 +35,7 @@ export default function CotacaoPublicaPage() {
 
   async function responder() {
     if (!acao) return
-    if (acao === 'recusar' && !motivo.trim()) { alert('Informe o motivo da recusa.'); return }
+    if (acao === 'recusar' && !motivo.trim()) { toast.error('Informe o motivo da recusa.'); return }
     setEnviando(true)
     const r = await fetch('/api/cotacoes/aprovar', {
       method: 'POST',

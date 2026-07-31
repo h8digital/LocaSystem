@@ -3,7 +3,7 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { supabase, fmt } from '@/lib/supabase'
-import { Btn, Badge, inputCls } from '@/components/ui'
+import { Btn, Badge, inputCls, useToast } from '@/components/ui'
 import { calcularPrecoItem, calcularDias, type PrecosProduto } from '@/lib/calcularCobranca'
 
 // ── Tipos ────────────────────────────────────────────────────────────────────
@@ -23,6 +23,7 @@ const STATUS_LABEL: Record<string, string> = {
 }
 
 export default function EquipamentoDetalhe() {
+  const toast   = useToast()
   const { id } = useParams<{ id: string }>()
   const router  = useRouter()
 
@@ -33,7 +34,6 @@ export default function EquipamentoDetalhe() {
   const [acessorios, setAcessorios] = useState<any[]>([])
   const [formAcess,  setFormAcess]  = useState({ nome:'', descricao:'', quantidade:1, obrigatorio:true })
   const [salvandoAcc,setSalvandoAcc]= useState(false)
-  const [erroAcc,    setErroAcc]    = useState('')
 
   // ── Campos de publicação no site ────────────────────────────────────────────
   const [siteData, setSiteData] = useState({
@@ -47,8 +47,6 @@ export default function EquipamentoDetalhe() {
     ordem_site:      0,
   })
   const [salvandoSite, setSalvandoSite] = useState(false)
-  const [erroSite,     setErroSite]     = useState('')
-  const [okSite,       setOkSite]       = useState(false)
 
   // ── Fotos (agora dentro da aba Internet) ─────────────────────────────────
   const [fotos,      setFotos]      = useState<any[]>([])
@@ -158,7 +156,7 @@ export default function EquipamentoDetalhe() {
     const path = `produtos/${id}/${Date.now()}.${ext}`
     const { error: upErr } = await supabase.storage
       .from('produto-fotos').upload(path, file, { upsert: false })
-    if (upErr) { alert('Erro no upload: ' + upErr.message); setUploadando(false); return }
+    if (upErr) { toast.error(upErr.message, { title: 'Erro no upload' }); setUploadando(false); return }
     const { data: { publicUrl } } = supabase.storage.from('produto-fotos').getPublicUrl(path)
     const isPrimeira = fotos.length === 0
     await supabase.from('produto_fotos').insert({
@@ -221,7 +219,7 @@ export default function EquipamentoDetalhe() {
   }
 
   async function salvarSite() {
-    setSalvandoSite(true); setErroSite(''); setOkSite(false)
+    setSalvandoSite(true)
     let slug = siteData.slug.trim()
     if (!slug && siteData.titulo_site.trim()) {
       slug = siteData.titulo_site.trim()
@@ -238,7 +236,7 @@ export default function EquipamentoDetalhe() {
         .eq('destaque_home', true)
         .neq('id', Number(id))
       if ((count ?? 0) >= 10) {
-        setErroSite('Limite atingido: o site suporta no máximo 10 equipamentos em destaque. Remova um destaque antes de adicionar outro.')
+        toast.error('Limite atingido: o site suporta no máximo 10 equipamentos em destaque. Remova um destaque antes de adicionar outro.')
         setSalvandoSite(false)
         return
       }
@@ -254,11 +252,10 @@ export default function EquipamentoDetalhe() {
       seo_description: siteData.seo_description.trim() || null,
       ordem_site:      Number(siteData.ordem_site) || 0,
     }).eq('id', Number(id))
-    if (error) { setErroSite(error.message); setSalvandoSite(false); return }
+    if (error) { toast.error(error.message); setSalvandoSite(false); return }
     if (slug) setSiteData(s => ({ ...s, slug }))
-    setOkSite(true)
     setSalvandoSite(false)
-    setTimeout(() => setOkSite(false), 3000)
+    toast.success('Configurações do site salvas com sucesso!')
   }
 
 
@@ -679,7 +676,6 @@ export default function EquipamentoDetalhe() {
             <div style={{ fontWeight:600, marginBottom:12, color:'var(--t-secondary)' }}>
               + Adicionar Acessório
             </div>
-            {erroAcc && <div className="ds-alert-error" style={{marginBottom:10}}>{erroAcc}</div>}
             <div style={{ display:'grid', gridTemplateColumns:'1fr 120px 120px auto', gap:8, alignItems:'end' }}>
               <div>
                 <div className="ds-label">Nome do acessório *</div>
@@ -702,8 +698,8 @@ export default function EquipamentoDetalhe() {
               </div>
               <button
                 onClick={async()=>{
-                  if(!formAcess.nome.trim()){setErroAcc('Informe o nome.');return}
-                  setSalvandoAcc(true);setErroAcc('')
+                  if(!formAcess.nome.trim()){toast.error('Informe o nome.');return}
+                  setSalvandoAcc(true)
                   const{error}=await supabase.from('produto_acessorios').insert({
                     produto_id:  Number(id),
                     nome:        formAcess.nome.trim(),
@@ -711,7 +707,7 @@ export default function EquipamentoDetalhe() {
                     obrigatorio: formAcess.obrigatorio,
                     ativo:       1,
                   })
-                  if(error){setErroAcc(error.message);setSalvandoAcc(false);return}
+                  if(error){toast.error(error.message);setSalvandoAcc(false);return}
                   setFormAcess({nome:'',descricao:'',quantidade:1,obrigatorio:true})
                   const{data}=await supabase.from('produto_acessorios')
                     .select('*').eq('produto_id',Number(id)).eq('ativo',1).order('id')
@@ -1004,12 +1000,6 @@ export default function EquipamentoDetalhe() {
           </div>
 
           {/* Salvar */}
-          {erroSite && <div className="ds-alert-error">{erroSite}</div>}
-          {okSite && (
-            <div style={{ background:'rgba(52,211,153,0.1)', border:'1px solid rgba(52,211,153,0.3)', borderRadius:'var(--r-md)', padding:'10px 16px', fontSize:'var(--fs-md)', color:'#34d399' }}>
-              ✅ Configurações do site salvas com sucesso!
-            </div>
-          )}
           <div style={{ display:'flex', justifyContent:'flex-end' }}>
             <button onClick={salvarSite} disabled={salvandoSite}
               style={{ padding:'10px 28px', borderRadius:'var(--r-md)', border:'none',

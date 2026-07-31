@@ -21,3 +21,5 @@ export const textareaCls = 'ds-textarea'
 export { default as PageShell } from './PageShell'
 
 export { default as Modal } from './Modal'
+export { ToastProvider, useToast } from './Toast'
+export type { ToastType } from './Toast'
