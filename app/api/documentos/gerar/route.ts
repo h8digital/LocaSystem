@@ -280,6 +280,7 @@ export async function POST(req: NextRequest) {
     '{{subtotal_sem_limpeza}}':            fmt_money(subtotal + totalAcessorios),
     '{{tem_limpeza}}':                     totalLimpeza > 0 ? '1' : '0',
     '{{desconto}}':                        fmt_money(contrato.desconto),
+    '{{acrescimo}}':                       fmt_money(contrato.acrescimo ?? 0),
     '{{frete}}':                           fmt_money(contrato.frete ?? 0),
     '{{total_geral}}':                     fmt_money(totalGeral),
     '{{multa_diaria}}':                    fmt_money(multaDiaria),
@@ -293,6 +294,7 @@ export async function POST(req: NextRequest) {
     '{{contrato_total}}':                  fmt_money(totalGeral),
     '{{contrato_subtotal}}':               fmt_money(subtotal + totalAcessorios),
     '{{contrato_desconto}}':               fmt_money(contrato.desconto),
+    '{{contrato_acrescimo}}':              fmt_money(contrato.acrescimo ?? 0),
     '{{contrato_frete}}':                  fmt_money(contrato.frete ?? 0),
     '{{contrato_forma_pagamento}}':        (contrato.forma_pagamento ?? '').replace(/_/g,' ').replace(/\b\w/g,(cc:string)=>cc.toUpperCase()),
     '{{contrato_observacoes}}':            contrato.observacoes ?? '',
@@ -314,6 +316,7 @@ export async function POST(req: NextRequest) {
   html = processarBlocos(html, {
     tem_acessorios:        temAcessorios,
     tem_desconto:          Number(contrato.desconto) > 0,
+    tem_acrescimo:         Number(contrato.acrescimo ?? 0) > 0,
     tem_frete:             Number(contrato.frete ?? 0) > 0,
     contrato_observacoes:  !!(contrato.observacoes?.trim()),
     contrato_observacoes2: !!(contrato.observacoes2?.trim()),
