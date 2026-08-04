@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
 import { cookies } from 'next/headers'
 import { geocodeEndereco } from '@/lib/geocode'
+import { calcularHoraEntrega } from '@/lib/horaEntrega'
 export const runtime = 'nodejs'
 
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!)
@@ -43,6 +44,7 @@ export async function POST(req: NextRequest) {
       periodo_id:           contrato.periodo_id || null,
       data_inicio:          contrato.data_inicio,
       data_fim:             contrato.data_fim || null,
+      hora_entrega:         calcularHoraEntrega(),
       forma_pagamento:      contrato.forma_pagamento || 'pix',
       caucao:               Number(contrato.caucao) || 0,
       subtotal:             Number(subtotal) || 0,

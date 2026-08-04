@@ -897,8 +897,9 @@ export default function VerContratoPage() {
                 <div className="form-grid-2" style={{gap:14}}>
                   <Campo label="Cliente"            value={contrato.clientes?.nome}/>
                   <Campo label="Vendedor"           value={(contrato.usuarios as any)?.nome}/>
+                  <Campo label="Locado em"           value={contrato.created_at ? `${new Date(contrato.created_at).toLocaleDateString('pt-BR')} ${new Date(contrato.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}` : '—'}/>
                   <Campo label="Forma de Pagamento" value={(contrato.forma_pagamento??'').replace(/_/g,' ').replace(/\w/g,(ch:string)=>ch.toUpperCase())}/>
-                  <Campo label="Início"             value={fmt.date(contrato.data_inicio)}/>
+                  <Campo label="Início"             value={`${fmt.date(contrato.data_inicio)} — Entrega até ${contrato.hora_entrega || '12:00'}`}/>
                   <div style={{display:'flex',flexDirection:'column',gap:3}}>
                     <span style={{fontSize:'var(--fs-xs)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em',
                       color: contrato.status==='ativo'&&contrato.data_fim<new Date().toISOString().split('T')[0] ? 'var(--c-danger)' : 'var(--t-muted)'

@@ -9,9 +9,13 @@ export interface ChangelogVersao {
   itens:  { tipo: ChangelogTipo; texto: string }[]
 }
 
-export const APP_VERSION = '1.7.0'
+export const APP_VERSION = '1.8.0'
 
 export const CHANGELOG: ChangelogVersao[] = [
+  { versao: '1.8.0', data: '2026-08-04', itens: [
+    { tipo: 'feat', texto: 'Ordem de Locação impressa agora mostra a data/hora em que a locação foi feita e o prazo de entrega do equipamento (até 12:00 ou até 18:00, conforme o horário do pedido)' },
+    { tipo: 'feat', texto: 'Tela do contrato e listagem de contratos passam a exibir o horário de entrega previsto do equipamento' },
+  ]},
   { versao: '1.7.0', data: '2026-07-31', itens: [
     { tipo: 'feat', texto: 'Notificações do sistema agora aparecem em um card no canto superior direito (estilo macOS), no lugar dos alertas do navegador' },
     { tipo: 'fix',  texto: 'CNPJ da empresa não ficava salvo em Parâmetros e por isso sumia da promissória e do comprovante de locação' },

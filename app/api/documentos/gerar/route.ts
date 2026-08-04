@@ -17,6 +17,11 @@ function fmt_date(d: string | null | undefined): string {
   if (!d) return '—'
   return new Date(d + 'T12:00:00').toLocaleDateString('pt-BR')
 }
+function fmt_datetime(d: string | null | undefined): string {
+  if (!d) return '—'
+  const dt = new Date(d)
+  return `${dt.toLocaleDateString('pt-BR')} ${dt.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+}
 function valor_extenso(valor: number): string {
   // Extenso simplificado para nota promissória (até 999.999,99)
   const partes: Record<number,string> = {
@@ -271,8 +276,11 @@ export async function POST(req: NextRequest) {
     '{{cliente_estado}}':                  endSrc?.estado ?? '',
     '{{contrato_numero}}':                 String(contrato.numero ?? ''),
     '{{data_emissao}}':                    new Date().toLocaleDateString('pt-BR'),
+    '{{data_hora_locacao}}':               fmt_datetime(contrato.created_at),
     '{{data_inicio}}':                     fmt_date(contrato.data_inicio),
     '{{data_fim}}':                        fmt_date(contrato.data_fim),
+    '{{hora_entrega}}':                    contrato.hora_entrega || '12:00',
+    '{{data_entrega}}':                    `${fmt_date(contrato.data_inicio)} às ${contrato.hora_entrega || '12:00'}`,
     '{{dias_totais}}':                     String(dias),
     '{{local_uso}}':                       localUso,
     '{{subtotal}}':                        fmt_money(subtotal + totalAcessorios),

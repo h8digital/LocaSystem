@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import { supabase, fmt } from '@/lib/supabase'
 import { carregarFeriados, carregarAjusteDiaUtilAtivo, postergarParaDiaUtil } from '@/lib/diasUteis'
+import { calcularHoraEntrega } from '@/lib/horaEntrega'
 import { useRouter } from 'next/navigation'
 import { LookupField, FormField, inputCls, selectCls, textareaCls, Btn, useToast } from '@/components/ui'
 import QuickCreateCliente from '@/components/quick-create/QuickCreateCliente'
@@ -223,6 +224,7 @@ export default function CriarCotacaoPage(){
         cliente_id:clienteId,usuario_id:user.id,periodo_id:periodoId||null,
         status:statusSalvar,data_emissao:new Date().toISOString().slice(0,10),
         data_validade:dataValidade,data_inicio:dataInicio||null,data_fim:dataFim||null,
+        hora_entrega:calcularHoraEntrega(),
         subtotal:Number(subtotal.toFixed(2)),desconto:Number(desconto),desconto_pct:Number(descontoPct),
         acrescimo:Number(acrescimo),total:Number(totalFinal.toFixed(2)),
         forma_pagamento:formaPgto||null,condicao_pagamento:condicaoPgto||null,

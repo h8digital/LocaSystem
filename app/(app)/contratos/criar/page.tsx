@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { calcularPrecoItem, calcularDias, type PrecosProduto } from '@/lib/calcularCobranca'
 import { supabase, fmt } from '@/lib/supabase'
 import { carregarFeriados, carregarAjusteDiaUtilAtivo, postergarParaDiaUtil } from '@/lib/diasUteis'
+import { calcularHoraEntrega } from '@/lib/horaEntrega'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { FormField, inputCls, selectCls, textareaCls, Btn, LookupField, useToast } from '@/components/ui'
 import { QuickCreateCliente, QuickCreateProduto } from '@/components/quick-create'
@@ -980,6 +981,7 @@ export default function CriarContratoPage() {
               {[
                 { l:'Cliente',    v: clienteNome },
                 { l:'Período',    v: `${fmt.date(form.data_inicio)} → ${fmt.date(form.data_fim)} (${dias}d)` },
+                { l:'Horário de entrega', v: `Até ${calcularHoraEntrega()} (equipamento deve ser entregue neste horário)` },
                 { l:'Pagamento',  v: form.forma_pagamento.replace(/_/g,' ').replace(/\b\w/g,(c:string)=>c.toUpperCase()) },
                 { l:'Local de uso', v: enderecoUsoLabel || 'Não informado' },
                 { l:'Itens',      v: `${itens.length} equipamento(s)` },

@@ -60,6 +60,9 @@ const TAGS = [
   {grupo:'📅 Datas', tags:[
     {tag:'{{data_geracao}}',desc:'Data atual'},
     {tag:'{{hora_geracao}}',desc:'Hora atual'},
+    {tag:'{{data_hora_locacao}}',desc:'Data e hora em que a locação foi registrada'},
+    {tag:'{{data_entrega}}',desc:'Data de entrega do equipamento + horário limite (12:00/18:00)'},
+    {tag:'{{hora_entrega}}',desc:'Horário limite de entrega (12:00 ou 18:00)'},
   ]},
   {grupo:'📝 Nota Promissória', tags:[
     {tag:'{{promissoria_itens}}',       desc:'Tabela de itens com custo de reposição (HTML)'},
