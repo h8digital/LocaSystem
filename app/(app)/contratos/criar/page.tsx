@@ -981,7 +981,7 @@ export default function CriarContratoPage() {
               {[
                 { l:'Cliente',    v: clienteNome },
                 { l:'Período',    v: `${fmt.date(form.data_inicio)} → ${fmt.date(form.data_fim)} (${dias}d)` },
-                { l:'Horário de entrega', v: `Até ${calcularHoraEntrega()} (equipamento deve ser entregue neste horário)` },
+                { l:'Horário de devolução', v: `Até ${calcularHoraEntrega()} na data de término (conforme horário de retirada)` },
                 { l:'Pagamento',  v: form.forma_pagamento.replace(/_/g,' ').replace(/\b\w/g,(c:string)=>c.toUpperCase()) },
                 { l:'Local de uso', v: enderecoUsoLabel || 'Não informado' },
                 { l:'Itens',      v: `${itens.length} equipamento(s)` },

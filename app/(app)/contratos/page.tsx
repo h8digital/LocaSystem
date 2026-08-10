@@ -325,10 +325,10 @@ export default function ContratosPage() {
               {(r.usuarios as any)?.nome ?? '—'}
             </span>
           )},
-          { key:'data_inicio', label:'Início', render: r => (
-            <span>{fmt.date(r.data_inicio)} <span style={{color:'var(--t-muted)',fontSize:'var(--fs-xs)'}}>({r.hora_entrega || '12:00'})</span></span>
+          { key:'data_inicio', label:'Início', render: r => fmt.date(r.data_inicio) },
+          { key:'data_fim',    label:'Fim',    render: r => (
+            <span>{fmt.date(r.data_fim)} <span style={{color:'var(--t-muted)',fontSize:'var(--fs-xs)'}}>({r.hora_entrega || '12:00'})</span></span>
           ) },
-          { key:'data_fim',    label:'Fim',    render: r => fmt.date(r.data_fim) },
           { key:'total',  label:'Total',  align:'right', render: r => (
             <span style={{ fontWeight:700 }}>{fmt.money(r.total)}</span>
           )},

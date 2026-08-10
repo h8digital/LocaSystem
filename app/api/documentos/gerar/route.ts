@@ -280,7 +280,7 @@ export async function POST(req: NextRequest) {
     '{{data_inicio}}':                     fmt_date(contrato.data_inicio),
     '{{data_fim}}':                        fmt_date(contrato.data_fim),
     '{{hora_entrega}}':                    contrato.hora_entrega || '12:00',
-    '{{data_entrega}}':                    `${fmt_date(contrato.data_inicio)} às ${contrato.hora_entrega || '12:00'}`,
+    '{{data_entrega}}':                    `${fmt_date(contrato.data_fim)} às ${contrato.hora_entrega || '12:00'}`,
     '{{dias_totais}}':                     String(dias),
     '{{local_uso}}':                       localUso,
     '{{subtotal}}':                        fmt_money(subtotal + totalAcessorios),

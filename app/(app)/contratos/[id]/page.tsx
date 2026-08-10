@@ -899,14 +899,14 @@ export default function VerContratoPage() {
                   <Campo label="Vendedor"           value={(contrato.usuarios as any)?.nome}/>
                   <Campo label="Locado em"           value={contrato.created_at ? `${new Date(contrato.created_at).toLocaleDateString('pt-BR')} ${new Date(contrato.created_at).toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'})}` : '—'}/>
                   <Campo label="Forma de Pagamento" value={(contrato.forma_pagamento??'').replace(/_/g,' ').replace(/\w/g,(ch:string)=>ch.toUpperCase())}/>
-                  <Campo label="Início"             value={`${fmt.date(contrato.data_inicio)} — Entrega até ${contrato.hora_entrega || '12:00'}`}/>
+                  <Campo label="Início"             value={fmt.date(contrato.data_inicio)}/>
                   <div style={{display:'flex',flexDirection:'column',gap:3}}>
                     <span style={{fontSize:'var(--fs-xs)',fontWeight:700,textTransform:'uppercase',letterSpacing:'0.04em',
                       color: contrato.status==='ativo'&&contrato.data_fim<new Date().toISOString().split('T')[0] ? 'var(--c-danger)' : 'var(--t-muted)'
                     }}>Fim Previsto {contrato.status==='ativo'&&contrato.data_fim<new Date().toISOString().split('T')[0]?'⚠':''}</span>
                     <span style={{fontSize:'var(--fs-base)',fontWeight:600,
                       color: contrato.status==='ativo'&&contrato.data_fim<new Date().toISOString().split('T')[0] ? 'var(--c-danger)' : 'var(--t-primary)'
-                    }}>{fmt.date(contrato.data_fim)}</span>
+                    }}>{fmt.date(contrato.data_fim)} — Devolução até {contrato.hora_entrega || '12:00'}</span>
                   </div>
                   <Campo label="Período de Locação" value={(contrato as any).periodos_locacao?.nome?`${(contrato as any).periodos_locacao.nome} (${(contrato as any).periodos_locacao.dias}d)`:'—'}/>
                   {contrato.data_devolucao_real&&<Campo label="Devolução Real" value={fmt.date(contrato.data_devolucao_real)}/>}
